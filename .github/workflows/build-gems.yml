@@ -4,23 +4,9 @@ on:
   workflow_dispatch:
   release:
     types: [published]
-
   push:
     branches: [main]
-    paths:
-      - "lib/**"
-      - "Gemfile"
-      - "Gemfile.lock"
-      - "Rakefile"
-      - ".ruby-version"
-
   pull_request:
-    paths:
-      - "lib/**"
-      - "Gemfile"
-      - "Gemfile.lock"
-      - "Rakefile"
-      - ".ruby-version"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,7 +17,45 @@ permissions:
 
 jobs:
   build:
-    name: Build gem
+    name: Build ${{ matrix.platform }} gem
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: arm64-darwin, os: macos-latest }
+          - { platform: x86_64-darwin, os: macos-13 }
+          - { platform: aarch64-linux, os: ubuntu-latest }
+          - { platform: x86_64-linux, os: ubuntu-latest }
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Cross-compile and package gem
+        run: bundle exec rake cross_compile[${{ matrix.platform }}] gem[${{ matrix.platform }}]
+
+      - name: Upload gem artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gem-${{ matrix.platform }}
+          path: pkg/*.gem
+          if-no-files-found: error
+          retention-days: 7
+
+  build-ruby:
+    name: Build Ruby (fallback) gem
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -46,22 +70,21 @@ jobs:
       - name: Run tests
         run: bundle exec rake test
 
-      - name: Build gem
-        run: bundle exec rake build
+      - name: Build fallback gem
+        run: bundle exec rake gem:ruby
 
-      - name: Upload gem artifacts
-        if: github.event_name == 'release'
+      - name: Upload gem artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gem
+          name: gem-ruby
           path: pkg/*.gem
           if-no-files-found: error
           retention-days: 7
 
   push:
-    name: Push gem with trusted publishing
+    name: Push gems with trusted publishing
     if: github.event_name == 'release' && github.repository_owner == 'marcoroth'
-    needs: build
+    needs: [build, build-ruby]
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
@@ -72,7 +95,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Vendor the attestation patch from rubygems/release-gem
       - name: Vendor release-gem patch
         uses: actions/checkout@v4
         with:
@@ -95,7 +117,7 @@ jobs:
       - name: Configure trusted publishing credentials
         uses: rubygems/configure-rubygems-credentials@v1.0.0
 
-      - name: Push gem with Sigstore attestation
+      - name: Push gems with Sigstore attestation
         env:
           RUBYOPT: "-r${{ github.workspace }}/.github/_release-gem/rubygems-attestation-patch.rb"
         run: |

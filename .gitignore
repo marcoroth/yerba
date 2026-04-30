@@ -6,6 +6,12 @@
 # Rust
 /rust/target/
 
+# Platform-specific binaries
+/exe/arm64-darwin/
+/exe/x86_64-darwin/
+/exe/aarch64-linux/
+/exe/x86_64-linux/
+
 # Build artifacts
 *.o
 *.so

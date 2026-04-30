@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../lib/yerba"
+require "yerba"
 
-puts "yerba v#{Yerba::VERSION}"
+exec(Yerba.executable, *ARGV)

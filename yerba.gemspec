@@ -23,15 +23,17 @@ Gem::Specification.new do |spec|
   spec.files = Dir[
     "yerba.gemspec",
     "LICENSE.txt",
-    "Rakefile",
     "README.md",
     "lib/**/*.rb",
     "sig/**/*.rbs",
-    "exe/*"
+    "exe/yerba",
+    "rust/Cargo.toml",
+    "rust/Cargo.lock",
+    "rust/src/**/*.rs"
   ]
 
   spec.bindir = "exe"
-  spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
+  spec.executables = ["yerba"]
 
   spec.metadata["allowed_push_host"] = "https://rubygems.org"
   spec.metadata["rubygems_mfa_required"] = "true"

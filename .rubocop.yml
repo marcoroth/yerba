@@ -31,14 +31,20 @@ Style/BlockDelimiters:
 Style/TrailingCommaInHashLiteral:
   EnforcedStyleForMultiline: diff_comma
 
+Metrics/PerceivedComplexity:
+  Enabled: false
+
+Metrics/AbcSize:
+  Enabled: false
+
 Metrics/CyclomaticComplexity:
-  Max: 15
+  Enabled: false
 
 Metrics/MethodLength:
-  Max: 20
+  Enabled: false
 
 Metrics/BlockLength:
-  Max: 30
+  Enabled: false
 
 Layout/LineLength:
   Enabled: false

@@ -1,0 +1,23 @@
+[package]
+name = "yerba"
+version = "0.0.1"
+edition = "2021"
+authors = ["Marco Roth <marco.roth@intergga.ch>"]
+description = "YAML Editing and Refactoring with Better Accuracy"
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/marcoroth/yerba"
+keywords = ["yaml", "editing", "refactoring", "lossless", "cli"]
+categories = ["parser-implementations", "development-tools"]
+
+[lib]
+name = "yerba"
+path = "src/lib.rs"
+
+[[bin]]
+name = "yerba"
+path = "src/main.rs"
+
+[dependencies]
+
+[dev-dependencies]

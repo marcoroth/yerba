@@ -1,0 +1,19 @@
+/.bundle/
+/tmp/
+/pkg/
+/vendor/bundle/
+
+# Rust
+/rust/target/
+
+# Build artifacts
+*.o
+*.so
+*.dylib
+*.bundle
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

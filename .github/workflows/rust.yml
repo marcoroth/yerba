@@ -53,19 +53,19 @@ jobs:
         working-directory: rust
 
       - name: Clippy
-        run: cargo clippy -- -D warnings
+        run: cargo +stable clippy -- -D warnings
         working-directory: rust
 
       - name: Build
-        run: cargo build
+        run: cargo +stable build
         working-directory: rust
 
       - name: Run tests
-        run: cargo test
+        run: cargo +stable test
         working-directory: rust
 
       - name: Test cargo package
-        run: cargo package
+        run: cargo +stable package
         working-directory: rust
 
       - name: Upload Rust artifacts

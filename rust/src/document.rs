@@ -16,6 +16,13 @@ use crate::syntax::{
 };
 
 #[derive(Debug)]
+pub struct FindResult {
+  pub text: String,
+  pub line: usize,
+  pub end_line: usize,
+}
+
+#[derive(Debug)]
 pub struct Document {
   root: SyntaxNode,
   path: Option<PathBuf>,
@@ -44,7 +51,7 @@ impl Document {
   }
 
   pub fn get(&self, dot_path: &str) -> Option<String> {
-    if dot_path.contains("[]") {
+    if dot_path.contains('[') {
       return self.get_all(dot_path).into_iter().next();
     }
 
@@ -62,14 +69,42 @@ impl Document {
       .collect()
   }
 
+  pub fn find_items(&self, dot_path: &str, condition: &str) -> Vec<FindResult> {
+    let source = self.root.text().to_string();
     let nodes = self.navigate_to_many(dot_path);
 
     nodes
       .iter()
-      .filter(|node| {
-        self.evaluate_condition_on_node(node, condition)
+      .filter(|node| self.evaluate_condition_on_node(node, condition))
+      .map(|node| {
+        let start_offset: usize = node.text_range().start().into();
+        let end_offset: usize = node.text_range().end().into();
+
+        FindResult {
+          text: node.text().to_string(),
+          line: byte_offset_to_line(&source, start_offset),
+          end_line: byte_offset_to_line(&source, end_offset),
+        }
       })
-      .map(|node| node.text().to_string())
+      .collect()
+  }
+
+  pub fn find_all(&self, dot_path: &str) -> Vec<FindResult> {
+    let source = self.root.text().to_string();
+
+    self
+      .navigate_to_many(dot_path)
+      .iter()
+      .map(|node| {
+        let start_offset: usize = node.text_range().start().into();
+        let end_offset: usize = node.text_range().end().into();
+
+        FindResult {
+          text: node.text().to_string(),
+          line: byte_offset_to_line(&source, start_offset),
+          end_line: byte_offset_to_line(&source, end_offset),
+        }
+      })
       .collect()
   }
 
@@ -137,7 +172,7 @@ impl Document {
   }
 
   pub fn exists(&self, dot_path: &str) -> bool {
-    if dot_path.contains("[]") {
+    if dot_path.contains('[') {
       return !self.navigate_to_many(dot_path).is_empty();
     }
 
@@ -162,6 +197,7 @@ impl Document {
       left.to_string()
     };
 
+    let has_brackets = full_path.contains('[');
 
     match operator {
       "==" => {
@@ -905,29 +941,22 @@ impl Document {
 
     let mut current_nodes = vec![document.syntax().clone()];
 
+    if segments.is_empty() {
+      if let Some(sequence) = document.syntax().descendants().find_map(BlockSeq::cast) {
+        current_nodes = sequence
+          .entries()
+          .map(|entry| entry.syntax().clone())
+          .collect();
+      }
+
+      return current_nodes;
+    }
+
     for segment in &segments {
       let mut next_nodes = Vec::new();
 
       for node in &current_nodes {
-        match *segment {
-          "[]" => {
-            if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
-              for entry in sequence.entries() {
-                next_nodes.push(entry.syntax().clone());
-              }
-            }
-          }
-
-          key => {
-            if let Some(map) = node.descendants().find_map(BlockMap::cast) {
-              if let Some(entry) = find_entry_by_key(&map, key) {
-                if let Some(value) = entry.value() {
-                  next_nodes.push(value.syntax().clone());
-                }
-              }
-            }
-          }
-        }
+        next_nodes.extend(resolve_segment(node, segment));
       }
 
       current_nodes = next_nodes;
@@ -1096,16 +1125,21 @@ fn parse_path_segments(path: &str) -> Vec<&str> {
   let mut rest = path;
 
   while !rest.is_empty() {
-    if rest.starts_with("[]") {
-      segments.push("[]");
-      rest = &rest[2..];
+    if rest.starts_with('[') {
+      if let Some(close) = rest.find(']') {
+        segments.push(&rest[..close + 1]);
+        rest = &rest[close + 1..];
 
-      if rest.starts_with('.') {
-        rest = &rest[1..];
+        if rest.starts_with('.') {
+          rest = &rest[1..];
+        }
+      } else {
+        segments.push(rest);
+        break;
       }
     } else {
       let dot_index = rest.find('.');
-      let bracket_index = rest.find("[]");
+      let bracket_index = rest.find('[');
 
       let split_at = match (dot_index, bracket_index) {
         (Some(dot), Some(bracket)) => Some(dot.min(bracket)),
@@ -1140,6 +1174,48 @@ fn parse_path_segments(path: &str) -> Vec<&str> {
   segments
 }
 
+fn parse_bracket_index(segment: &str) -> Option<usize> {
+  if segment == "[]" {
+    return None;
+  }
+
+  segment
+    .strip_prefix('[')
+    .and_then(|rest| rest.strip_suffix(']'))
+    .and_then(|inner| inner.parse::<usize>().ok())
+}
+
+fn resolve_segment(node: &SyntaxNode, segment: &str) -> Vec<SyntaxNode> {
+  if segment.starts_with('[') {
+    if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+      match parse_bracket_index(segment) {
+        None => sequence
+          .entries()
+          .map(|entry| entry.syntax().clone())
+          .collect(),
+
+        Some(index) => sequence
+          .entries()
+          .nth(index)
+          .map(|entry| vec![entry.syntax().clone()])
+          .unwrap_or_default(),
+      }
+    } else {
+      Vec::new()
+    }
+  } else {
+    if let Some(map) = node.descendants().find_map(BlockMap::cast) {
+      if let Some(entry) = find_entry_by_key(&map, segment) {
+        if let Some(value) = entry.value() {
+          return vec![value.syntax().clone()];
+        }
+      }
+    }
+
+    Vec::new()
+  }
+}
+
 fn navigate_from_node(node: &SyntaxNode, path: &str) -> Vec<SyntaxNode> {
   let segments = parse_path_segments(path);
   let mut current_nodes = vec![node.clone()];
@@ -1148,24 +1224,7 @@ fn navigate_from_node(node: &SyntaxNode, path: &str) -> Vec<SyntaxNode> {
     let mut next_nodes = Vec::new();
 
     for current in &current_nodes {
-      match *segment {
-        "[]" => {
-          if let Some(sequence) = current.descendants().find_map(BlockSeq::cast) {
-            for entry in sequence.entries() {
-              next_nodes.push(entry.syntax().clone());
-            }
-          }
-        }
-        key => {
-          if let Some(map) = current.descendants().find_map(BlockMap::cast) {
-            if let Some(entry) = find_entry_by_key(&map, key) {
-              if let Some(value) = entry.value() {
-                next_nodes.push(value.syntax().clone());
-              }
-            }
-          }
-        }
-      }
+      next_nodes.extend(resolve_segment(current, segment));
     }
 
     current_nodes = next_nodes;
@@ -1176,6 +1235,14 @@ fn navigate_from_node(node: &SyntaxNode, path: &str) -> Vec<SyntaxNode> {
   }
 
   current_nodes
+}
+
+fn byte_offset_to_line(source: &str, offset: usize) -> usize {
+  source[..offset.min(source.len())]
+    .chars()
+    .filter(|character| *character == '\n')
+    .count()
+    + 1
 }
 
 fn rebuild_entries<'a>(entries: impl Iterator<Item = &'a str>, indent: &str) -> String {

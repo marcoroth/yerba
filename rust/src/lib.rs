@@ -4,7 +4,7 @@ mod quote_style;
 mod syntax;
 pub mod yerbafile;
 
-pub use document::Document;
+pub use document::{Document, FindResult};
 pub use error::YerbaError;
 pub use quote_style::QuoteStyle;
 pub use yerbafile::Yerbafile;

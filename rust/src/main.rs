@@ -228,11 +228,28 @@ fn main() {
       let file_pattern = &args[2];
       let path = &args[3];
       let key_order: Vec<&str> = args[4].split(',').collect();
+      let files = resolve_files(file_pattern);
 
-      for file in resolve_files(file_pattern) {
-        let mut document = parse_file(&file);
+      let mut has_errors = false;
+
+      for file in &files {
+        let document = parse_file(file);
+
+        if let Err(error) = document.validate_sort_keys(path, &key_order) {
+          eprintln!("Error in {}: {}", file, error);
+          has_errors = true;
+        }
+      }
+
+      if has_errors {
+        process::exit(1);
+      }
+
+      for file in &files {
+        let mut document = parse_file(file);
+
         if document.sort_keys(path, &key_order).is_ok() {
-          output(&file, &document, dry_run);
+          output(file, &document, dry_run);
         }
       }
     }

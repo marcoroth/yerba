@@ -83,10 +83,54 @@ impl Yerbafile {
         }
       };
 
-      for file_path in files {
-        let file = file_path.to_string_lossy().to_string();
+      let file_strings: Vec<String> = files
+        .iter()
+        .map(|path| path.to_string_lossy().to_string())
+        .collect();
 
-        let result = self.apply_rule_to_file(rule, &file, write);
+      if let Some(sort_keys_rule) = &rule.sort_keys {
+        let key_order: Vec<&str> = sort_keys_rule
+          .order
+          .iter()
+          .map(|key| key.as_str())
+          .collect();
+
+        let mut has_validation_error = false;
+
+        for file in &file_strings {
+          let document = match Document::parse_file(file) {
+            Ok(document) => document,
+            Err(error) => {
+              results.push(RuleResult {
+                file: file.clone(),
+                changed: false,
+                error: Some(format!("{}", error)),
+              });
+
+              has_validation_error = true;
+
+              continue;
+            }
+          };
+
+          if let Err(error) = document.validate_sort_keys(&sort_keys_rule.path, &key_order) {
+            results.push(RuleResult {
+              file: file.clone(),
+              changed: false,
+              error: Some(format!("{}", error)),
+            });
+
+            has_validation_error = true;
+          }
+        }
+
+        if has_validation_error {
+          continue;
+        }
+      }
+
+      for file in &file_strings {
+        let result = self.apply_rule_to_file(rule, file, write);
         results.push(result);
       }
     }

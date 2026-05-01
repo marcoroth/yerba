@@ -51,6 +51,7 @@ pub enum YerbaError {
   PathNotFound(String),
   NotASequence(String),
   IndexOutOfBounds(usize, usize),
+  UnknownKeys(Vec<String>),
 }
 
 impl std::fmt::Display for YerbaError {
@@ -62,6 +63,20 @@ impl std::fmt::Display for YerbaError {
       YerbaError::NotASequence(path) => write!(f, "not a sequence: {}", path),
       YerbaError::IndexOutOfBounds(index, length) => {
         write!(f, "index {} out of bounds (length {})", index, length)
+      }
+      YerbaError::UnknownKeys(keys) => {
+        let suggestion = keys
+          .iter()
+          .map(|key| format!("\"{}\"", key))
+          .collect::<Vec<_>>()
+          .join(", ");
+
+        write!(
+          f,
+          "found keys not listed in sort order: {}\n\n  Add them to your sort order or Yerbafile:\n    {}\n",
+          keys.join(", "),
+          suggestion
+        )
       }
     }
   }
@@ -373,6 +388,32 @@ impl Document {
       })
       .map(|(index, _entry)| index)
       .ok_or_else(|| YerbaError::PathNotFound(format!("{} item '{}'", dot_path, reference)))
+  }
+
+  pub fn validate_sort_keys(&self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
+    let keys: Vec<&str> = dot_path.split('.').collect();
+    let current_node = self.navigate_to_path(&keys)?;
+
+    let map = current_node
+      .descendants()
+      .find_map(BlockMap::cast)
+      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+
+    let unknown_keys: Vec<String> = map
+      .entries()
+      .filter_map(|entry| {
+        entry
+          .key()
+          .and_then(|key_node| extract_scalar_text(key_node.syntax()))
+      })
+      .filter(|key_name| !key_order.contains(&key_name.as_str()))
+      .collect();
+
+    if unknown_keys.is_empty() {
+      Ok(())
+    } else {
+      Err(YerbaError::UnknownKeys(unknown_keys))
+    }
   }
 
   pub fn sort_keys(&mut self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {

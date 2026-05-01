@@ -150,3 +150,40 @@ fn test_evaluate_condition_flat_speakers_contains() {
   assert!(document.evaluate_condition("", ".speakers contains \"Marco Roth\""));
   assert!(document.evaluate_condition("", ".speakers[] contains \"Marco Roth\""));
 }
+
+#[test]
+fn test_evaluate_condition_contains_substring() {
+  let document = Document::parse("title: Ruby on Rails\n").unwrap();
+
+  assert!(document.evaluate_condition("", ".title contains Ruby"));
+  assert!(document.evaluate_condition("", ".title contains Rails"));
+  assert!(document.evaluate_condition("", ".title contains \"on\""));
+  assert!(!document.evaluate_condition("", ".title contains Python"));
+}
+
+#[test]
+fn test_evaluate_condition_not_contains_substring() {
+  let document = Document::parse("title: Ruby on Rails\n").unwrap();
+
+  assert!(document.evaluate_condition("", ".title not_contains Python"));
+  assert!(!document.evaluate_condition("", ".title not_contains Ruby"));
+}
+
+#[test]
+fn test_evaluate_condition_contains_still_works_for_arrays() {
+  let yaml = "tags:\n  - ruby\n  - rust\n";
+  let document = Document::parse(yaml).unwrap();
+
+  assert!(document.evaluate_condition("", ".tags contains ruby"));
+  assert!(!document.evaluate_condition("", ".tags contains rub"));
+}
+
+#[test]
+fn test_evaluate_condition_contains_substring_nested() {
+  let yaml = "database:\n  host: localhost\n  name: myapp_development\n";
+  let document = Document::parse(yaml).unwrap();
+
+  assert!(document.evaluate_condition("database", ".name contains development"));
+  assert!(document.evaluate_condition("database", ".name contains myapp"));
+  assert!(!document.evaluate_condition("database", ".name contains production"));
+}

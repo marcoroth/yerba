@@ -137,7 +137,10 @@ impl Document {
       "==" => values.iter().any(|value| value == &right),
       "!=" => values.iter().all(|value| value != &right),
       "contains" => {
-        if values.iter().any(|value| value == &right) {
+        if values
+          .iter()
+          .any(|value| value == &right || value.contains(&right))
+        {
           return true;
         }
 
@@ -174,7 +177,9 @@ impl Document {
           }
         }
 
-        !values.iter().any(|value| value == &right)
+        !values
+          .iter()
+          .any(|value| value == &right || value.contains(&right))
       }
       _ => false,
     }
@@ -225,18 +230,40 @@ impl Document {
       }
       "contains" => {
         if has_brackets {
-          self.get_all(&full_path).iter().any(|value| value == &right)
+          self
+            .get_all(&full_path)
+            .iter()
+            .any(|value| value == &right || value.contains(&right))
         } else {
           let items = self.get_sequence_values(&full_path);
-          items.iter().any(|item| item == &right)
+
+          if !items.is_empty() {
+            items.iter().any(|item| item == &right)
+          } else {
+            self
+              .get(&full_path)
+              .map(|value| value.contains(&right))
+              .unwrap_or(false)
+          }
         }
       }
       "not_contains" => {
         if has_brackets {
-          self.get_all(&full_path).iter().all(|value| value != &right)
+          self
+            .get_all(&full_path)
+            .iter()
+            .all(|value| value != &right && !value.contains(&right))
         } else {
           let items = self.get_sequence_values(&full_path);
-          !items.iter().any(|item| item == &right)
+
+          if !items.is_empty() {
+            !items.iter().any(|item| item == &right)
+          } else {
+            self
+              .get(&full_path)
+              .map(|value| !value.contains(&right))
+              .unwrap_or(true)
+          }
         }
       }
       _ => false,

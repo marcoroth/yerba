@@ -12,7 +12,7 @@ use crate::QuoteStyle;
 
 use crate::syntax::{
   extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
-  preceding_whitespace_indent, removal_range,
+  is_yaml_non_string, preceding_whitespace_indent, removal_range,
 };
 
 #[derive(Debug)]
@@ -354,6 +354,95 @@ impl Document {
     self.apply_edit(map_range, &map_text)
   }
 
+  pub fn enforce_key_style(
+    &mut self,
+    style: &QuoteStyle,
+    dot_path: Option<&str>,
+  ) -> Result<(), YerbaError> {
+    let source = self.root.text().to_string();
+
+    let scope_node = match dot_path {
+      Some(path) if !path.is_empty() => {
+        let keys: Vec<&str> = path.split('.').collect();
+        self.navigate_to_path(&keys)?
+      }
+      _ => self.root.clone(),
+    };
+
+    let scope_range = scope_node.text_range();
+    let mut edits: Vec<(TextRange, String)> = Vec::new();
+
+    for element in self.root.descendants_with_tokens() {
+      if let Some(token) = element.into_token() {
+        if !scope_range.contains_range(token.text_range()) {
+          continue;
+        }
+
+        if !is_map_key(&token) {
+          continue;
+        }
+
+        let current_kind = token.kind();
+
+        if !matches!(
+          current_kind,
+          SyntaxKind::PLAIN_SCALAR
+            | SyntaxKind::DOUBLE_QUOTED_SCALAR
+            | SyntaxKind::SINGLE_QUOTED_SCALAR
+        ) {
+          continue;
+        }
+
+        let target_kind = style.to_syntax_kind();
+
+        if current_kind == target_kind {
+          continue;
+        }
+
+        let raw_value = match current_kind {
+          SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR => {
+            let text = token.text();
+            text[1..text.len() - 1].to_string()
+          }
+          SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
+          _ => continue,
+        };
+
+        let new_text = match style {
+          QuoteStyle::DoubleQuoted => format!("\"{}\"", raw_value),
+          QuoteStyle::SingleQuoted => format!("'{}'", raw_value),
+          QuoteStyle::Plain => raw_value,
+          _ => continue,
+        };
+
+        if new_text != token.text() {
+          edits.push((token.text_range(), new_text));
+        }
+      }
+    }
+
+    if edits.is_empty() {
+      return Ok(());
+    }
+
+    edits.reverse();
+
+    let mut new_source = source;
+
+    for (range, replacement) in edits {
+      let start: usize = range.start().into();
+      let end: usize = range.end().into();
+
+      new_source.replace_range(start..end, &replacement);
+    }
+
+    let path = self.path.take();
+    *self = Self::parse(&new_source)?;
+    self.path = path;
+
+    Ok(())
+  }
+
   pub fn enforce_quotes(&mut self, style: &QuoteStyle) -> Result<(), YerbaError> {
     self.enforce_quotes_at(style, None)
   }
@@ -419,6 +508,10 @@ impl Document {
 
           _ => continue,
         };
+
+        if is_yaml_non_string(&raw_value) {
+          continue;
+        }
 
         let new_text = match style {
           QuoteStyle::DoubleQuoted => format!("\"{}\"", raw_value),

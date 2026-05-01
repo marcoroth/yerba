@@ -106,3 +106,81 @@ pub fn removal_range(node: &SyntaxNode) -> TextRange {
 
   node_range
 }
+
+pub fn is_yaml_non_string(value: &str) -> bool {
+  // Null (YAML 1.1 + 1.2)
+  if matches!(value, "null" | "Null" | "NULL" | "~" | "") {
+    return true;
+  }
+
+  // Boolean (YAML 1.2)
+  if matches!(
+    value,
+    "true" | "True" | "TRUE" | "false" | "False" | "FALSE"
+  ) {
+    return true;
+  }
+
+  // Boolean (YAML 1.1 extras)
+  if matches!(
+    value,
+    "yes"
+      | "Yes"
+      | "YES"
+      | "no"
+      | "No"
+      | "NO"
+      | "on"
+      | "On"
+      | "ON"
+      | "off"
+      | "Off"
+      | "OFF"
+      | "y"
+      | "Y"
+      | "n"
+      | "N"
+  ) {
+    return true;
+  }
+
+  // Special floats (YAML 1.1 + 1.2)
+  if matches!(
+    value,
+    ".inf"
+      | ".Inf"
+      | ".INF"
+      | "-.inf"
+      | "-.Inf"
+      | "-.INF"
+      | "+.inf"
+      | "+.Inf"
+      | "+.INF"
+      | ".nan"
+      | ".NaN"
+      | ".NAN"
+  ) {
+    return true;
+  }
+
+  // Integer
+  if value.parse::<i64>().is_ok() {
+    return true;
+  }
+
+  // Octal (0o...) and hex (0x...)
+  if value.starts_with("0x")
+    || value.starts_with("0X")
+    || value.starts_with("0o")
+    || value.starts_with("0O")
+  {
+    return true;
+  }
+
+  // Float
+  if value.parse::<f64>().is_ok() {
+    return true;
+  }
+
+  false
+}

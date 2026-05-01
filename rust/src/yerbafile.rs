@@ -28,9 +28,15 @@ pub struct SortKeysRule {
 
 #[derive(Debug, Deserialize)]
 pub struct QuoteStyleRule {
-  pub style: String,
+  #[serde(default = "default_key_style")]
+  pub key_style: String,
+  pub value_style: String,
   #[serde(default)]
   pub path: Option<String>,
+}
+
+fn default_key_style() -> String {
+  "plain".to_string()
 }
 
 #[derive(Debug)]
@@ -154,18 +160,26 @@ impl Yerbafile {
     let mut had_error = None;
 
     if let Some(quote_style_rule) = &rule.quote_style {
-      match quote_style_rule.style.parse::<QuoteStyle>() {
-        Ok(style) => {
-          let dot_path = quote_style_rule.path.as_deref();
+      let dot_path = quote_style_rule.path.as_deref();
 
+      match quote_style_rule.key_style.parse::<QuoteStyle>() {
+        Ok(style) => {
+          if let Err(error) = document.enforce_key_style(&style, dot_path) {
+            had_error = Some(format!("{}", error));
+          }
+        }
+
+        Err(error) => had_error = Some(error),
+      }
+
+      match quote_style_rule.value_style.parse::<QuoteStyle>() {
+        Ok(style) => {
           if let Err(error) = document.enforce_quotes_at(&style, dot_path) {
             had_error = Some(format!("{}", error));
           }
         }
 
-        Err(error) => {
-          had_error = Some(error);
-        }
+        Err(error) => had_error = Some(error),
       }
     }
 

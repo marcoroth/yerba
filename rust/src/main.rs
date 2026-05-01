@@ -34,34 +34,18 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
   #[command(
-    about = "Get a value at a dot-separated path",
+    about = "Get values at a path (single or multi-value with [] brackets)",
     arg_required_else_help = true,
     after_help = indoc! {r#"
       Examples:
         yerba get config.yml database.host
         yerba get config.yml database.host --condition '.port == 5432'
-        yerba get "data/**/event.yml" title
+        yerba get videos.yml "[].title"
+        yerba get "data/**/videos.yml" "[].speakers[].name"
         yerba get videos.yml "[0].title"
     "#}
   )]
   Get {
-    file: String,
-    path: String,
-    #[arg(long)]
-    condition: Option<String>,
-  },
-
-  #[command(
-    about = "Get all values matching a path with glob and bracket support",
-    arg_required_else_help = true,
-    after_help = indoc! {r#"
-      Examples:
-        yerba get-all "data/**/videos.yml" "[].title"
-        yerba get-all "data/**/videos.yml" "[].speakers[].name"
-        yerba get-all config.yml "[].name" --condition '.kind == conference'
-    "#}
-  )]
-  GetAll {
     file: String,
     path: String,
     #[arg(long)]
@@ -307,33 +291,6 @@ fn main() {
       path,
       condition,
     } => {
-      let document = parse_file(&file);
-
-      if let Some(condition) = &condition {
-        let parent_path = path
-          .rsplit_once('.')
-          .map(|(parent, _)| parent)
-          .unwrap_or("");
-
-        if !document.evaluate_condition(parent_path, condition) {
-          process::exit(0);
-        }
-      }
-
-      match document.get(&path) {
-        Some(value) => println!("{}", value),
-        None => {
-          eprintln!("Path not found: {}", path);
-          process::exit(1);
-        }
-      }
-    }
-
-    Command::GetAll {
-      file,
-      path,
-      condition,
-    } => {
       for resolved_file in resolve_files(&file) {
         let document = parse_file(&resolved_file);
 
@@ -348,7 +305,14 @@ fn main() {
           }
         }
 
-        for value in document.get_all(&path) {
+        let values = document.get_all(&path);
+
+        if values.is_empty() && !path.contains('[') && !document.exists(&path) {
+          eprintln!("Path not found: {}", path);
+          process::exit(1);
+        }
+
+        for value in values {
           println!("{}", value);
         }
       }

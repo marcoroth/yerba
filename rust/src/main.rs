@@ -4,23 +4,27 @@ use std::fs;
 use std::process;
 
 use clap::{Parser, Subcommand};
+use indoc::indoc;
 
 #[derive(Parser)]
 #[command(
   name = "yerba",
   version = yerba::version(),
   about = "Yerba 🧉 YAML Editing and Refactoring with Better Accuracy",
+  arg_required_else_help = true,
   override_usage = "yerba [command] [options]",
   disable_help_subcommand = true,
-  after_help = "\x1b[1mExamples:\x1b[0m
-  yerba get config.yml database.host
-  yerba set config.yml database.host 0.0.0.0
-  yerba insert config.yml database.ssl true --after host
-  yerba delete config.yml database.pool
-  yerba find \"data/**/videos.yml\" \"[]\" --condition '.kind == keynote' --select id,title
-  yerba sort-keys config.yml database id,host,port,name
-  yerba quote-style \"data/**/*.yml\" double
-  yerba apply"
+  after_help = indoc! {r#"
+    Examples:
+      yerba get config.yml database.host
+      yerba set config.yml database.host 0.0.0.0
+      yerba insert config.yml database.ssl true --after host
+      yerba delete config.yml database.pool
+      yerba find "data/**/videos.yml" "[]" --condition '.kind == keynote' --select 'id,title'
+      yerba sort-keys config.yml database 'id,host,port,name'
+      yerba quote-style "data/**/*.yml" double
+      yerba apply
+  "#}
 )]
 struct Cli {
   #[command(subcommand)]
@@ -29,6 +33,17 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+  #[command(
+    about = "Get a value at a dot-separated path",
+    arg_required_else_help = true,
+    after_help = indoc! {r#"
+      Examples:
+        yerba get config.yml database.host
+        yerba get config.yml database.host --condition '.port == 5432'
+        yerba get "data/**/event.yml" title
+        yerba get videos.yml "[0].title"
+    "#}
+  )]
   Get {
     file: String,
     path: String,
@@ -36,6 +51,16 @@ enum Command {
     condition: Option<String>,
   },
 
+  #[command(
+    about = "Get all values matching a path with glob and bracket support",
+    arg_required_else_help = true,
+    after_help = indoc! {r#"
+      Examples:
+        yerba get-all "data/**/videos.yml" "[].title"
+        yerba get-all "data/**/videos.yml" "[].speakers[].name"
+        yerba get-all config.yml "[].name" --condition '.kind == conference'
+    "#}
+  )]
   GetAll {
     file: String,
     path: String,
@@ -43,17 +68,43 @@ enum Command {
     condition: Option<String>,
   },
 
+  #[command(
+    about = "Find and filter items with conditions, output as JSON or raw YAML",
+    arg_required_else_help = true,
+    after_help = indoc! {r#"
+      Examples:
+        yerba find "data/**/videos.yml" "[]" --condition '.kind == keynote'
+        yerba find "data/**/videos.yml" "[]" --select 'id,title' --condition '.kind == keynote'
+        yerba find "data/**/videos.yml" "[]" --select 'id,title,speakers[0].name'
+        yerba find "data/**/videos.yml" "[]" --condition '.title contains Ruby' --raw
+        yerba find "data/**/videos.yml" "[]" --condition '.speakers contains "Matz"'
+    "#}
+  )]
   Find {
     file: String,
     path: String,
     #[arg(long)]
     condition: Option<String>,
+    /// Comma-separated fields to include (supports dot paths like speakers[].name)
     #[arg(long)]
     select: Option<String>,
+    /// Output raw YAML instead of JSON
     #[arg(long)]
     raw: bool,
   },
 
+  #[command(
+    about = "Update an existing value at a path (preserves quote style)",
+    arg_required_else_help = true,
+    after_help = indoc! {r#"
+      Examples:
+        yerba set config.yml database.host 0.0.0.0
+        yerba set config.yml database.host 0.0.0.0 --if-exists
+        yerba set config.yml database.host 0.0.0.0 --condition '.port == 5432'
+        yerba set config.yml database.host 0.0.0.0 --dry-run
+        yerba set "data/**/event.yml" website "" --if-exists
+    "#}
+  )]
   Set {
     file: String,
     path: String,
@@ -68,6 +119,19 @@ enum Command {
     dry_run: bool,
   },
 
+  #[command(
+    about = "Insert a new key into a map or item into a sequence",
+    arg_required_else_help = true,
+    after_help = indoc! {r#"
+      Examples:
+        yerba insert config.yml database.ssl true
+        yerba insert config.yml database.ssl true --after host
+        yerba insert config.yml database.ssl true --before port
+        yerba insert config.yml tags yaml
+        yerba insert config.yml tags yaml --at 0
+        yerba insert config.yml tags yaml --after ruby
+    "#}
+  )]
   Insert {
     file: String,
     path: String,
@@ -82,6 +146,15 @@ enum Command {
     dry_run: bool,
   },
 
+  #[command(
+    about = "Rename a key in a map (preserves value and position)",
+    arg_required_else_help = true,
+    after_help = indoc! {"
+      Examples:
+        yerba rename config.yml database.host hostname
+        yerba rename config.yml database.name database_name
+    "}
+  )]
   Rename {
     file: String,
     path: String,
@@ -90,6 +163,15 @@ enum Command {
     dry_run: bool,
   },
 
+  #[command(
+    about = "Delete a key and its value from a map",
+    arg_required_else_help = true,
+    after_help = indoc! {"
+      Examples:
+        yerba delete config.yml database.pool
+        yerba delete config.yml database.pool --dry-run
+    "}
+  )]
   Delete {
     file: String,
     path: String,
@@ -97,6 +179,14 @@ enum Command {
     dry_run: bool,
   },
 
+  #[command(
+    about = "Remove an item from a sequence by its value",
+    arg_required_else_help = true,
+    after_help = indoc! {"
+      Examples:
+        yerba remove config.yml tags rust
+    "}
+  )]
   Remove {
     file: String,
     path: String,
@@ -105,6 +195,16 @@ enum Command {
     dry_run: bool,
   },
 
+  #[command(
+    about = "Move a sequence item to a new position",
+    arg_required_else_help = true,
+    after_help = indoc! {"
+      Examples:
+        yerba move config.yml tags rust --before ruby
+        yerba move config.yml tags rust --after yaml
+        yerba move config.yml tags 2 --to 0
+    "}
+  )]
   Move {
     file: String,
     path: String,
@@ -119,6 +219,15 @@ enum Command {
     dry_run: bool,
   },
 
+  #[command(
+    about = "Move a key to a new position within a map",
+    arg_required_else_help = true,
+    after_help = indoc! {"
+      Examples:
+        yerba move-key config.yml database pool --before host
+        yerba move-key config.yml database name --to 0
+    "}
+  )]
   MoveKey {
     file: String,
     path: String,
@@ -133,29 +242,59 @@ enum Command {
     dry_run: bool,
   },
 
+  #[command(
+    about = "Sort keys in a map by a predefined order (aborts on unknown keys)",
+    arg_required_else_help = true,
+    after_help = indoc! {r#"
+      Examples:
+        yerba sort-keys config.yml database 'host,port,name,pool'
+        yerba sort-keys "data/**/event.yml" "" "id,title,kind,location"
+        yerba sort-keys "data/**/videos.yml" "[]" "id,title,speakers"
+        yerba sort-keys config.yml database 'host,port' --dry-run
+    "#}
+  )]
   SortKeys {
     file: String,
     path: String,
+    /// Comma-separated key order
     order: String,
     #[arg(long)]
     dry_run: bool,
   },
 
+  #[command(
+    about = "Enforce a consistent quote style on values, keys, or both",
+    arg_required_else_help = true,
+    after_help = indoc! {"
+      Examples:
+        yerba quote-style config.yml double
+        yerba quote-style config.yml plain --keys
+        yerba quote-style config.yml double --all
+        yerba quote-style config.yml single --path database.host
+    "}
+  )]
   QuoteStyle {
     file: String,
-    style: String,
+    /// Quote style
+    style: yerba::QuoteStyle,
+    /// Scope to a specific path
     #[arg(long)]
     path: Option<String>,
+    /// Apply to keys only
     #[arg(long)]
     keys: bool,
+    /// Apply to both keys and values
     #[arg(long)]
     all: bool,
     #[arg(long)]
     dry_run: bool,
   },
 
+  #[command(about = "Apply all rules from the Yerbafile and write changes")]
   Apply,
+  #[command(about = "Check if all files match Yerbafile rules (exits 1 if not)")]
   Check,
+  #[command(about = "Print the yerba version")]
   Version,
 }
 
@@ -494,23 +633,18 @@ fn main() {
       all,
       dry_run,
     } => {
-      let parsed_style: yerba::QuoteStyle = style.parse().unwrap_or_else(|error| {
-        eprintln!("{}", error);
-        process::exit(1);
-      });
-
       let dot_path = path.as_deref();
 
       for resolved_file in resolve_files(&file) {
         let mut document = parse_file(&resolved_file);
 
         if keys {
-          let _ = document.enforce_key_style(&parsed_style, dot_path);
+          let _ = document.enforce_key_style(&style, dot_path);
         } else if all {
-          let _ = document.enforce_key_style(&parsed_style, dot_path);
-          let _ = document.enforce_quotes_at(&parsed_style, dot_path);
+          let _ = document.enforce_key_style(&style, dot_path);
+          let _ = document.enforce_quotes_at(&style, dot_path);
         } else {
-          let _ = document.enforce_quotes_at(&parsed_style, dot_path);
+          let _ = document.enforce_quotes_at(&style, dot_path);
         }
 
         output(&resolved_file, &document, dry_run);
@@ -641,7 +775,17 @@ fn resolve_files(pattern: &str) -> Vec<String> {
 
 fn parse_file(file: &str) -> yerba::Document {
   yerba::parse_file(file).unwrap_or_else(|error| {
-    eprintln!("Error parsing {}: {}", file, error);
+    match &error {
+      yerba::YerbaError::IoError(io_error) => match io_error.kind() {
+        std::io::ErrorKind::NotFound => eprintln!("Error: file not found: {}", file),
+        std::io::ErrorKind::PermissionDenied => {
+          eprintln!("Error: permission denied: {}", file)
+        }
+        _ => eprintln!("Error reading {}: {}", file, io_error),
+      },
+      _ => eprintln!("Error parsing {}: {}", file, error),
+    }
+
     process::exit(1);
   })
 }

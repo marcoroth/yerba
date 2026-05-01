@@ -1023,8 +1023,8 @@ impl Document {
         };
 
         let new_text = match style {
-          QuoteStyle::DoubleQuoted => format!("\"{}\"", raw_value),
-          QuoteStyle::SingleQuoted => format!("'{}'", raw_value),
+          QuoteStyle::Double => format!("\"{}\"", raw_value),
+          QuoteStyle::Single => format!("'{}'", raw_value),
           QuoteStyle::Plain => raw_value,
           _ => continue,
         };
@@ -1128,8 +1128,8 @@ impl Document {
         }
 
         let new_text = match style {
-          QuoteStyle::DoubleQuoted => format!("\"{}\"", raw_value),
-          QuoteStyle::SingleQuoted => format!("'{}'", raw_value),
+          QuoteStyle::Double => format!("\"{}\"", raw_value),
+          QuoteStyle::Single => format!("'{}'", raw_value),
           QuoteStyle::Plain => raw_value,
           _ => continue,
         };

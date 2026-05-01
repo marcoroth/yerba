@@ -73,6 +73,27 @@ impl Yerbafile {
     }
   }
 
+  pub fn sort_order_for(&self, file_path: &str, dot_path: &str) -> Option<Vec<String>> {
+    for rule in &self.rules {
+      if let Some(sort_keys_rule) = &rule.sort_keys {
+        let rule_path = sort_keys_rule.path.trim_end_matches("[]");
+        let rule_path = rule_path.trim_end_matches('.');
+
+        if rule_path != dot_path && !rule_path.is_empty() && !dot_path.is_empty() {
+          continue;
+        }
+
+        if let Ok(pattern) = glob::Pattern::new(&rule.files) {
+          if pattern.matches(file_path) || pattern.matches_path(std::path::Path::new(file_path)) {
+            return Some(sort_keys_rule.order.clone());
+          }
+        }
+      }
+    }
+
+    None
+  }
+
   pub fn apply(&self, write: bool) -> Vec<RuleResult> {
     let mut results = Vec::new();
 

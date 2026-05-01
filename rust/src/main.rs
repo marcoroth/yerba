@@ -15,8 +15,10 @@ fn main() {
     println!(
       "  yerba set <file> <path> <value> [--if-exists] [--if-missing] [--condition <cond>] [--dry-run]"
     );
+    println!(
+      "  yerba insert <file> <path.key> <value> [--before|--after <key>] [--at <index>] [--dry-run]"
+    );
     println!("  yerba rename <file> <path> <new_key> [--dry-run]");
-    println!("  yerba append <file> <path> <value> [--dry-run]");
     println!("  yerba delete <file> <path> [--dry-run]");
     println!("  yerba remove <file> <path> <value> [--dry-run]");
     println!("  yerba move <file> <path> <item> --before <target> [--dry-run]");
@@ -248,6 +250,46 @@ fn main() {
       output(file, &document, dry_run);
     }
 
+    "insert" => {
+      if args.len() < 5 {
+        eprintln!(
+          "Usage: yerba insert <file> <path.key> <value> [--before|--after <key>] [--at <index>] [--dry-run]"
+        );
+
+        process::exit(1);
+      }
+
+      let file = &args[2];
+      let path = &args[3];
+      let value = &args[4];
+
+      let parent_path = path
+        .rsplit_once('.')
+        .map(|(parent, _)| parent)
+        .unwrap_or("");
+
+      let position = if let Some(index) = parse_option(&args, "--at") {
+        yerba::InsertPosition::At(index.parse::<usize>().unwrap_or_else(|_| {
+          eprintln!("Error: --at requires a numeric index");
+          process::exit(1);
+        }))
+      } else if let Some(target) = parse_option(&args, "--before") {
+        yerba::InsertPosition::Before(target.to_string())
+      } else if let Some(target) = parse_option(&args, "--after") {
+        yerba::InsertPosition::After(target.to_string())
+      } else {
+        yerba::Yerbafile::find()
+          .and_then(|yerbafile_path| yerba::Yerbafile::load(&yerbafile_path).ok())
+          .and_then(|yerbafile| yerbafile.sort_order_for(file, parent_path))
+          .map(yerba::InsertPosition::FromSortOrder)
+          .unwrap_or(yerba::InsertPosition::Last)
+      };
+
+      let mut document = parse_file(file);
+      run(|| document.insert_into(path, value, position));
+      output(file, &document, dry_run);
+    }
+
     "rename" => {
       if args.len() < 5 {
         eprintln!("Usage: yerba rename <file> <path> <new_key> [--dry-run]");
@@ -260,21 +302,6 @@ fn main() {
 
       let mut document = parse_file(file);
       run(|| document.rename(path, new_key));
-      output(file, &document, dry_run);
-    }
-
-    "append" => {
-      if args.len() < 5 {
-        eprintln!("Usage: yerba append <file> <path> <value> [--dry-run]");
-        process::exit(1);
-      }
-
-      let file = &args[2];
-      let path = &args[3];
-      let value = &args[4];
-
-      let mut document = parse_file(file);
-      run(|| document.append(path, value));
       output(file, &document, dry_run);
     }
 

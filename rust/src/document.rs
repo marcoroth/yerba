@@ -23,6 +23,15 @@ pub struct FindResult {
 }
 
 #[derive(Debug)]
+pub enum InsertPosition {
+  At(usize),
+  Last,
+  Before(String),
+  After(String),
+  FromSortOrder(Vec<String>),
+}
+
+#[derive(Debug)]
 pub struct Document {
   root: SyntaxNode,
   path: Option<PathBuf>,
@@ -269,6 +278,38 @@ impl Document {
   }
 
   pub fn append(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
+    self.insert_into(dot_path, value, InsertPosition::Last)
+  }
+
+  pub fn insert_into(
+    &mut self,
+    dot_path: &str,
+    value: &str,
+    position: InsertPosition,
+  ) -> Result<(), YerbaError> {
+    let keys: Vec<&str> = dot_path.split('.').collect();
+
+    if let Ok(current_node) = self.navigate_to_path(&keys) {
+      if current_node
+        .descendants()
+        .find_map(BlockSeq::cast)
+        .is_some()
+      {
+        return self.insert_sequence_item(dot_path, value, position);
+      }
+    }
+
+    let (parent_path, key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
+
+    self.insert_map_key(parent_path, key, value, position)
+  }
+
+  fn insert_sequence_item(
+    &mut self,
+    dot_path: &str,
+    value: &str,
+    position: InsertPosition,
+  ) -> Result<(), YerbaError> {
     let keys: Vec<&str> = dot_path.split('.').collect();
     let current_node = self.navigate_to_path(&keys)?;
 
@@ -277,15 +318,202 @@ impl Document {
       .find_map(BlockSeq::cast)
       .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
-    let last_entry = sequence
-      .entries()
-      .last()
+    let entries: Vec<_> = sequence.entries().collect();
+
+    if entries.is_empty() {
+      return Err(YerbaError::PathNotFound(dot_path.to_string()));
+    }
+
+    let indent = entries
+      .get(1)
+      .or(entries.first())
+      .map(|entry| preceding_whitespace_indent(entry.syntax()))
+      .unwrap_or_default();
+
+    let new_item = format!("- {}", value);
+
+    match position {
+      InsertPosition::Last => {
+        let last_entry = entries.last().unwrap();
+        let new_text = format!("\n{}{}", indent, new_item);
+
+        self.insert_after_node(last_entry.syntax(), &new_text)
+      }
+
+      InsertPosition::At(index) => {
+        if index >= entries.len() {
+          let last_entry = entries.last().unwrap();
+          let new_text = format!("\n{}{}", indent, new_item);
+
+          self.insert_after_node(last_entry.syntax(), &new_text)
+        } else {
+          let target_entry = &entries[index];
+          let target_range = target_entry.syntax().text_range();
+          let replacement = format!("{}\n{}", new_item, indent);
+          let insert_range = TextRange::new(target_range.start(), target_range.start());
+
+          self.apply_edit(insert_range, &replacement)
+        }
+      }
+
+      InsertPosition::Before(target_value) => {
+        let target_entry = entries
+          .iter()
+          .find(|entry| {
+            entry
+              .flow()
+              .and_then(|flow| extract_scalar_text(flow.syntax()))
+              .map(|text| text == target_value)
+              .unwrap_or(false)
+          })
+          .ok_or_else(|| {
+            YerbaError::PathNotFound(format!("{} item '{}'", dot_path, target_value))
+          })?;
+
+        let target_range = target_entry.syntax().text_range();
+        let replacement = format!("{}\n{}", new_item, indent);
+        let insert_range = TextRange::new(target_range.start(), target_range.start());
+
+        self.apply_edit(insert_range, &replacement)
+      }
+
+      InsertPosition::After(target_value) => {
+        let target_entry = entries
+          .iter()
+          .find(|entry| {
+            entry
+              .flow()
+              .and_then(|flow| extract_scalar_text(flow.syntax()))
+              .map(|text| text == target_value)
+              .unwrap_or(false)
+          })
+          .ok_or_else(|| {
+            YerbaError::PathNotFound(format!("{} item '{}'", dot_path, target_value))
+          })?;
+
+        let new_text = format!("\n{}{}", indent, new_item);
+
+        self.insert_after_node(target_entry.syntax(), &new_text)
+      }
+
+      InsertPosition::FromSortOrder(_) => {
+        let last_entry = entries.last().unwrap();
+        let new_text = format!("\n{}{}", indent, new_item);
+
+        self.insert_after_node(last_entry.syntax(), &new_text)
+      }
+    }
+  }
+
+  fn insert_map_key(
+    &mut self,
+    dot_path: &str,
+    key: &str,
+    value: &str,
+    position: InsertPosition,
+  ) -> Result<(), YerbaError> {
+    let keys: Vec<&str> = dot_path.split('.').collect();
+    let current_node = self.navigate_to_path(&keys)?;
+
+    let map = current_node
+      .descendants()
+      .find_map(BlockMap::cast)
       .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
 
-    let indent = preceding_whitespace_indent(last_entry.syntax());
-    let new_entry = format!("\n{}- {}", indent, value);
+    let entries: Vec<_> = map.entries().collect();
 
-    self.insert_after_node(last_entry.syntax(), &new_entry)
+    if entries.is_empty() {
+      let indent = preceding_whitespace_indent(map.syntax());
+      let new_entry = format!("\n{}{}: {}", indent, key, value);
+
+      return self.insert_after_node(map.syntax(), &new_entry);
+    }
+
+    if find_entry_by_key(&map, key).is_some() {
+      return Err(YerbaError::ParseError(format!(
+        "key '{}' already exists at '{}'",
+        key, dot_path
+      )));
+    }
+
+    let indent = entries
+      .get(1)
+      .or(entries.first())
+      .map(|entry| preceding_whitespace_indent(entry.syntax()))
+      .unwrap_or_default();
+
+    let new_entry_text = format!("{}: {}", key, value);
+
+    match position {
+      InsertPosition::Last => {
+        let last_entry = entries.last().unwrap();
+        let new_text = format!("\n{}{}", indent, new_entry_text);
+
+        self.insert_after_node(last_entry.syntax(), &new_text)
+      }
+
+      InsertPosition::At(index) => {
+        if index >= entries.len() {
+          let last_entry = entries.last().unwrap();
+          let new_text = format!("\n{}{}", indent, new_entry_text);
+
+          self.insert_after_node(last_entry.syntax(), &new_text)
+        } else {
+          let target_entry = &entries[index];
+          let target_range = target_entry.syntax().text_range();
+          let replacement = format!("{}\n{}", new_entry_text, indent);
+          let insert_range = TextRange::new(target_range.start(), target_range.start());
+
+          self.apply_edit(insert_range, &replacement)
+        }
+      }
+
+      InsertPosition::Before(target_key) => {
+        let target_entry = find_entry_by_key(&map, &target_key)
+          .ok_or_else(|| YerbaError::PathNotFound(format!("{}.{}", dot_path, target_key)))?;
+
+        let target_range = target_entry.syntax().text_range();
+        let replacement = format!("{}\n{}", new_entry_text, indent);
+        let insert_range = TextRange::new(target_range.start(), target_range.start());
+
+        self.apply_edit(insert_range, &replacement)
+      }
+
+      InsertPosition::After(target_key) => {
+        let target_entry = find_entry_by_key(&map, &target_key)
+          .ok_or_else(|| YerbaError::PathNotFound(format!("{}.{}", dot_path, target_key)))?;
+
+        let new_text = format!("\n{}{}", indent, new_entry_text);
+
+        self.insert_after_node(target_entry.syntax(), &new_text)
+      }
+
+      InsertPosition::FromSortOrder(order) => {
+        let new_key_position = order.iter().position(|ordered_key| ordered_key == key);
+
+        let resolved = match new_key_position {
+          Some(new_position) => {
+            let mut insert_after: Option<String> = None;
+
+            for ordered_key in order.iter().take(new_position).rev() {
+              if find_entry_by_key(&map, ordered_key).is_some() {
+                insert_after = Some(ordered_key.clone());
+                break;
+              }
+            }
+
+            match insert_after {
+              Some(after_key) => InsertPosition::After(after_key),
+              None => InsertPosition::At(0),
+            }
+          }
+
+          None => InsertPosition::Last,
+        };
+
+        self.insert_map_key(dot_path, key, value, resolved)
+      }
+    }
   }
 
   pub fn rename(&mut self, dot_path: &str, new_key: &str) -> Result<(), YerbaError> {

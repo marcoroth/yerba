@@ -5,6 +5,7 @@
 
 # Rust
 /rust/target/
+/rust/README.md
 
 # Platform-specific binaries
 /exe/arm64-darwin/

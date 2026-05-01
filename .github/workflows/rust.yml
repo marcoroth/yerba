@@ -56,6 +56,9 @@ jobs:
         run: cargo +stable clippy -- -D warnings
         working-directory: rust
 
+      - name: Copy README for packaging
+        run: cp README.md rust/README.md
+
       - name: Build
         run: cargo +stable build
         working-directory: rust

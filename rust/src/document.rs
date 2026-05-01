@@ -477,6 +477,10 @@ impl Document {
           continue;
         }
 
+        if is_map_key(&token) {
+          continue;
+        }
+
         let current_kind = token.kind();
 
         if !matches!(
@@ -631,6 +635,12 @@ impl Document {
 
     Ok(())
   }
+}
+
+fn is_map_key(token: &SyntaxToken) -> bool {
+  token
+    .parent_ancestors()
+    .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_KEY)
 }
 
 fn find_entry_by_key(map: &BlockMap, key: &str) -> Option<BlockMapEntry> {

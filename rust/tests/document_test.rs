@@ -458,7 +458,7 @@ fn test_enforce_quotes_to_double() {
 
   assert_eq!(
     document.to_string(),
-    "\"host\": \"localhost\"\n\"name\": \"myapp\"\n"
+    "host: \"localhost\"\nname: \"myapp\"\n"
   );
 }
 
@@ -471,15 +471,12 @@ fn test_enforce_quotes_to_single() {
     .enforce_quotes(&yerba::QuoteStyle::SingleQuoted)
     .unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "'host': 'localhost'\n'name': 'myapp'\n"
-  );
+  assert_eq!(document.to_string(), "host: 'localhost'\nname: 'myapp'\n");
 }
 
 #[test]
 fn test_enforce_quotes_to_plain() {
-  let yaml = "\"host\": \"localhost\"\n'name': 'myapp'\n";
+  let yaml = "host: \"localhost\"\nname: 'myapp'\n";
   let mut document = Document::parse(yaml).unwrap();
 
   document.enforce_quotes(&yerba::QuoteStyle::Plain).unwrap();
@@ -498,7 +495,7 @@ fn test_enforce_quotes_preserves_comments() {
 
   assert_eq!(
     document.to_string(),
-    "# Config\n\"host\": \"localhost\"\n# End\n"
+    "# Config\nhost: \"localhost\"\n# End\n"
   );
 }
 

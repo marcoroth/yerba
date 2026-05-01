@@ -1,7 +1,9 @@
 mod document;
+mod quote_style;
 pub mod yerbafile;
 
-pub use document::{Document, QuoteStyle, YerbaError};
+pub use document::{Document, YerbaError};
+pub use quote_style::QuoteStyle;
 pub use yerbafile::Yerbafile;
 
 pub fn version() -> &'static str {

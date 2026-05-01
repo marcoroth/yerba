@@ -154,14 +154,17 @@ impl Yerbafile {
     let mut had_error = None;
 
     if let Some(quote_style_rule) = &rule.quote_style {
-      if let Some(style) = QuoteStyle::from_str(&quote_style_rule.style) {
-        let dot_path = quote_style_rule.path.as_deref();
+      match quote_style_rule.style.parse::<QuoteStyle>() {
+        Ok(style) => {
+          let dot_path = quote_style_rule.path.as_deref();
 
-        if let Err(error) = document.enforce_quotes_at(&style, dot_path) {
-          had_error = Some(format!("{}", error));
+          if let Err(error) = document.enforce_quotes_at(&style, dot_path) {
+            had_error = Some(format!("{}", error));
+          }
         }
-      } else {
-        had_error = Some(format!("unknown quote style: '{}'", quote_style_rule.style));
+        Err(error) => {
+          had_error = Some(error);
+        }
       }
     }
 

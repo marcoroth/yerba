@@ -12,37 +12,7 @@ pub struct Document {
   path: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum QuoteStyle {
-  Plain,
-  SingleQuoted,
-  DoubleQuoted,
-  BlockLiteral,
-  BlockFolded,
-}
-
-impl QuoteStyle {
-  pub fn from_str(string: &str) -> Option<Self> {
-    match string {
-      "plain" => Some(QuoteStyle::Plain),
-      "single" => Some(QuoteStyle::SingleQuoted),
-      "double" => Some(QuoteStyle::DoubleQuoted),
-      "literal" | "block-literal" => Some(QuoteStyle::BlockLiteral),
-      "folded" | "block-folded" => Some(QuoteStyle::BlockFolded),
-      _ => None,
-    }
-  }
-
-  fn to_syntax_kind(&self) -> SyntaxKind {
-    match self {
-      QuoteStyle::Plain => SyntaxKind::PLAIN_SCALAR,
-      QuoteStyle::SingleQuoted => SyntaxKind::SINGLE_QUOTED_SCALAR,
-      QuoteStyle::DoubleQuoted => SyntaxKind::DOUBLE_QUOTED_SCALAR,
-      QuoteStyle::BlockLiteral => SyntaxKind::BLOCK_SCALAR_TEXT,
-      QuoteStyle::BlockFolded => SyntaxKind::BLOCK_SCALAR_TEXT,
-    }
-  }
-}
+use crate::QuoteStyle;
 
 #[derive(Debug)]
 pub enum YerbaError {
@@ -606,10 +576,6 @@ impl Document {
     Ok(())
   }
 
-  pub fn to_string(&self) -> String {
-    self.root.text().to_string()
-  }
-
   fn navigate_to_path(&self, keys: &[&str]) -> Result<SyntaxNode, YerbaError> {
     let keys: Vec<&&str> = keys.iter().filter(|key| !key.is_empty()).collect();
     let path_string = keys.iter().map(|key| **key).collect::<Vec<_>>().join(".");
@@ -675,6 +641,12 @@ impl Document {
     self.path = path;
 
     Ok(())
+  }
+}
+
+impl std::fmt::Display for Document {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.root.text())
   }
 }
 

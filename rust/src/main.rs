@@ -195,12 +195,8 @@ fn main() {
       let file_pattern = &args[2];
       let style_name = &args[3];
 
-      let style = yerba::QuoteStyle::from_str(style_name).unwrap_or_else(|| {
-        eprintln!(
-          "Unknown quote style: '{}'. Use: plain, single, double",
-          style_name
-        );
-
+      let style: yerba::QuoteStyle = style_name.parse().unwrap_or_else(|error| {
+        eprintln!("{}", error);
         process::exit(1);
       });
 
@@ -455,7 +451,7 @@ fn run(operation: impl FnOnce() -> Result<(), yerba::YerbaError>) {
 fn output(file: &str, document: &yerba::Document, dry_run: bool) {
   if dry_run {
     println!("--- {}", file);
-    print!("{}", document.to_string());
+    print!("{}", document);
   } else {
     fs::write(file, document.to_string()).unwrap_or_else(|error| {
       eprintln!("Error writing {}: {}", file, error);

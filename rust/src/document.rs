@@ -267,6 +267,16 @@ impl Document {
   }
 
   pub fn validate_sort_keys(&self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
+    if dot_path == "[]" || dot_path.ends_with(".[]") {
+      let seq_path = if dot_path == "[]" {
+        ""
+      } else {
+        &dot_path[..dot_path.len() - 3]
+      };
+
+      return self.validate_each_sort_keys(seq_path, key_order);
+    }
+
     let keys: Vec<&str> = dot_path.split('.').collect();
     let current_node = self.navigate_to_path(&keys)?;
 
@@ -293,6 +303,16 @@ impl Document {
   }
 
   pub fn sort_keys(&mut self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
+    if dot_path == "[]" || dot_path.ends_with(".[]") {
+      let seq_path = if dot_path == "[]" {
+        ""
+      } else {
+        &dot_path[..dot_path.len() - 3]
+      };
+
+      return self.sort_each_keys(seq_path, key_order);
+    }
+
     let keys: Vec<&str> = dot_path.split('.').collect();
     let current_node = self.navigate_to_path(&keys)?;
 
@@ -352,6 +372,139 @@ impl Document {
     let map_range = map.syntax().text_range();
 
     self.apply_edit(map_range, &map_text)
+  }
+
+  pub fn sort_each_keys(&mut self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
+    let keys: Vec<&str> = dot_path.split('.').collect();
+    let current_node = self.navigate_to_path(&keys)?;
+
+    let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+      Some(sequence) => sequence,
+      None => return Ok(()),
+    };
+
+    let mut edits: Vec<(TextRange, String)> = Vec::new();
+
+    for entry in sequence.entries() {
+      let entry_node = entry.syntax();
+
+      let map = match entry_node.descendants().find_map(BlockMap::cast) {
+        Some(map) => map,
+        None => continue,
+      };
+
+      let entries: Vec<_> = map.entries().collect();
+
+      if entries.len() <= 1 {
+        continue;
+      }
+
+      let entry_data: Vec<(String, String)> = entries
+        .iter()
+        .map(|entry| {
+          let key_name = entry
+            .key()
+            .and_then(|key_node| extract_scalar_text(key_node.syntax()))
+            .unwrap_or_default();
+          let text = entry.syntax().text().to_string();
+          (key_name, text)
+        })
+        .collect();
+
+      let mut sorted = entry_data.clone();
+
+      sorted.sort_by(|(key_a, _), (key_b, _)| {
+        let position_a = key_order.iter().position(|&key| key == key_a);
+        let position_b = key_order.iter().position(|&key| key == key_b);
+
+        match (position_a, position_b) {
+          (Some(a), Some(b)) => a.cmp(&b),
+          (Some(_), None) => std::cmp::Ordering::Less,
+          (None, Some(_)) => std::cmp::Ordering::Greater,
+
+          (None, None) => {
+            let original_a = entry_data.iter().position(|(key, _)| key == key_a).unwrap();
+            let original_b = entry_data.iter().position(|(key, _)| key == key_b).unwrap();
+
+            original_a.cmp(&original_b)
+          }
+        }
+      });
+
+      if sorted.iter().map(|(key, _)| key).collect::<Vec<_>>()
+        == entry_data.iter().map(|(key, _)| key).collect::<Vec<_>>()
+      {
+        continue;
+      }
+
+      let indent = entries
+        .get(1)
+        .map(|entry| preceding_whitespace_indent(entry.syntax()))
+        .unwrap_or_default();
+
+      let map_text = rebuild_entries(sorted.iter().map(|(_key, text)| text.as_str()), &indent);
+
+      edits.push((map.syntax().text_range(), map_text));
+    }
+
+    if edits.is_empty() {
+      return Ok(());
+    }
+
+    edits.reverse();
+
+    let source = self.root.text().to_string();
+    let mut new_source = source;
+
+    for (range, replacement) in edits {
+      let start: usize = range.start().into();
+      let end: usize = range.end().into();
+
+      new_source.replace_range(start..end, &replacement);
+    }
+
+    let path = self.path.take();
+    *self = Self::parse(&new_source)?;
+    self.path = path;
+
+    Ok(())
+  }
+
+  pub fn validate_each_sort_keys(
+    &self,
+    dot_path: &str,
+    key_order: &[&str],
+  ) -> Result<(), YerbaError> {
+    let keys: Vec<&str> = dot_path.split('.').collect();
+    let current_node = self.navigate_to_path(&keys)?;
+
+    let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+      Some(sequence) => sequence,
+      None => return Ok(()),
+    };
+
+    let mut all_unknown: Vec<String> = Vec::new();
+
+    for entry in sequence.entries() {
+      if let Some(map) = entry.syntax().descendants().find_map(BlockMap::cast) {
+        for map_entry in map.entries() {
+          if let Some(key_name) = map_entry
+            .key()
+            .and_then(|key_node| extract_scalar_text(key_node.syntax()))
+          {
+            if !key_order.contains(&key_name.as_str()) && !all_unknown.contains(&key_name) {
+              all_unknown.push(key_name);
+            }
+          }
+        }
+      }
+    }
+
+    if all_unknown.is_empty() {
+      Ok(())
+    } else {
+      Err(YerbaError::UnknownKeys(all_unknown))
+    }
   }
 
   pub fn enforce_key_style(

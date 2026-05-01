@@ -147,6 +147,10 @@ enum Command {
     #[arg(long)]
     path: Option<String>,
     #[arg(long)]
+    keys: bool,
+    #[arg(long)]
+    all: bool,
+    #[arg(long)]
     dry_run: bool,
   },
 
@@ -486,6 +490,8 @@ fn main() {
       file,
       style,
       path,
+      keys,
+      all,
       dry_run,
     } => {
       let parsed_style: yerba::QuoteStyle = style.parse().unwrap_or_else(|error| {
@@ -498,9 +504,16 @@ fn main() {
       for resolved_file in resolve_files(&file) {
         let mut document = parse_file(&resolved_file);
 
-        if document.enforce_quotes_at(&parsed_style, dot_path).is_ok() {
-          output(&resolved_file, &document, dry_run);
+        if keys {
+          let _ = document.enforce_key_style(&parsed_style, dot_path);
+        } else if all {
+          let _ = document.enforce_key_style(&parsed_style, dot_path);
+          let _ = document.enforce_quotes_at(&parsed_style, dot_path);
+        } else {
+          let _ = document.enforce_quotes_at(&parsed_style, dot_path);
         }
+
+        output(&resolved_file, &document, dry_run);
       }
     }
 

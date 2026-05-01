@@ -27,13 +27,16 @@ Gem::Specification.new do |spec|
     "lib/**/*.rb",
     "sig/**/*.rbs",
     "exe/yerba",
+    "ext/yerba/extconf.rb",
     "rust/Cargo.toml",
     "rust/Cargo.lock",
-    "rust/src/**/*.rs"
+    "rust/src/**/*.rs",
+    "rust/rustfmt.toml"
   ]
 
   spec.bindir = "exe"
   spec.executables = ["yerba"]
+  spec.extensions = ["ext/yerba/extconf.rb"]
 
   spec.metadata["allowed_push_host"] = "https://rubygems.org"
   spec.metadata["rubygems_mfa_required"] = "true"

@@ -1,61 +1,24 @@
-use rowan::ast::AstNode;
-use rowan::{TextRange, TextSize};
-use yaml_parser::ast::{BlockMap, BlockMapEntry, BlockSeq, Root};
-use yaml_parser::{SyntaxKind, SyntaxNode, SyntaxToken};
-
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use rowan::ast::AstNode;
+use rowan::TextRange;
+
+use yaml_parser::ast::{BlockMap, BlockSeq, Root};
+use yaml_parser::{SyntaxKind, SyntaxNode, SyntaxToken};
+
+use crate::error::YerbaError;
+use crate::QuoteStyle;
+
+use crate::syntax::{
+  extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
+  preceding_whitespace_indent, removal_range,
+};
 
 #[derive(Debug)]
 pub struct Document {
   root: SyntaxNode,
   path: Option<PathBuf>,
-}
-
-use crate::QuoteStyle;
-
-#[derive(Debug)]
-pub enum YerbaError {
-  ParseError(String),
-  IoError(std::io::Error),
-  PathNotFound(String),
-  NotASequence(String),
-  IndexOutOfBounds(usize, usize),
-  UnknownKeys(Vec<String>),
-}
-
-impl std::fmt::Display for YerbaError {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      YerbaError::ParseError(msg) => write!(f, "parse error: {}", msg),
-      YerbaError::IoError(err) => write!(f, "io error: {}", err),
-      YerbaError::PathNotFound(path) => write!(f, "path not found: {}", path),
-      YerbaError::NotASequence(path) => write!(f, "not a sequence: {}", path),
-      YerbaError::IndexOutOfBounds(index, length) => {
-        write!(f, "index {} out of bounds (length {})", index, length)
-      }
-      YerbaError::UnknownKeys(keys) => {
-        let suggestion = keys
-          .iter()
-          .map(|key| format!("\"{}\"", key))
-          .collect::<Vec<_>>()
-          .join(", ");
-
-        write!(
-          f,
-          "found keys not listed in sort order: {}\n\n  Add them to your sort order or Yerbafile:\n    {}\n",
-          keys.join(", "),
-          suggestion
-        )
-      }
-    }
-  }
-}
-
-impl From<std::io::Error> for YerbaError {
-  fn from(err: std::io::Error) -> Self {
-    YerbaError::IoError(err)
-  }
 }
 
 impl Document {
@@ -194,45 +157,15 @@ impl Document {
       .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
     let entries: Vec<_> = sequence.entries().collect();
-    let length = entries.len();
 
-    if from >= length {
-      return Err(YerbaError::IndexOutOfBounds(from, length));
-    }
-
-    if to >= length {
-      return Err(YerbaError::IndexOutOfBounds(to, length));
-    }
-
-    let entry_texts: Vec<String> = entries
-      .iter()
-      .map(|entry| entry.syntax().text().to_string())
-      .collect();
-
-    let mut reordered = entry_texts.clone();
-    let item = reordered.remove(from);
-    reordered.insert(to, item);
-
-    let indent = entries
-      .get(1)
-      .map(|entry| preceding_whitespace_indent(entry.syntax()))
-      .unwrap_or_default();
-
-    let sequence_text: String = reordered
-      .iter()
-      .enumerate()
-      .map(|(index, text)| {
-        if index == 0 {
-          text.clone()
-        } else {
-          format!("\n{}{}", indent, text)
-        }
-      })
-      .collect();
-
-    let sequence_range = sequence.syntax().text_range();
-
-    self.apply_edit(sequence_range, &sequence_text)
+    self.reorder_entries(
+      &entries,
+      from,
+      to,
+      |entry| entry.syntax().text().to_string(),
+      |entry| preceding_whitespace_indent(entry.syntax()),
+      sequence.syntax().text_range(),
+    )
   }
 
   pub fn move_key(&mut self, dot_path: &str, from: usize, to: usize) -> Result<(), YerbaError> {
@@ -249,45 +182,15 @@ impl Document {
       .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
 
     let entries: Vec<_> = map.entries().collect();
-    let length = entries.len();
 
-    if from >= length {
-      return Err(YerbaError::IndexOutOfBounds(from, length));
-    }
-
-    if to >= length {
-      return Err(YerbaError::IndexOutOfBounds(to, length));
-    }
-
-    let entry_texts: Vec<String> = entries
-      .iter()
-      .map(|entry| entry.syntax().text().to_string())
-      .collect();
-
-    let mut reordered = entry_texts.clone();
-    let item = reordered.remove(from);
-    reordered.insert(to, item);
-
-    let indent = entries
-      .get(1)
-      .map(|entry| preceding_whitespace_indent(entry.syntax()))
-      .unwrap_or_default();
-
-    let map_text: String = reordered
-      .iter()
-      .enumerate()
-      .map(|(index, text)| {
-        if index == 0 {
-          text.clone()
-        } else {
-          format!("\n{}{}", indent, text)
-        }
-      })
-      .collect();
-
-    let map_range = map.syntax().text_range();
-
-    self.apply_edit(map_range, &map_text)
+    self.reorder_entries(
+      &entries,
+      from,
+      to,
+      |entry| entry.syntax().text().to_string(),
+      |entry| preceding_whitespace_indent(entry.syntax()),
+      map.syntax().text_range(),
+    )
   }
 
   pub fn resolve_key_index(&self, dot_path: &str, reference: &str) -> Result<usize, YerbaError> {
@@ -442,18 +345,7 @@ impl Document {
       .map(|entry| preceding_whitespace_indent(entry.syntax()))
       .unwrap_or_default();
 
-    let map_text: String = sorted
-      .iter()
-      .enumerate()
-      .map(|(index, (_key, text))| {
-        if index == 0 {
-          text.clone()
-        } else {
-          format!("\n{}{}", indent, text)
-        }
-      })
-      .collect();
-
+    let map_text = rebuild_entries(sorted.iter().map(|(_key, text)| text.as_str()), &indent);
     let map_range = map.syntax().text_range();
 
     self.apply_edit(map_range, &map_text)
@@ -628,6 +520,41 @@ impl Document {
     self.apply_edit(range, "")
   }
 
+  fn reorder_entries<T>(
+    &mut self,
+    entries: &[T],
+    from: usize,
+    to: usize,
+    get_text: impl Fn(&T) -> String,
+    get_indent: impl Fn(&T) -> String,
+    range: TextRange,
+  ) -> Result<(), YerbaError>
+  where
+    T: rowan::ast::AstNode,
+  {
+    let length = entries.len();
+
+    if from >= length {
+      return Err(YerbaError::IndexOutOfBounds(from, length));
+    }
+
+    if to >= length {
+      return Err(YerbaError::IndexOutOfBounds(to, length));
+    }
+
+    let entry_texts: Vec<String> = entries.iter().map(&get_text).collect();
+
+    let mut reordered = entry_texts.clone();
+    let item = reordered.remove(from);
+    reordered.insert(to, item);
+
+    let indent = entries.get(1).map(&get_indent).unwrap_or_default();
+
+    let text = rebuild_entries(reordered.iter().map(|text| text.as_str()), &indent);
+
+    self.apply_edit(range, &text)
+  }
+
   fn apply_edit(&mut self, range: TextRange, replacement: &str) -> Result<(), YerbaError> {
     let source = self.root.text().to_string();
     let start: usize = range.start().into();
@@ -650,105 +577,15 @@ impl std::fmt::Display for Document {
   }
 }
 
-fn is_map_key(token: &SyntaxToken) -> bool {
-  token
-    .parent_ancestors()
-    .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_KEY)
-}
-
-fn find_entry_by_key(map: &BlockMap, key: &str) -> Option<BlockMapEntry> {
-  map.entries().find(|entry| {
-    entry
-      .key()
-      .and_then(|key_node| extract_scalar_text(key_node.syntax()))
-      .map(|key_text| key_text == key)
-      .unwrap_or(false)
-  })
-}
-
-fn find_scalar_token(node: &SyntaxNode) -> Option<SyntaxToken> {
-  node
-    .descendants_with_tokens()
-    .filter_map(|element| element.into_token())
-    .find(|token| {
-      matches!(
-        token.kind(),
-        SyntaxKind::PLAIN_SCALAR
-          | SyntaxKind::DOUBLE_QUOTED_SCALAR
-          | SyntaxKind::SINGLE_QUOTED_SCALAR
-      )
+fn rebuild_entries<'a>(entries: impl Iterator<Item = &'a str>, indent: &str) -> String {
+  entries
+    .enumerate()
+    .map(|(index, text)| {
+      if index == 0 {
+        text.to_string()
+      } else {
+        format!("\n{}{}", indent, text)
+      }
     })
-}
-
-fn format_scalar_value(value: &str, kind: SyntaxKind) -> String {
-  match kind {
-    SyntaxKind::DOUBLE_QUOTED_SCALAR => format!("\"{}\"", value),
-    SyntaxKind::SINGLE_QUOTED_SCALAR => format!("'{}'", value),
-    _ => value.to_string(),
-  }
-}
-
-fn preceding_whitespace_indent(node: &SyntaxNode) -> String {
-  preceding_whitespace_token(node)
-    .map(|token| {
-      let text = token.text();
-
-      text
-        .rfind('\n')
-        .map(|newline| text[newline + 1..].to_string())
-        .unwrap_or_default()
-    })
-    .unwrap_or_default()
-}
-
-fn preceding_whitespace_token(node: &SyntaxNode) -> Option<SyntaxToken> {
-  node
-    .prev_sibling_or_token()
-    .and_then(|sibling| sibling.into_token())
-    .filter(|token| token.kind() == SyntaxKind::WHITESPACE)
-}
-
-fn following_whitespace_token(node: &SyntaxNode) -> Option<SyntaxToken> {
-  node
-    .next_sibling_or_token()
-    .and_then(|sibling| sibling.into_token())
-    .filter(|token| token.kind() == SyntaxKind::WHITESPACE)
-}
-
-fn removal_range(node: &SyntaxNode) -> TextRange {
-  let node_range = node.text_range();
-
-  if let Some(whitespace_token) = preceding_whitespace_token(node) {
-    let whitespace_text = whitespace_token.text();
-    let whitespace_start = whitespace_token.text_range().start();
-
-    let remove_from = whitespace_text
-      .rfind('\n')
-      .map(|offset| whitespace_start + TextSize::from(offset as u32))
-      .unwrap_or(whitespace_start);
-
-    return TextRange::new(remove_from, node_range.end());
-  }
-
-  if let Some(whitespace_token) = following_whitespace_token(node) {
-    return TextRange::new(node_range.start(), whitespace_token.text_range().end());
-  }
-
-  node_range
-}
-
-fn extract_scalar_text(node: &SyntaxNode) -> Option<String> {
-  let token = find_scalar_token(node)?;
-
-  match token.kind() {
-    SyntaxKind::PLAIN_SCALAR => Some(token.text().to_string()),
-
-    SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR => {
-      let text = token.text();
-
-      Some(text[1..text.len() - 1].to_string())
-    }
-
-    _ => None,
-  }
+    .collect()
 }

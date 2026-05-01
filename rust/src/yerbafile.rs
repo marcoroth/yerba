@@ -31,6 +31,15 @@ pub enum PipelineStep {
   Rename(RenameConfig),
   Remove(RemoveConfig),
   BlankLines(BlankLinesConfig),
+  Sort(SortConfig),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SortConfig {
+  #[serde(default)]
+  pub path: Option<String>,
+  #[serde(default)]
+  pub by: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -123,8 +132,13 @@ impl<'de> Deserialize<'de> for PipelineStep {
       return Ok(PipelineStep::BlankLines(config));
     }
 
+    if let Some(value) = mapping.get(serde_yaml::Value::String("sort".to_string())) {
+      let config: SortConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      return Ok(PipelineStep::Sort(config));
+    }
+
     Err(serde::de::Error::custom(
-      "unknown pipeline step: expected get, sort_keys, quote_style, set, insert, delete, rename, remove, or blank_lines",
+      "unknown pipeline step: expected get, sort_keys, quote_style, set, insert, delete, rename, remove, blank_lines, or sort",
     ))
   }
 }
@@ -500,6 +514,13 @@ fn execute_step(
       let full_path = resolve_step_path(base_path, config.path.as_deref());
 
       document.enforce_blank_lines(&full_path, config.count)
+    }
+
+    PipelineStep::Sort(config) => {
+      let full_path = resolve_step_path(base_path, config.path.as_deref());
+      let sort_fields = config.by.as_deref().map(crate::SortField::parse_list).unwrap_or_default();
+
+      document.sort_items(&full_path, &sort_fields)
     }
   }
 }

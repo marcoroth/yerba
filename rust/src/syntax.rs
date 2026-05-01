@@ -36,8 +36,16 @@ pub fn find_scalar_token(node: &SyntaxNode) -> Option<SyntaxToken> {
 
 pub fn format_scalar_value(value: &str, kind: SyntaxKind) -> String {
   match kind {
-    SyntaxKind::DOUBLE_QUOTED_SCALAR => format!("\"{}\"", value),
-    SyntaxKind::SINGLE_QUOTED_SCALAR => format!("'{}'", value),
+    SyntaxKind::DOUBLE_QUOTED_SCALAR => {
+      let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
+      format!("\"{}\"", escaped)
+    }
+
+    SyntaxKind::SINGLE_QUOTED_SCALAR => {
+      let escaped = value.replace('\'', "''");
+      format!("'{}'", escaped)
+    }
+
     _ => value.to_string(),
   }
 }
@@ -48,14 +56,30 @@ pub fn extract_scalar_text(node: &SyntaxNode) -> Option<String> {
   match token.kind() {
     SyntaxKind::PLAIN_SCALAR => Some(token.text().to_string()),
 
-    SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR => {
+    SyntaxKind::DOUBLE_QUOTED_SCALAR => {
       let text = token.text();
+      let inner = &text[1..text.len() - 1];
 
-      Some(text[1..text.len() - 1].to_string())
+      Some(unescape_double_quoted(inner))
+    }
+
+    SyntaxKind::SINGLE_QUOTED_SCALAR => {
+      let text = token.text();
+      let inner = &text[1..text.len() - 1];
+
+      Some(unescape_single_quoted(inner))
     }
 
     _ => None,
   }
+}
+
+pub fn unescape_double_quoted(text: &str) -> String {
+  text.replace("\\\"", "\"").replace("\\\\", "\\")
+}
+
+pub fn unescape_single_quoted(text: &str) -> String {
+  text.replace("''", "'")
 }
 
 pub fn preceding_whitespace_indent(node: &SyntaxNode) -> String {

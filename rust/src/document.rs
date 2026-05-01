@@ -12,7 +12,8 @@ use crate::QuoteStyle;
 
 use crate::syntax::{
   extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
-  is_yaml_non_string, preceding_whitespace_indent, removal_range,
+  is_yaml_non_string, preceding_whitespace_indent, removal_range, unescape_double_quoted,
+  unescape_single_quoted,
 };
 
 #[derive(Debug)]
@@ -1014,18 +1015,34 @@ impl Document {
         }
 
         let raw_value = match current_kind {
-          SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR => {
+          SyntaxKind::DOUBLE_QUOTED_SCALAR => {
             let text = token.text();
-            text[1..text.len() - 1].to_string()
+            unescape_double_quoted(&text[1..text.len() - 1])
           }
+
+          SyntaxKind::SINGLE_QUOTED_SCALAR => {
+            let text = token.text();
+            unescape_single_quoted(&text[1..text.len() - 1])
+          }
+
           SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
+
           _ => continue,
         };
 
         let new_text = match style {
-          QuoteStyle::Double => format!("\"{}\"", raw_value),
-          QuoteStyle::Single => format!("'{}'", raw_value),
+          QuoteStyle::Double => {
+            let escaped = raw_value.replace('\\', "\\\\").replace('"', "\\\"");
+            format!("\"{}\"", escaped)
+          }
+
+          QuoteStyle::Single => {
+            let escaped = raw_value.replace('\'', "''");
+            format!("'{}'", escaped)
+          }
+
           QuoteStyle::Plain => raw_value,
+
           _ => continue,
         };
 
@@ -1110,12 +1127,12 @@ impl Document {
         let raw_value = match current_kind {
           SyntaxKind::DOUBLE_QUOTED_SCALAR => {
             let text = token.text();
-            text[1..text.len() - 1].to_string()
+            unescape_double_quoted(&text[1..text.len() - 1])
           }
 
           SyntaxKind::SINGLE_QUOTED_SCALAR => {
             let text = token.text();
-            text[1..text.len() - 1].to_string()
+            unescape_single_quoted(&text[1..text.len() - 1])
           }
 
           SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
@@ -1128,9 +1145,32 @@ impl Document {
         }
 
         let new_text = match style {
-          QuoteStyle::Double => format!("\"{}\"", raw_value),
-          QuoteStyle::Single => format!("'{}'", raw_value),
-          QuoteStyle::Plain => raw_value,
+          QuoteStyle::Double => {
+            if raw_value.contains('"') && current_kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
+              continue;
+            }
+
+            let escaped = raw_value.replace('\\', "\\\\").replace('"', "\\\"");
+            format!("\"{}\"", escaped)
+          }
+
+          QuoteStyle::Single => {
+            let escaped = raw_value.replace('\'', "''");
+            format!("'{}'", escaped)
+          }
+
+          QuoteStyle::Plain => {
+            if raw_value.contains('"')
+              || raw_value.contains('\'')
+              || raw_value.contains(':')
+              || raw_value.contains('#')
+            {
+              continue;
+            }
+
+            raw_value
+          }
+
           _ => continue,
         };
 

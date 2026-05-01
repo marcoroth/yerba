@@ -235,3 +235,59 @@ fn test_enforce_quotes_scoped_to_nested_key() {
     "database:\n  host: \"localhost\"\n  port: 5432\napp:\n  name: myapp\n"
   );
 }
+
+#[test]
+fn test_enforce_quotes_skips_value_with_inner_double_quotes() {
+  let yaml = "title: 'Panel \"Post-Rails world\" - wroc_love.rb'\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    "title: 'Panel \"Post-Rails world\" - wroc_love.rb'\n"
+  );
+}
+
+#[test]
+fn test_enforce_quotes_single_escapes_inner_single_quotes() {
+  let yaml = "title: \"it's a test\"\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.enforce_quotes(&yerba::QuoteStyle::Single).unwrap();
+
+  assert_eq!(document.to_string(), "title: 'it''s a test'\n");
+}
+
+#[test]
+fn test_enforce_quotes_plain_skips_value_with_special_chars() {
+  let yaml = "title: \"hello: world\"\nsubtitle: \"no # comment\"\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.enforce_quotes(&yerba::QuoteStyle::Plain).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    "title: \"hello: world\"\nsubtitle: \"no # comment\"\n"
+  );
+}
+
+#[test]
+fn test_enforce_quotes_plain_strips_safe_values() {
+  let yaml = "title: \"hello world\"\nname: \"myapp\"\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.enforce_quotes(&yerba::QuoteStyle::Plain).unwrap();
+
+  assert_eq!(document.to_string(), "title: hello world\nname: myapp\n");
+}
+
+#[test]
+fn test_enforce_quotes_double_with_plain_containing_quotes() {
+  let yaml = "name: simple\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
+
+  assert_eq!(document.to_string(), "name: \"simple\"\n");
+}

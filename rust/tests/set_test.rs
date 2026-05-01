@@ -52,3 +52,33 @@ fn test_set_preserves_comments() {
     "# Database config\nhost: 0.0.0.0\n# Port\nport: 5432\n"
   );
 }
+
+#[test]
+fn test_set_escapes_double_quotes_in_double_quoted_field() {
+  let mut document = Document::parse("title: \"old title\"\n").unwrap();
+
+  document.set("title", "something \"quoted\" here").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    "title: \"something \\\"quoted\\\" here\"\n"
+  );
+}
+
+#[test]
+fn test_set_escapes_single_quotes_in_single_quoted_field() {
+  let mut document = Document::parse("title: 'old title'\n").unwrap();
+
+  document.set("title", "it's a test").unwrap();
+
+  assert_eq!(document.to_string(), "title: 'it''s a test'\n");
+}
+
+#[test]
+fn test_set_plain_field_with_value_containing_quotes() {
+  let mut document = Document::parse("title: old\n").unwrap();
+
+  document.set("title", "something \"quoted\"").unwrap();
+
+  assert_eq!(document.to_string(), "title: something \"quoted\"\n");
+}

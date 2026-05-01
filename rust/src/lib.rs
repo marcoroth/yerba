@@ -7,7 +7,7 @@ pub mod yerbafile;
 pub use document::{Document, FindResult, InsertPosition};
 pub use error::YerbaError;
 pub use quote_style::QuoteStyle;
-pub use yerbafile::Yerbafile;
+pub use yerbafile::{resolve_template, Variable, Yerbafile};
 
 pub fn version() -> &'static str {
   env!("CARGO_PKG_VERSION")

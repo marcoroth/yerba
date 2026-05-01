@@ -6,6 +6,7 @@ pub enum YerbaError {
   NotASequence(String),
   IndexOutOfBounds(usize, usize),
   UnknownKeys(Vec<String>),
+  ReferenceNotFound(String),
 }
 
 impl std::fmt::Display for YerbaError {
@@ -15,9 +16,15 @@ impl std::fmt::Display for YerbaError {
       YerbaError::IoError(err) => write!(f, "io error: {}", err),
       YerbaError::PathNotFound(path) => write!(f, "path not found: {}", path),
       YerbaError::NotASequence(path) => write!(f, "not a sequence: {}", path),
+
       YerbaError::IndexOutOfBounds(index, length) => {
         write!(f, "index {} out of bounds (length {})", index, length)
       }
+
+      YerbaError::ReferenceNotFound(reference) => {
+        write!(f, "template reference not found: ${{{}}}", reference)
+      }
+
       YerbaError::UnknownKeys(keys) => {
         let suggestion = keys
           .iter()

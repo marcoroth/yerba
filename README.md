@@ -36,7 +36,7 @@ yerba get config.yml path.to.key
 
 ### Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake test` to run the tests.
+After checking out the repo, run `bundle install` to install dependencies. Then, run `bundle exec rake test` to run the tests.
 
 ### Rust
 

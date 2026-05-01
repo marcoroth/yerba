@@ -182,6 +182,33 @@ fn test_insert_from_sort_order_key_not_in_order() {
 }
 
 #[test]
+fn test_insert_into_nested_map() {
+  let yaml = "settings:\n  debug: true\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document
+    .insert_into("settings.db_host", "localhost", InsertPosition::Last)
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    "settings:\n  debug: true\n  db_host: localhost\n"
+  );
+}
+
+#[test]
+fn test_insert_into_deeply_nested_map() {
+  let yaml = "a:\n  b:\n    c: 1\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document
+    .insert_into("a.b.d", "2", InsertPosition::Last)
+    .unwrap();
+
+  assert_eq!(document.to_string(), "a:\n  b:\n    c: 1\n    d: 2\n");
+}
+
+#[test]
 fn test_insert_into_sequence_at_end() {
   let yaml = "tags:\n  - ruby\n  - rust\n";
   let mut document = Document::parse(yaml).unwrap();

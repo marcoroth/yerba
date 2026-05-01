@@ -544,29 +544,53 @@ impl Document {
     }
   }
 
-  pub fn rename(&mut self, dot_path: &str, new_key: &str) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let parent_node = self.navigate_to_path(&keys[..keys.len() - 1])?;
-    let last_key = keys.last().unwrap();
+  pub fn rename(&mut self, source_path: &str, destination_path: &str) -> Result<(), YerbaError> {
+    let source_parent = source_path
+      .rsplit_once('.')
+      .map(|(parent, _)| parent)
+      .unwrap_or("");
 
-    let map = parent_node
-      .descendants()
-      .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+    let destination_parent = destination_path
+      .rsplit_once('.')
+      .map(|(parent, _)| parent)
+      .unwrap_or("");
 
-    let entry = find_entry_by_key(&map, last_key)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+    let destination_key = destination_path
+      .rsplit_once('.')
+      .map(|(_, key)| key)
+      .unwrap_or(destination_path);
 
-    let key_node = entry
-      .key()
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+    if source_parent == destination_parent {
+      let keys: Vec<&str> = source_path.split('.').collect();
+      let parent_node = self.navigate_to_path(&keys[..keys.len() - 1])?;
+      let source_key = keys.last().unwrap();
 
-    let key_token = find_scalar_token(key_node.syntax())
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      let map = parent_node
+        .descendants()
+        .find_map(BlockMap::cast)
+        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
 
-    let new_text = format_scalar_value(new_key, key_token.kind());
+      let entry = find_entry_by_key(&map, source_key)
+        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
 
-    self.replace_token(&key_token, &new_text)
+      let key_node = entry
+        .key()
+        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+
+      let key_token = find_scalar_token(key_node.syntax())
+        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+
+      let new_text = format_scalar_value(destination_key, key_token.kind());
+
+      self.replace_token(&key_token, &new_text)
+    } else {
+      let value = self
+        .get(source_path)
+        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+
+      self.delete(source_path)?;
+      self.insert_into(destination_path, &value, InsertPosition::Last)
+    }
   }
 
   pub fn delete(&mut self, dot_path: &str) -> Result<(), YerbaError> {

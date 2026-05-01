@@ -135,14 +135,15 @@ enum Command {
     arg_required_else_help = true,
     after_help = indoc! {"
       Examples:
+        yerba rename config.yml database.host database.hostname
         yerba rename config.yml database.host hostname
-        yerba rename config.yml database.name database_name
+        yerba rename config.yml database.host settings.db_host
     "}
   )]
   Rename {
     file: String,
-    path: String,
-    new_key: String,
+    source: String,
+    destination: String,
     #[arg(long)]
     dry_run: bool,
   },
@@ -208,14 +209,13 @@ enum Command {
     arg_required_else_help = true,
     after_help = indoc! {"
       Examples:
-        yerba move-key config.yml database pool --before host
-        yerba move-key config.yml database name --to 0
+        yerba move-key config.yml database.pool --before database.host
+        yerba move-key config.yml database.name --to 0
     "}
   )]
   MoveKey {
     file: String,
     path: String,
-    key: String,
     #[arg(long)]
     before: Option<String>,
     #[arg(long)]
@@ -497,12 +497,12 @@ fn main() {
 
     Command::Rename {
       file,
-      path,
-      new_key,
+      source,
+      destination,
       dry_run,
     } => {
       let mut document = parse_file(&file);
-      run(|| document.rename(&path, &new_key));
+      run(|| document.rename(&source, &destination));
       output(&file, &document, dry_run);
     }
 
@@ -554,24 +554,56 @@ fn main() {
     Command::MoveKey {
       file,
       path,
-      key,
       before,
       after,
       to,
       dry_run,
     } => {
+      let (parent_path, key) = path.rsplit_once('.').unwrap_or(("", &path));
+
       let mut document = parse_file(&file);
+
+      let before_key = before.map(|target| {
+        let (target_parent, target_key) = target.rsplit_once('.').unwrap_or(("", &target));
+
+        if target_parent != parent_path {
+          eprintln!(
+            "Error: cannot move key across different maps ({} → {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
+            path, target
+          );
+
+          process::exit(1);
+        }
+
+        target_key.to_string()
+      });
+
+      let after_key = after.map(|target| {
+        let (target_parent, target_key) = target.rsplit_once('.').unwrap_or(("", &target));
+
+        if target_parent != parent_path {
+          eprintln!(
+            "Error: cannot move key across different maps ({} → {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
+            path, target
+          );
+
+          process::exit(1);
+        }
+
+        target_key.to_string()
+      });
+
       let (from_index, to_index) = resolve_move_indexes(
         &document,
-        &path,
-        &key,
-        before,
-        after,
+        parent_path,
+        key,
+        before_key,
+        after_key,
         to,
-        |document, path, reference| document.resolve_key_index(path, reference),
+        |document, parent_path, reference| document.resolve_key_index(parent_path, reference),
       );
 
-      run(|| document.move_key(&path, from_index, to_index));
+      run(|| document.move_key(parent_path, from_index, to_index));
       output(&file, &document, dry_run);
     }
 

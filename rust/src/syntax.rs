@@ -83,16 +83,27 @@ pub fn unescape_single_quoted(text: &str) -> String {
 }
 
 pub fn preceding_whitespace_indent(node: &SyntaxNode) -> String {
-  preceding_whitespace_token(node)
-    .map(|token| {
-      let text = token.text();
+  if let Some(token) = preceding_whitespace_token(node) {
+    let text = token.text();
 
-      text
-        .rfind('\n')
-        .map(|newline| text[newline + 1..].to_string())
-        .unwrap_or_default()
-    })
-    .unwrap_or_default()
+    if let Some(newline) = text.rfind('\n') {
+      return text[newline + 1..].to_string();
+    }
+  }
+
+  let start_offset: usize = node.text_range().start().into();
+  let root = node.ancestors().last().unwrap_or_else(|| node.clone());
+  let source = root.text().to_string();
+
+  if start_offset > 0 {
+    let before = &source[..start_offset];
+
+    if let Some(newline_position) = before.rfind('\n') {
+      return before[newline_position + 1..].to_string();
+    }
+  }
+
+  String::new()
 }
 
 pub fn preceding_whitespace_token(node: &SyntaxNode) -> Option<SyntaxToken> {

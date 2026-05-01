@@ -12,8 +12,8 @@ use crate::QuoteStyle;
 
 use crate::syntax::{
   extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
-  is_yaml_non_string, preceding_whitespace_indent, removal_range, unescape_double_quoted,
-  unescape_single_quoted,
+  is_yaml_non_string, preceding_whitespace_indent, preceding_whitespace_token, removal_range,
+  unescape_double_quoted, unescape_single_quoted,
 };
 
 #[derive(Debug)]
@@ -967,6 +967,74 @@ impl Document {
     } else {
       Err(YerbaError::UnknownKeys(all_unknown))
     }
+  }
+
+  pub fn enforce_blank_lines(
+    &mut self,
+    dot_path: &str,
+    blank_lines: usize,
+  ) -> Result<(), YerbaError> {
+    let keys: Vec<&str> = dot_path.split('.').collect();
+    let current_node = self.navigate_to_path(&keys)?;
+
+    let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+      Some(sequence) => sequence,
+      None => return Ok(()),
+    };
+
+    let entries: Vec<_> = sequence.entries().collect();
+
+    if entries.len() <= 1 {
+      return Ok(());
+    }
+
+    let source = self.root.text().to_string();
+    let mut edits: Vec<(TextRange, String)> = Vec::new();
+
+    for entry in entries.iter().skip(1) {
+      if let Some(whitespace_token) = preceding_whitespace_token(entry.syntax()) {
+        let whitespace_text = whitespace_token.text();
+
+        let newline_count = whitespace_text
+          .chars()
+          .filter(|character| *character == '\n')
+          .count();
+
+        let indent = whitespace_text
+          .rfind('\n')
+          .map(|position| &whitespace_text[position + 1..])
+          .unwrap_or("");
+
+        let desired_newlines = blank_lines + 1;
+
+        if newline_count != desired_newlines {
+          let new_whitespace = format!("{}{}", "\n".repeat(desired_newlines), indent);
+
+          edits.push((whitespace_token.text_range(), new_whitespace));
+        }
+      }
+    }
+
+    if edits.is_empty() {
+      return Ok(());
+    }
+
+    edits.reverse();
+
+    let mut new_source = source;
+
+    for (range, replacement) in edits {
+      let start: usize = range.start().into();
+      let end: usize = range.end().into();
+
+      new_source.replace_range(start..end, &replacement);
+    }
+
+    let path = self.path.take();
+    *self = Self::parse(&new_source)?;
+    self.path = path;
+
+    Ok(())
   }
 
   pub fn enforce_key_style(

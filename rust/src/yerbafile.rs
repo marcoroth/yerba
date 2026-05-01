@@ -17,6 +17,15 @@ pub struct Rule {
   pub sort_keys: Option<SortKeysRule>,
   #[serde(default)]
   pub quote_style: Option<QuoteStyleRule>,
+  #[serde(default)]
+  pub blank_lines: Option<BlankLinesRule>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BlankLinesRule {
+  #[serde(default)]
+  pub path: String,
+  pub count: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -212,6 +221,14 @@ impl Yerbafile {
         .collect();
 
       if let Err(error) = document.sort_keys(&sort_keys_rule.path, &key_order) {
+        had_error = Some(format!("{}", error));
+      }
+    }
+
+    if let Some(blank_lines_rule) = &rule.blank_lines {
+      if let Err(error) =
+        document.enforce_blank_lines(&blank_lines_rule.path, blank_lines_rule.count)
+      {
         had_error = Some(format!("{}", error));
       }
     }

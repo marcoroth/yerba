@@ -1,0 +1,12 @@
+- id: talk-a
+  title: First Talk
+  speakers:
+    - Alice
+- id: talk-b
+  title: Second Talk
+  speakers:
+    - Bob
+- id: talk-c
+  title: Third Talk
+  speakers:
+    - Charlie

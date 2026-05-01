@@ -274,6 +274,25 @@ enum Command {
     dry_run: bool,
   },
 
+  #[command(
+    about = "Enforce blank lines between sequence entries",
+    arg_required_else_help = true,
+    after_help = indoc! {r#"
+      Examples:
+        yerba blank-lines videos.yml "" 1
+        yerba blank-lines "data/**/videos.yml" "[]" 1
+        yerba blank-lines config.yml tags 0
+    "#}
+  )]
+  BlankLines {
+    file: String,
+    path: String,
+    /// Number of blank lines between entries (0 = no blanks, 1 = one empty line)
+    count: usize,
+    #[arg(long)]
+    dry_run: bool,
+  },
+
   #[command(about = "Apply all rules from the Yerbafile and write changes")]
   Apply,
   #[command(about = "Check if all files match Yerbafile rules (exits 1 if not)")]
@@ -612,6 +631,21 @@ fn main() {
         }
 
         output(&resolved_file, &document, dry_run);
+      }
+    }
+
+    Command::BlankLines {
+      file,
+      path,
+      count,
+      dry_run,
+    } => {
+      for resolved_file in resolve_files(&file) {
+        let mut document = parse_file(&resolved_file);
+
+        if document.enforce_blank_lines(&path, count).is_ok() {
+          output(&resolved_file, &document, dry_run);
+        }
       }
     }
 

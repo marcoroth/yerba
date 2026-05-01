@@ -9,8 +9,12 @@ fn main() {
     println!("🧉 yerba v{}", yerba::version());
     println!();
     println!("Usage:");
-    println!("  yerba get <file> <path>");
-    println!("  yerba set <file> <path> <value> [--dry-run]");
+    println!("  yerba get <file> <path> [--condition <cond>]");
+    println!("  yerba get-all <file> <path> [--condition <cond>]");
+    println!("  yerba find <file> <path> [--select <fields>] [--condition <cond>] [--raw]");
+    println!(
+      "  yerba set <file> <path> <value> [--if-exists] [--if-missing] [--condition <cond>] [--dry-run]"
+    );
     println!("  yerba rename <file> <path> <new_key> [--dry-run]");
     println!("  yerba append <file> <path> <value> [--dry-run]");
     println!("  yerba delete <file> <path> [--dry-run]");
@@ -44,14 +48,26 @@ fn main() {
   match command.as_str() {
     "get" => {
       if args.len() < 4 {
-        eprintln!("Usage: yerba get <file> <path>");
+        eprintln!("Usage: yerba get <file> <path> [--condition <cond>]");
         process::exit(1);
       }
 
       let file = &args[2];
       let path = &args[3];
+      let condition = parse_option(&args, "--condition");
 
       let document = parse_file(file);
+
+      if let Some(condition) = condition {
+        let parent_path = path
+          .rsplit_once('.')
+          .map(|(parent, _)| parent)
+          .unwrap_or("");
+
+        if !document.evaluate_condition(parent_path, condition) {
+          process::exit(0);
+        }
+      }
 
       match document.get(path) {
         Some(value) => println!("{}", value),
@@ -62,9 +78,143 @@ fn main() {
       }
     }
 
+    "get-all" => {
+      if args.len() < 4 {
+        eprintln!("Usage: yerba get-all <file> <path> [--condition <cond>]");
+        process::exit(1);
+      }
+
+      let file_pattern = &args[2];
+      let path = &args[3];
+      let condition = parse_option(&args, "--condition");
+
+      for file in resolve_files(file_pattern) {
+        let document = parse_file(&file);
+
+        if let Some(condition) = condition {
+          let parent_path = path
+            .rsplit_once('.')
+            .map(|(parent, _)| parent)
+            .unwrap_or("");
+
+          if !document.evaluate_condition(parent_path, condition) {
+            continue;
+          }
+        }
+
+        for value in document.get_all(path) {
+          println!("{}", value);
+        }
+      }
+    }
+
+    "find" => {
+      if args.len() < 4 {
+        eprintln!(
+          "Usage: yerba find <file> <path> [--select <fields>] [--condition <cond>] [--raw]"
+        );
+
+        process::exit(1);
+      }
+
+      let file_pattern = &args[2];
+      let path = &args[3];
+      let raw = args.iter().any(|arg| arg == "--raw");
+      let condition = parse_option(&args, "--condition");
+      let select_fields: Option<Vec<&str>> =
+        parse_option(&args, "--select").map(|fields| fields.split(',').collect());
+
+      if raw {
+        for file in resolve_files(file_pattern) {
+          let document = parse_file(&file);
+
+          let matches = match condition {
+            Some(condition) => document.find_items(path, condition),
+            None => document
+              .navigate_to_many(path)
+              .iter()
+              .map(|node| node.text().to_string())
+              .collect(),
+          };
+
+          for (index, item) in matches.iter().enumerate() {
+            if index > 0 {
+              println!();
+            }
+
+            eprintln!("# {}", file);
+            println!("{}", item);
+          }
+        }
+      } else {
+        let mut all_results: Vec<serde_json::Value> = Vec::new();
+
+        for file in resolve_files(file_pattern) {
+          let document = parse_file(&file);
+
+          let matches = match condition {
+            Some(condition) => document.find_items(path, condition),
+
+            None => document
+              .navigate_to_many(path)
+              .iter()
+              .map(|node| node.text().to_string())
+              .collect(),
+          };
+
+          for item in &matches {
+            let yaml_with_dash = format!("- {}", item.trim_start_matches("- "));
+
+            if let Ok(parsed) = serde_yaml::from_str::<Vec<serde_yaml::Value>>(&yaml_with_dash) {
+              for value in parsed {
+                let mut result = serde_json::Map::new();
+
+                result.insert(
+                  "__file".to_string(),
+                  serde_json::Value::String(file.clone()),
+                );
+
+                match &select_fields {
+                  Some(fields) => {
+                    for field in fields {
+                      let json_value = resolve_select_field(&value, field);
+                      result.insert(field.to_string(), json_value);
+                    }
+                  }
+
+                  None => {
+                    if let serde_yaml::Value::Mapping(map) = &value {
+                      for (key, val) in map {
+                        let json_key = match key {
+                          serde_yaml::Value::String(string) => string.clone(),
+                          _ => format!("{:?}", key),
+                        };
+
+                        result.insert(json_key, yaml_to_json(val));
+                      }
+                    }
+                  }
+                }
+
+                all_results.push(serde_json::Value::Object(result));
+              }
+            }
+          }
+        }
+
+        println!(
+          "{}",
+          serde_json::to_string_pretty(&all_results).unwrap_or_else(|_| "[]".to_string())
+        );
+      }
+    }
+
     "set" => {
       if args.len() < 5 {
-        eprintln!("Usage: yerba set <file> <path> <value> [--dry-run]");
+        eprintln!(
+          "Usage: yerba set <file> <path> <value> [--if-exists] [--if-missing] [--condition <cond>] [--dry-run]"
+        );
+
         process::exit(1);
       }
 
@@ -72,8 +222,32 @@ fn main() {
       let path = &args[3];
       let value = &args[4];
 
+      let if_exists = args.iter().any(|arg| arg == "--if-exists");
+      let if_missing = args.iter().any(|arg| arg == "--if-missing");
+
+      let if_condition = parse_option(&args, "--condition");
+
       let mut document = parse_file(file);
-      run(|| document.set(path, value));
+
+      let parent_path = path
+        .rsplit_once('.')
+        .map(|(parent, _)| parent)
+        .unwrap_or("");
+
+      let should_set = if if_exists {
+        document.exists(path)
+      } else if if_missing {
+        !document.exists(path)
+      } else if let Some(condition) = if_condition {
+        document.evaluate_condition(parent_path, condition)
+      } else {
+        true
+      };
+
+      if should_set {
+        run(|| document.set(path, value));
+      }
+
       output(file, &document, dry_run);
     }
 
@@ -138,6 +312,7 @@ fn main() {
 
     "apply" | "check" => {
       let write = command == "apply";
+
       let yerbafile_path = yerba::Yerbafile::find().unwrap_or_else(|| {
         eprintln!("No Yerbafile found. Create one in the current directory or a parent.");
         process::exit(1);
@@ -157,6 +332,7 @@ fn main() {
       for result in &results {
         if let Some(error) = &result.error {
           eprintln!("  error: {} — {}", result.file, error);
+
           has_errors = true;
         } else if result.changed {
           if write {
@@ -164,6 +340,7 @@ fn main() {
           } else {
             eprintln!("  would change: {}", result.file);
           }
+
           has_changes = true;
         }
       }
@@ -197,6 +374,7 @@ fn main() {
 
       let style: yerba::QuoteStyle = style_name.parse().unwrap_or_else(|error| {
         eprintln!("{}", error);
+
         process::exit(1);
       });
 
@@ -412,6 +590,14 @@ fn main() {
   }
 }
 
+fn parse_option<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
+  args
+    .iter()
+    .position(|arg| arg == flag)
+    .and_then(|index| args.get(index + 1))
+    .map(|value| value.as_str())
+}
+
 fn resolve_files(pattern: &str) -> Vec<String> {
   if pattern.contains('*') || pattern.contains('?') || pattern.contains('[') {
     let paths: Vec<String> = glob::glob(pattern)
@@ -458,4 +644,153 @@ fn output(file: &str, document: &yerba::Document, dry_run: bool) {
       process::exit(1);
     });
   }
+}
+
+fn yaml_to_json(value: &serde_yaml::Value) -> serde_json::Value {
+  match value {
+    serde_yaml::Value::Null => serde_json::Value::Null,
+    serde_yaml::Value::Bool(boolean) => serde_json::Value::Bool(*boolean),
+
+    serde_yaml::Value::Number(number) => {
+      if let Some(integer) = number.as_i64() {
+        serde_json::Value::Number(integer.into())
+      } else if let Some(float) = number.as_f64() {
+        serde_json::json!(float)
+      } else {
+        serde_json::Value::String(number.to_string())
+      }
+    }
+
+    serde_yaml::Value::String(string) => serde_json::Value::String(string.clone()),
+
+    serde_yaml::Value::Sequence(sequence) => {
+      serde_json::Value::Array(sequence.iter().map(yaml_to_json).collect())
+    }
+
+    serde_yaml::Value::Mapping(mapping) => {
+      let mut map = serde_json::Map::new();
+
+      for (key, val) in mapping {
+        let json_key = match key {
+          serde_yaml::Value::String(string) => string.clone(),
+          _ => format!("{:?}", key),
+        };
+
+        map.insert(json_key, yaml_to_json(val));
+      }
+
+      serde_json::Value::Object(map)
+    }
+
+    serde_yaml::Value::Tagged(tagged) => yaml_to_json(&tagged.value),
+  }
+}
+
+fn resolve_select_field(value: &serde_yaml::Value, field: &str) -> serde_json::Value {
+  if !field.contains('.') && !field.contains("[]") {
+    if let serde_yaml::Value::Mapping(map) = value {
+      for (key, val) in map {
+        if let serde_yaml::Value::String(key_string) = key {
+          if key_string == field {
+            return yaml_to_json(val);
+          }
+        }
+      }
+    }
+
+    return serde_json::Value::Null;
+  }
+
+  let mut current_values = vec![value.clone()];
+
+  for segment in parse_select_segments(field) {
+    let mut next_values = Vec::new();
+
+    for current in &current_values {
+      match segment {
+        "[]" => {
+          if let serde_yaml::Value::Sequence(sequence) = current {
+            next_values.extend(sequence.iter().cloned());
+          }
+        }
+
+        key => {
+          if let serde_yaml::Value::Mapping(map) = current {
+            for (map_key, val) in map {
+              if let serde_yaml::Value::String(key_string) = map_key {
+                if key_string == key {
+                  next_values.push(val.clone());
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    current_values = next_values;
+  }
+
+  let used_brackets = field.contains("[]");
+
+  if current_values.is_empty() {
+    if used_brackets {
+      serde_json::Value::Array(Vec::new())
+    } else {
+      serde_json::Value::Null
+    }
+  } else if current_values.len() == 1 && !used_brackets {
+    yaml_to_json(&current_values[0])
+  } else {
+    serde_json::Value::Array(current_values.iter().map(yaml_to_json).collect())
+  }
+}
+
+fn parse_select_segments(field: &str) -> Vec<&str> {
+  let mut segments = Vec::new();
+  let mut rest = field;
+
+  while !rest.is_empty() {
+    if rest.starts_with("[]") {
+      segments.push("[]");
+      rest = &rest[2..];
+
+      if rest.starts_with('.') {
+        rest = &rest[1..];
+      }
+    } else {
+      let dot_index = rest.find('.');
+      let bracket_index = rest.find("[]");
+
+      let split_at = match (dot_index, bracket_index) {
+        (Some(dot), Some(bracket)) => Some(dot.min(bracket)),
+        (Some(dot), None) => Some(dot),
+        (None, Some(bracket)) => Some(bracket),
+        (None, None) => None,
+      };
+
+      match split_at {
+        Some(index) => {
+          let segment = &rest[..index];
+
+          if !segment.is_empty() {
+            segments.push(segment);
+          }
+
+          rest = &rest[index..];
+
+          if rest.starts_with('.') {
+            rest = &rest[1..];
+          }
+        }
+
+        None => {
+          segments.push(rest);
+          break;
+        }
+      }
+    }
+  }
+
+  segments
 }

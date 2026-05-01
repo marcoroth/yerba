@@ -44,10 +44,180 @@ impl Document {
   }
 
   pub fn get(&self, dot_path: &str) -> Option<String> {
+    if dot_path.contains("[]") {
+      return self.get_all(dot_path).into_iter().next();
+    }
+
     let keys: Vec<&str> = dot_path.split('.').collect();
     let current_node = self.navigate_to_path(&keys).ok()?;
 
     extract_scalar_text(&current_node)
+  }
+
+  pub fn get_all(&self, dot_path: &str) -> Vec<String> {
+    self
+      .navigate_to_many(dot_path)
+      .iter()
+      .filter_map(extract_scalar_text)
+      .collect()
+  }
+
+    let nodes = self.navigate_to_many(dot_path);
+
+    nodes
+      .iter()
+      .filter(|node| {
+        self.evaluate_condition_on_node(node, condition)
+      })
+      .map(|node| node.text().to_string())
+      .collect()
+  }
+
+  fn evaluate_condition_on_node(&self, node: &SyntaxNode, condition: &str) -> bool {
+    let condition = condition.trim();
+
+    let (left, operator, right) = match parse_condition(condition) {
+      Some(parts) => parts,
+      None => return false,
+    };
+
+    let left_path = left.strip_prefix('.').unwrap_or(&left);
+    let target_nodes = navigate_from_node(node, left_path);
+
+    let values: Vec<String> = target_nodes
+      .iter()
+      .filter_map(extract_scalar_text)
+      .collect();
+
+    match operator {
+      "==" => values.iter().any(|value| value == &right),
+      "!=" => values.iter().all(|value| value != &right),
+      "contains" => {
+        if values.iter().any(|value| value == &right) {
+          return true;
+        }
+
+        for node in &target_nodes {
+          if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+            for entry in sequence.entries() {
+              if let Some(text) = entry
+                .flow()
+                .and_then(|flow| extract_scalar_text(flow.syntax()))
+              {
+                if text == right {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+
+        false
+      }
+      "not_contains" => {
+        for node in &target_nodes {
+          if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+            for entry in sequence.entries() {
+              if let Some(text) = entry
+                .flow()
+                .and_then(|flow| extract_scalar_text(flow.syntax()))
+              {
+                if text == right {
+                  return false;
+                }
+              }
+            }
+          }
+        }
+
+        !values.iter().any(|value| value == &right)
+      }
+      _ => false,
+    }
+  }
+
+  pub fn exists(&self, dot_path: &str) -> bool {
+    if dot_path.contains("[]") {
+      return !self.navigate_to_many(dot_path).is_empty();
+    }
+
+    self.get(dot_path).is_some()
+  }
+
+  pub fn evaluate_condition(&self, parent_path: &str, condition: &str) -> bool {
+    let condition = condition.trim();
+
+    let (left, operator, right) = match parse_condition(condition) {
+      Some(parts) => parts,
+      None => return false,
+    };
+
+    let full_path = if let Some(relative_key) = left.strip_prefix('.') {
+      if parent_path.is_empty() {
+        relative_key.to_string()
+      } else {
+        format!("{}.{}", parent_path, relative_key)
+      }
+    } else {
+      left.to_string()
+    };
+
+
+    match operator {
+      "==" => {
+        if has_brackets {
+          self.get_all(&full_path).iter().any(|value| value == &right)
+        } else {
+          self.get(&full_path).unwrap_or_default() == right
+        }
+      }
+      "!=" => {
+        if has_brackets {
+          self.get_all(&full_path).iter().all(|value| value != &right)
+        } else {
+          self.get(&full_path).unwrap_or_default() != right
+        }
+      }
+      "contains" => {
+        if has_brackets {
+          self.get_all(&full_path).iter().any(|value| value == &right)
+        } else {
+          let items = self.get_sequence_values(&full_path);
+          items.iter().any(|item| item == &right)
+        }
+      }
+      "not_contains" => {
+        if has_brackets {
+          self.get_all(&full_path).iter().all(|value| value != &right)
+        } else {
+          let items = self.get_sequence_values(&full_path);
+          !items.iter().any(|item| item == &right)
+        }
+      }
+      _ => false,
+    }
+  }
+
+  pub fn get_sequence_values(&self, dot_path: &str) -> Vec<String> {
+    let keys: Vec<&str> = dot_path.split('.').collect();
+    let current_node = match self.navigate_to_path(&keys) {
+      Ok(node) => node,
+      Err(_) => return Vec::new(),
+    };
+
+    let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+      Some(sequence) => sequence,
+      None => return Vec::new(),
+    };
+
+    sequence
+      .entries()
+      .filter_map(|entry| {
+        entry
+          .flow()
+          .and_then(|flow| extract_scalar_text(flow.syntax()))
+      })
+      .collect()
   }
 
   pub fn set(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
@@ -720,6 +890,56 @@ impl Document {
     Ok(())
   }
 
+  pub fn navigate_to_many(&self, dot_path: &str) -> Vec<SyntaxNode> {
+    let segments = parse_path_segments(dot_path);
+
+    let root = match Root::cast(self.root.clone()) {
+      Some(root) => root,
+      None => return Vec::new(),
+    };
+
+    let document = match root.documents().next() {
+      Some(document) => document,
+      None => return Vec::new(),
+    };
+
+    let mut current_nodes = vec![document.syntax().clone()];
+
+    for segment in &segments {
+      let mut next_nodes = Vec::new();
+
+      for node in &current_nodes {
+        match *segment {
+          "[]" => {
+            if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+              for entry in sequence.entries() {
+                next_nodes.push(entry.syntax().clone());
+              }
+            }
+          }
+
+          key => {
+            if let Some(map) = node.descendants().find_map(BlockMap::cast) {
+              if let Some(entry) = find_entry_by_key(&map, key) {
+                if let Some(value) = entry.value() {
+                  next_nodes.push(value.syntax().clone());
+                }
+              }
+            }
+          }
+        }
+      }
+
+      current_nodes = next_nodes;
+
+      if current_nodes.is_empty() {
+        break;
+      }
+    }
+
+    current_nodes
+  }
+
   fn navigate_to_path(&self, keys: &[&str]) -> Result<SyntaxNode, YerbaError> {
     let keys: Vec<&&str> = keys.iter().filter(|key| !key.is_empty()).collect();
     let path_string = keys.iter().map(|key| **key).collect::<Vec<_>>().join(".");
@@ -827,6 +1047,135 @@ impl std::fmt::Display for Document {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.root.text())
   }
+}
+
+fn parse_condition(condition: &str) -> Option<(String, &str, String)> {
+  let (left, operator, right) = if let Some(index) = condition.find(" not_contains ") {
+    (
+      condition[..index].trim(),
+      "not_contains",
+      condition[index + 14..].trim(),
+    )
+  } else if let Some(index) = condition.find(" contains ") {
+    (
+      condition[..index].trim(),
+      "contains",
+      condition[index + 10..].trim(),
+    )
+  } else if let Some(index) = condition.find("!=") {
+    (
+      condition[..index].trim(),
+      "!=",
+      condition[index + 2..].trim(),
+    )
+  } else if let Some(index) = condition.find("==") {
+    (
+      condition[..index].trim(),
+      "==",
+      condition[index + 2..].trim(),
+    )
+  } else {
+    return None;
+  };
+
+  let right = right
+    .trim_start_matches('"')
+    .trim_end_matches('"')
+    .trim_start_matches('\'')
+    .trim_end_matches('\'');
+
+  Some((left.to_string(), operator, right.to_string()))
+}
+
+fn parse_path_segments(path: &str) -> Vec<&str> {
+  if path.is_empty() {
+    return Vec::new();
+  }
+
+  let mut segments = Vec::new();
+  let mut rest = path;
+
+  while !rest.is_empty() {
+    if rest.starts_with("[]") {
+      segments.push("[]");
+      rest = &rest[2..];
+
+      if rest.starts_with('.') {
+        rest = &rest[1..];
+      }
+    } else {
+      let dot_index = rest.find('.');
+      let bracket_index = rest.find("[]");
+
+      let split_at = match (dot_index, bracket_index) {
+        (Some(dot), Some(bracket)) => Some(dot.min(bracket)),
+        (Some(dot), None) => Some(dot),
+        (None, Some(bracket)) => Some(bracket),
+        (None, None) => None,
+      };
+
+      match split_at {
+        Some(index) => {
+          let segment = &rest[..index];
+
+          if !segment.is_empty() {
+            segments.push(segment);
+          }
+
+          rest = &rest[index..];
+
+          if rest.starts_with('.') {
+            rest = &rest[1..];
+          }
+        }
+
+        None => {
+          segments.push(rest);
+          break;
+        }
+      }
+    }
+  }
+
+  segments
+}
+
+fn navigate_from_node(node: &SyntaxNode, path: &str) -> Vec<SyntaxNode> {
+  let segments = parse_path_segments(path);
+  let mut current_nodes = vec![node.clone()];
+
+  for segment in &segments {
+    let mut next_nodes = Vec::new();
+
+    for current in &current_nodes {
+      match *segment {
+        "[]" => {
+          if let Some(sequence) = current.descendants().find_map(BlockSeq::cast) {
+            for entry in sequence.entries() {
+              next_nodes.push(entry.syntax().clone());
+            }
+          }
+        }
+        key => {
+          if let Some(map) = current.descendants().find_map(BlockMap::cast) {
+            if let Some(entry) = find_entry_by_key(&map, key) {
+              if let Some(value) = entry.value() {
+                next_nodes.push(value.syntax().clone());
+              }
+            }
+          }
+        }
+      }
+    }
+
+    current_nodes = next_nodes;
+
+    if current_nodes.is_empty() {
+      break;
+    }
+  }
+
+  current_nodes
 }
 
 fn rebuild_entries<'a>(entries: impl Iterator<Item = &'a str>, indent: &str) -> String {

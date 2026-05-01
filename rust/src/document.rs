@@ -974,9 +974,14 @@ impl Document {
     }
   }
 
-  pub fn sort_items(&mut self, dot_path: &str, sort_fields: &[SortField]) -> Result<(), YerbaError> {
+  pub fn sort_items(
+    &mut self,
+    dot_path: &str,
+    sort_fields: &[SortField],
+    case_sensitive: bool,
+  ) -> Result<(), YerbaError> {
     if dot_path.contains("[].") {
-      return self.sort_each_items(dot_path, sort_fields);
+      return self.sort_each_items(dot_path, sort_fields, case_sensitive);
     }
 
     let keys: Vec<&str> = dot_path.split('.').collect();
@@ -1022,7 +1027,11 @@ impl Document {
         let value_a = &values_a[index];
         let value_b = &values_b[index];
 
-        let ordering = value_a.cmp(value_b);
+        let ordering = if case_sensitive {
+          value_a.cmp(value_b)
+        } else {
+          value_a.to_lowercase().cmp(&value_b.to_lowercase())
+        };
 
         let ordering = if field.ascending { ordering } else { ordering.reverse() };
 
@@ -1032,7 +1041,11 @@ impl Document {
       }
 
       if sort_fields.is_empty() && !values_a.is_empty() && !values_b.is_empty() {
-        return values_a[0].cmp(&values_b[0]);
+        return if case_sensitive {
+          values_a[0].cmp(&values_b[0])
+        } else {
+          values_a[0].to_lowercase().cmp(&values_b[0].to_lowercase())
+        };
       }
 
       std::cmp::Ordering::Equal
@@ -1055,7 +1068,12 @@ impl Document {
     self.apply_edit(sequence_range, &sequence_text)
   }
 
-  fn sort_each_items(&mut self, dot_path: &str, sort_fields: &[SortField]) -> Result<(), YerbaError> {
+  fn sort_each_items(
+    &mut self,
+    dot_path: &str,
+    sort_fields: &[SortField],
+    case_sensitive: bool,
+  ) -> Result<(), YerbaError> {
     let (parent_path, child_path) = if let Some(last_bracket) = dot_path.rfind("[].") {
       (&dot_path[..last_bracket + 2], &dot_path[last_bracket + 3..])
     } else {
@@ -1114,7 +1132,12 @@ impl Document {
             let value_a = &values_a[index];
             let value_b = &values_b[index];
 
-            let ordering = value_a.cmp(value_b);
+            let ordering = if case_sensitive {
+              value_a.cmp(value_b)
+            } else {
+              value_a.to_lowercase().cmp(&value_b.to_lowercase())
+            };
+
             let ordering = if field.ascending { ordering } else { ordering.reverse() };
 
             if ordering != std::cmp::Ordering::Equal {
@@ -1123,7 +1146,11 @@ impl Document {
           }
 
           if sort_fields.is_empty() && !values_a.is_empty() && !values_b.is_empty() {
-            return values_a[0].cmp(&values_b[0]);
+            return if case_sensitive {
+              values_a[0].cmp(&values_b[0])
+            } else {
+              values_a[0].to_lowercase().cmp(&values_b[0].to_lowercase())
+            };
           }
 
           std::cmp::Ordering::Equal

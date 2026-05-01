@@ -40,6 +40,8 @@ pub struct SortConfig {
   pub path: Option<String>,
   #[serde(default)]
   pub by: Option<String>,
+  #[serde(default)]
+  pub case_sensitive: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -518,9 +520,13 @@ fn execute_step(
 
     PipelineStep::Sort(config) => {
       let full_path = resolve_step_path(base_path, config.path.as_deref());
-      let sort_fields = config.by.as_deref().map(crate::SortField::parse_list).unwrap_or_default();
+      let sort_fields = config
+        .by
+        .as_deref()
+        .map(crate::SortField::parse_list)
+        .unwrap_or_default();
 
-      document.sort_items(&full_path, &sort_fields)
+      document.sort_items(&full_path, &sort_fields, config.case_sensitive)
     }
   }
 }

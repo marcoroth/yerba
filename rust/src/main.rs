@@ -265,6 +265,9 @@ enum Command {
     /// Comma-separated sort fields, optionally with :desc (e.g. "date:desc,title")
     #[arg(long)]
     by: Option<String>,
+    /// Case-sensitive sort (default: case-insensitive)
+    #[arg(long)]
+    case_sensitive: bool,
     #[arg(long)]
     dry_run: bool,
   },
@@ -669,6 +672,7 @@ fn main() {
       file,
       path,
       by,
+      case_sensitive,
       dry_run,
     } => {
       let sort_fields = by.as_deref().map(yerba::SortField::parse_list).unwrap_or_default();
@@ -676,7 +680,7 @@ fn main() {
       for resolved_file in resolve_files(&file) {
         let mut document = parse_file(&resolved_file);
 
-        if document.sort_items(&path, &sort_fields).is_ok() {
+        if document.sort_items(&path, &sort_fields, case_sensitive).is_ok() {
           output(&resolved_file, &document, dry_run);
         }
       }

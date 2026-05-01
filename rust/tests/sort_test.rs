@@ -5,7 +5,7 @@ fn test_sort_simple_array() {
   let yaml = "tags:\n  - rust\n  - yaml\n  - ruby\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document.sort_items("tags", &[]).unwrap();
+  document.sort_items("tags", &[], true).unwrap();
 
   assert_eq!(document.to_string(), "tags:\n  - ruby\n  - rust\n  - yaml\n");
 }
@@ -15,7 +15,7 @@ fn test_sort_already_sorted_noop() {
   let yaml = "tags:\n  - a\n  - b\n  - c\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document.sort_items("tags", &[]).unwrap();
+  document.sort_items("tags", &[], true).unwrap();
 
   assert_eq!(document.to_string(), "tags:\n  - a\n  - b\n  - c\n");
 }
@@ -25,7 +25,7 @@ fn test_sort_by_field() {
   let yaml = "- name: Charlie\n- name: Alice\n- name: Bob\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document.sort_items("", &[SortField::asc("name")]).unwrap();
+  document.sort_items("", &[SortField::asc("name")], true).unwrap();
 
   assert_eq!(document.to_string(), "- name: Alice\n- name: Bob\n- name: Charlie\n");
 }
@@ -35,7 +35,7 @@ fn test_sort_by_field_descending() {
   let yaml = "- name: Alice\n- name: Bob\n- name: Charlie\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document.sort_items("", &[SortField::desc("name")]).unwrap();
+  document.sort_items("", &[SortField::desc("name")], true).unwrap();
 
   assert_eq!(document.to_string(), "- name: Charlie\n- name: Bob\n- name: Alice\n");
 }
@@ -46,7 +46,7 @@ fn test_sort_by_multiple_fields() {
   let mut document = Document::parse(yaml).unwrap();
 
   document
-    .sort_items("", &[SortField::asc("kind"), SortField::asc("title")])
+    .sort_items("", &[SortField::asc("kind"), SortField::asc("title")], true)
     .unwrap();
 
   assert_eq!(
@@ -61,7 +61,7 @@ fn test_sort_by_mixed_directions() {
   let mut document = Document::parse(yaml).unwrap();
 
   document
-    .sort_items("", &[SortField::asc("kind"), SortField::desc("title")])
+    .sort_items("", &[SortField::asc("kind"), SortField::desc("title")], true)
     .unwrap();
 
   assert_eq!(
@@ -75,7 +75,7 @@ fn test_sort_nested_sequence() {
   let yaml = "data:\n  items:\n    - c\n    - a\n    - b\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document.sort_items("data.items", &[]).unwrap();
+  document.sort_items("data.items", &[], true).unwrap();
 
   assert_eq!(document.to_string(), "data:\n  items:\n    - a\n    - b\n    - c\n");
 }
@@ -85,7 +85,7 @@ fn test_sort_each_nested_sequence() {
   let yaml = "- tags:\n    - rust\n    - ruby\n- tags:\n    - yaml\n    - go\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document.sort_items("[].tags", &[]).unwrap();
+  document.sort_items("[].tags", &[], true).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -98,7 +98,7 @@ fn test_sort_single_item_noop() {
   let yaml = "tags:\n  - only\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document.sort_items("tags", &[]).unwrap();
+  document.sort_items("tags", &[], true).unwrap();
 
   assert_eq!(document.to_string(), "tags:\n  - only\n");
 }
@@ -132,7 +132,37 @@ fn test_sort_preserves_comments() {
   let yaml = "# tags\ntags:\n  - rust\n  - ruby\n# end\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document.sort_items("tags", &[]).unwrap();
+  document.sort_items("tags", &[], true).unwrap();
 
   assert_eq!(document.to_string(), "# tags\ntags:\n  - ruby\n  - rust\n# end\n");
+}
+
+#[test]
+fn test_sort_case_insensitive() {
+  let yaml = "- name: charlie\n- name: Alice\n- name: Bob\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.sort_items("", &[SortField::asc("name")], false).unwrap();
+
+  assert_eq!(document.to_string(), "- name: Alice\n- name: Bob\n- name: charlie\n");
+}
+
+#[test]
+fn test_sort_case_sensitive() {
+  let yaml = "- name: charlie\n- name: Alice\n- name: Bob\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.sort_items("", &[SortField::asc("name")], true).unwrap();
+
+  assert_eq!(document.to_string(), "- name: Alice\n- name: Bob\n- name: charlie\n");
+}
+
+#[test]
+fn test_sort_case_insensitive_simple_array() {
+  let yaml = "tags:\n  - Rust\n  - apple\n  - Banana\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.sort_items("tags", &[], false).unwrap();
+
+  assert_eq!(document.to_string(), "tags:\n  - apple\n  - Banana\n  - Rust\n");
 }

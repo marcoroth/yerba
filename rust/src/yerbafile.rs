@@ -162,6 +162,7 @@ impl Yerbafile {
             had_error = Some(format!("{}", error));
           }
         }
+
         Err(error) => {
           had_error = Some(error);
         }

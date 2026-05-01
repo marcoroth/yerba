@@ -35,8 +35,11 @@ impl Document {
   pub fn parse_file(path: impl AsRef<Path>) -> Result<Self, YerbaError> {
     let path = path.as_ref();
     let source = fs::read_to_string(path)?;
+
     let mut document = Self::parse(&source)?;
+
     document.path = Some(path.to_path_buf());
+
     Ok(document)
   }
 
@@ -406,11 +409,14 @@ impl Document {
             let text = token.text();
             text[1..text.len() - 1].to_string()
           }
+
           SyntaxKind::SINGLE_QUOTED_SCALAR => {
             let text = token.text();
             text[1..text.len() - 1].to_string()
           }
+
           SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
+
           _ => continue,
         };
 
@@ -546,10 +552,10 @@ impl Document {
 
     let mut reordered = entry_texts.clone();
     let item = reordered.remove(from);
+
     reordered.insert(to, item);
 
     let indent = entries.get(1).map(&get_indent).unwrap_or_default();
-
     let text = rebuild_entries(reordered.iter().map(|text| text.as_str()), &indent);
 
     self.apply_edit(range, &text)

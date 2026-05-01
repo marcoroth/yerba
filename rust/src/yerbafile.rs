@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -268,32 +269,35 @@ impl Yerbafile {
           let full_path = resolve_step_path(rule.path.as_deref(), config.path.as_deref());
           let key_order: Vec<&str> = config.order.iter().map(|key| key.as_str()).collect();
 
-          for file in &file_strings {
-            let document = match Document::parse_file(file) {
-              Ok(document) => document,
+          let validation_results: Vec<RuleResult> = file_strings
+            .par_iter()
+            .filter_map(|file| {
+              let document = match Document::parse_file(file) {
+                Ok(document) => document,
+                Err(error) => {
+                  return Some(RuleResult {
+                    file: file.clone(),
+                    changed: false,
+                    error: Some(format!("{}", error)),
+                  });
+                }
+              };
 
-              Err(error) => {
-                results.push(RuleResult {
+              if let Err(error) = document.validate_sort_keys(&full_path, &key_order) {
+                Some(RuleResult {
                   file: file.clone(),
                   changed: false,
                   error: Some(format!("{}", error)),
-                });
-
-                has_validation_error = true;
-
-                continue;
+                })
+              } else {
+                None
               }
-            };
+            })
+            .collect();
 
-            if let Err(error) = document.validate_sort_keys(&full_path, &key_order) {
-              results.push(RuleResult {
-                file: file.clone(),
-                changed: false,
-                error: Some(format!("{}", error)),
-              });
-
-              has_validation_error = true;
-            }
+          if !validation_results.is_empty() {
+            has_validation_error = true;
+            results.extend(validation_results);
           }
         }
       }
@@ -302,11 +306,12 @@ impl Yerbafile {
         continue;
       }
 
-      for file in &file_strings {
-        let result = self.apply_pipeline_to_file(rule, file, write);
+      let file_results: Vec<RuleResult> = file_strings
+        .par_iter()
+        .map(|file| self.apply_pipeline_to_file(rule, file, write))
+        .collect();
 
-        results.push(result);
-      }
+      results.extend(file_results);
     }
 
     results

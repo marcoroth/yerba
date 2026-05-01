@@ -17,6 +17,8 @@
 
 **Yerba** is a lossless YAML editing tool that lets you programmatically modify YAML files while preserving their original structure, comments, and formatting.
 
+Yerba was born out of the need to manage, validate, programmatically modify, and enforce lossless and consistent style/formatting for the YAML data files in the [RubyEvents.org](https://github.com/rubyevents/rubyevents) project.
+
 ### Command-Line Usage
 
 Install the Yerba gem via RubyGems:

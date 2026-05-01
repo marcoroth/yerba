@@ -4,7 +4,7 @@ mod quote_style;
 mod syntax;
 pub mod yerbafile;
 
-pub use document::{Document, FindResult, InsertPosition};
+pub use document::{Document, FindResult, InsertPosition, SortField};
 pub use error::YerbaError;
 pub use quote_style::QuoteStyle;
 pub use yerbafile::{resolve_template, Variable, Yerbafile};

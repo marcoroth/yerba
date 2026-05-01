@@ -23,6 +23,43 @@ pub struct FindResult {
   pub end_line: usize,
 }
 
+#[derive(Debug, Clone)]
+pub struct SortField {
+  pub path: String,
+  pub ascending: bool,
+}
+
+impl SortField {
+  pub fn asc(path: &str) -> Self {
+    SortField {
+      path: path.to_string(),
+      ascending: true,
+    }
+  }
+
+  pub fn desc(path: &str) -> Self {
+    SortField {
+      path: path.to_string(),
+      ascending: false,
+    }
+  }
+
+  pub fn parse(input: &str) -> Self {
+    if let Some((path, direction)) = input.rsplit_once(':') {
+      match direction {
+        "desc" | "descending" => SortField::desc(path),
+        _ => SortField::asc(input),
+      }
+    } else {
+      SortField::asc(input)
+    }
+  }
+
+  pub fn parse_list(input: &str) -> Vec<Self> {
+    input.split(',').map(|field| SortField::parse(field.trim())).collect()
+  }
+}
+
 #[derive(Debug)]
 pub enum InsertPosition {
   At(usize),
@@ -935,6 +972,200 @@ impl Document {
     } else {
       Err(YerbaError::UnknownKeys(all_unknown))
     }
+  }
+
+  pub fn sort_items(&mut self, dot_path: &str, sort_fields: &[SortField]) -> Result<(), YerbaError> {
+    if dot_path.contains("[].") {
+      return self.sort_each_items(dot_path, sort_fields);
+    }
+
+    let keys: Vec<&str> = dot_path.split('.').collect();
+    let current_node = self.navigate_to_path(&keys)?;
+
+    let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+      Some(sequence) => sequence,
+      None => return Ok(()),
+    };
+
+    let entries: Vec<_> = sequence.entries().collect();
+
+    if entries.len() <= 1 {
+      return Ok(());
+    }
+
+    let mut sortable: Vec<(Vec<String>, String)> = entries
+      .iter()
+      .map(|entry| {
+        let sort_values = if sort_fields.is_empty() {
+          vec![entry
+            .flow()
+            .and_then(|flow| extract_scalar_text(flow.syntax()))
+            .unwrap_or_default()]
+        } else {
+          sort_fields
+            .iter()
+            .map(|field| {
+              let nodes = navigate_from_node(entry.syntax(), &field.path);
+              nodes.first().and_then(extract_scalar_text).unwrap_or_default()
+            })
+            .collect()
+        };
+
+        (sort_values, entry.syntax().text().to_string())
+      })
+      .collect();
+
+    let original_order: Vec<String> = sortable.iter().map(|(_, text)| text.clone()).collect();
+
+    sortable.sort_by(|(values_a, _), (values_b, _)| {
+      for (index, field) in sort_fields.iter().enumerate().take(values_a.len()) {
+        let value_a = &values_a[index];
+        let value_b = &values_b[index];
+
+        let ordering = value_a.cmp(value_b);
+
+        let ordering = if field.ascending { ordering } else { ordering.reverse() };
+
+        if ordering != std::cmp::Ordering::Equal {
+          return ordering;
+        }
+      }
+
+      if sort_fields.is_empty() && !values_a.is_empty() && !values_b.is_empty() {
+        return values_a[0].cmp(&values_b[0]);
+      }
+
+      std::cmp::Ordering::Equal
+    });
+
+    let sorted_texts: Vec<String> = sortable.into_iter().map(|(_, text)| text).collect();
+
+    if sorted_texts == original_order {
+      return Ok(());
+    }
+
+    let indent = entries
+      .get(1)
+      .map(|entry| preceding_whitespace_indent(entry.syntax()))
+      .unwrap_or_default();
+
+    let sequence_text = rebuild_entries(sorted_texts.iter().map(|text| text.as_str()), &indent);
+    let sequence_range = sequence.syntax().text_range();
+
+    self.apply_edit(sequence_range, &sequence_text)
+  }
+
+  fn sort_each_items(&mut self, dot_path: &str, sort_fields: &[SortField]) -> Result<(), YerbaError> {
+    let (parent_path, child_path) = if let Some(last_bracket) = dot_path.rfind("[].") {
+      (&dot_path[..last_bracket + 2], &dot_path[last_bracket + 3..])
+    } else {
+      (dot_path, "")
+    };
+
+    let parent_nodes = self.navigate_to_many(parent_path);
+    let source = self.root.text().to_string();
+    let mut edits: Vec<(TextRange, String)> = Vec::new();
+
+    for parent_node in &parent_nodes {
+      let child_nodes = if child_path.is_empty() {
+        vec![parent_node.clone()]
+      } else {
+        navigate_from_node(parent_node, child_path)
+      };
+
+      for child_node in &child_nodes {
+        let sequence = match child_node.descendants().find_map(BlockSeq::cast) {
+          Some(sequence) => sequence,
+          None => continue,
+        };
+
+        let entries: Vec<_> = sequence.entries().collect();
+
+        if entries.len() <= 1 {
+          continue;
+        }
+
+        let mut sortable: Vec<(Vec<String>, String)> = entries
+          .iter()
+          .map(|entry| {
+            let sort_values = if sort_fields.is_empty() {
+              vec![entry
+                .flow()
+                .and_then(|flow| extract_scalar_text(flow.syntax()))
+                .unwrap_or_default()]
+            } else {
+              sort_fields
+                .iter()
+                .map(|field| {
+                  let nodes = navigate_from_node(entry.syntax(), &field.path);
+                  nodes.first().and_then(extract_scalar_text).unwrap_or_default()
+                })
+                .collect()
+            };
+
+            (sort_values, entry.syntax().text().to_string())
+          })
+          .collect();
+
+        let original_order: Vec<String> = sortable.iter().map(|(_, text)| text.clone()).collect();
+
+        sortable.sort_by(|(values_a, _), (values_b, _)| {
+          for (index, field) in sort_fields.iter().enumerate().take(values_a.len()) {
+            let value_a = &values_a[index];
+            let value_b = &values_b[index];
+
+            let ordering = value_a.cmp(value_b);
+            let ordering = if field.ascending { ordering } else { ordering.reverse() };
+
+            if ordering != std::cmp::Ordering::Equal {
+              return ordering;
+            }
+          }
+
+          if sort_fields.is_empty() && !values_a.is_empty() && !values_b.is_empty() {
+            return values_a[0].cmp(&values_b[0]);
+          }
+
+          std::cmp::Ordering::Equal
+        });
+
+        let sorted_texts: Vec<String> = sortable.into_iter().map(|(_, text)| text).collect();
+
+        if sorted_texts == original_order {
+          continue;
+        }
+
+        let indent = entries
+          .get(1)
+          .map(|entry| preceding_whitespace_indent(entry.syntax()))
+          .unwrap_or_default();
+
+        let sequence_text = rebuild_entries(sorted_texts.iter().map(|text| text.as_str()), &indent);
+
+        edits.push((sequence.syntax().text_range(), sequence_text));
+      }
+    }
+
+    if edits.is_empty() {
+      return Ok(());
+    }
+
+    edits.reverse();
+
+    let mut new_source = source;
+
+    for (range, replacement) in edits {
+      let start: usize = range.start().into();
+      let end: usize = range.end().into();
+
+      new_source.replace_range(start..end, &replacement);
+    }
+
+    let path = self.path.take();
+    *self = Self::parse(&new_source)?;
+    self.path = path;
+
+    Ok(())
   }
 
   pub fn enforce_blank_lines(&mut self, dot_path: &str, blank_lines: usize) -> Result<(), YerbaError> {

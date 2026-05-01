@@ -79,56 +79,47 @@ impl<'de> Deserialize<'de> for PipelineStep {
     let mapping = serde_yaml::Mapping::deserialize(deserializer)?;
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("get".to_string())) {
-      let config: GetConfig =
-        serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      let config: GetConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Get(config));
     }
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("sort_keys".to_string())) {
-      let config: SortKeysConfig =
-        serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      let config: SortKeysConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::SortKeys(config));
     }
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("quote_style".to_string())) {
-      let config: QuoteStyleConfig =
-        serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      let config: QuoteStyleConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::QuoteStyle(config));
     }
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("set".to_string())) {
-      let config: SetConfig =
-        serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      let config: SetConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Set(config));
     }
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("insert".to_string())) {
-      let config: InsertConfig =
-        serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      let config: InsertConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Insert(config));
     }
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("delete".to_string())) {
-      let config: DeleteConfig =
-        serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      let config: DeleteConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Delete(config));
     }
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("rename".to_string())) {
-      let config: RenameConfig =
-        serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      let config: RenameConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Rename(config));
     }
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("remove".to_string())) {
-      let config: RemoveConfig =
-        serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      let config: RemoveConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Remove(config));
     }
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("blank_lines".to_string())) {
-      let config: BlankLinesConfig =
-        serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      let config: BlankLinesConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::BlankLines(config));
     }
 
@@ -377,8 +368,8 @@ fn execute_step(
       if let Some(file_pattern) = &config.file {
         let mut all_values = Vec::new();
 
-        let files = glob::glob(file_pattern)
-          .map_err(|error| YerbaError::ParseError(format!("invalid glob: {}", error)))?;
+        let files =
+          glob::glob(file_pattern).map_err(|error| YerbaError::ParseError(format!("invalid glob: {}", error)))?;
 
         for entry in files.flatten() {
           let external_document = Document::parse_file(&entry)?;
@@ -386,10 +377,7 @@ fn execute_step(
         }
 
         if all_values.len() == 1 && !config.path.contains('[') {
-          variables.insert(
-            config.as_name.clone(),
-            Variable::Single(all_values.remove(0)),
-          );
+          variables.insert(config.as_name.clone(), Variable::Single(all_values.remove(0)));
         } else {
           variables.insert(config.as_name.clone(), Variable::List(all_values));
         }
@@ -410,10 +398,7 @@ fn execute_step(
     PipelineStep::QuoteStyle(config) => {
       let dot_path = config.path.as_deref();
 
-      let key_style = config
-        .key_style
-        .parse::<QuoteStyle>()
-        .map_err(YerbaError::ParseError)?;
+      let key_style = config.key_style.parse::<QuoteStyle>().map_err(YerbaError::ParseError)?;
 
       let value_style = config
         .value_style
@@ -439,10 +424,7 @@ fn execute_step(
 
       if let Some(condition) = &config.condition {
         let resolved_condition = resolve_template(condition, document, base_path, variables)?;
-        let parent_path = full_path
-          .rsplit_once('.')
-          .map(|(parent, _)| parent)
-          .unwrap_or("");
+        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
         if !document.evaluate_condition(parent_path, &resolved_condition) {
           return Ok(());
@@ -458,10 +440,7 @@ fn execute_step(
 
       if let Some(condition) = &config.condition {
         let resolved_condition = resolve_template(condition, document, base_path, variables)?;
-        let parent_path = full_path
-          .rsplit_once('.')
-          .map(|(parent, _)| parent)
-          .unwrap_or("");
+        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
         if !document.evaluate_condition(parent_path, &resolved_condition) {
           return Ok(());
@@ -476,10 +455,7 @@ fn execute_step(
 
       if let Some(condition) = &config.condition {
         let resolved_condition = resolve_template(condition, document, base_path, variables)?;
-        let parent_path = full_path
-          .rsplit_once('.')
-          .map(|(parent, _)| parent)
-          .unwrap_or("");
+        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
         if !document.evaluate_condition(parent_path, &resolved_condition) {
           return Ok(());
@@ -494,10 +470,7 @@ fn execute_step(
 
       if let Some(condition) = &config.condition {
         let resolved_condition = resolve_template(condition, document, base_path, variables)?;
-        let parent_path = full_path
-          .rsplit_once('.')
-          .map(|(parent, _)| parent)
-          .unwrap_or("");
+        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
         if !document.evaluate_condition(parent_path, &resolved_condition) {
           return Ok(());
@@ -513,10 +486,7 @@ fn execute_step(
 
       if let Some(condition) = &config.condition {
         let resolved_condition = resolve_template(condition, document, base_path, variables)?;
-        let parent_path = full_path
-          .rsplit_once('.')
-          .map(|(parent, _)| parent)
-          .unwrap_or("");
+        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
         if !document.evaluate_condition(parent_path, &resolved_condition) {
           return Ok(());

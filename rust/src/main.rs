@@ -247,6 +247,29 @@ enum Command {
   },
 
   #[command(
+    about = "Sort items in a sequence by field(s)",
+    arg_required_else_help = true,
+    after_help = indoc! {r#"
+      Examples:
+        yerba sort config.yml tags
+        yerba sort videos.yml "" --by title
+        yerba sort videos.yml "" --by "date:desc,title"
+        yerba sort videos.yml "[].speakers"
+        yerba sort videos.yml "[].speakers" --by name
+        yerba sort videos.yml "" --by "kind,date:desc,title" --dry-run
+    "#}
+  )]
+  Sort {
+    file: String,
+    path: String,
+    /// Comma-separated sort fields, optionally with :desc (e.g. "date:desc,title")
+    #[arg(long)]
+    by: Option<String>,
+    #[arg(long)]
+    dry_run: bool,
+  },
+
+  #[command(
     about = "Enforce a consistent quote style on values, keys, or both",
     arg_required_else_help = true,
     after_help = indoc! {"
@@ -639,6 +662,23 @@ fn main() {
         }
 
         output(&resolved_file, &document, dry_run);
+      }
+    }
+
+    Command::Sort {
+      file,
+      path,
+      by,
+      dry_run,
+    } => {
+      let sort_fields = by.as_deref().map(yerba::SortField::parse_list).unwrap_or_default();
+
+      for resolved_file in resolve_files(&file) {
+        let mut document = parse_file(&resolved_file);
+
+        if document.sort_items(&path, &sort_fields).is_ok() {
+          output(&resolved_file, &document, dry_run);
+        }
       }
     }
 

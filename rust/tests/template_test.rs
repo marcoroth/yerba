@@ -87,10 +87,7 @@ fn test_template_resolves_single_variable() {
   let document = Document::parse("id: test\n").unwrap();
   let mut variables = HashMap::new();
 
-  variables.insert(
-    "my_var".to_string(),
-    Variable::Single("stored_value".to_string()),
-  );
+  variables.insert("my_var".to_string(), Variable::Single("stored_value".to_string()));
 
   let result = resolve_template("${my_var}", &document, None, &variables).unwrap();
 
@@ -104,11 +101,7 @@ fn test_template_resolves_list_variable() {
 
   variables.insert(
     "names".to_string(),
-    Variable::List(vec![
-      "Alice".to_string(),
-      "Bob".to_string(),
-      "Charlie".to_string(),
-    ]),
+    Variable::List(vec!["Alice".to_string(), "Bob".to_string(), "Charlie".to_string()]),
   );
 
   let result = resolve_template("${names}", &document, None, &variables).unwrap();
@@ -121,10 +114,7 @@ fn test_template_variable_takes_precedence_over_document() {
   let document = Document::parse("id: from-document\n").unwrap();
   let mut variables = HashMap::new();
 
-  variables.insert(
-    "id".to_string(),
-    Variable::Single("from-variable".to_string()),
-  );
+  variables.insert("id".to_string(), Variable::Single("from-variable".to_string()));
 
   let result = resolve_template("${id}", &document, None, &variables).unwrap();
 
@@ -165,13 +155,7 @@ fn test_simulated_get_then_set_with_prefix() {
   let value = document.get("id").unwrap();
   variables.insert("id".to_string(), Variable::Single(value));
 
-  let resolved = resolve_template(
-    "https://example.com/talks/${id}",
-    &document,
-    None,
-    &variables,
-  )
-  .unwrap();
+  let resolved = resolve_template("https://example.com/talks/${id}", &document, None, &variables).unwrap();
   document.set("url", &resolved).unwrap();
 
   assert_eq!(

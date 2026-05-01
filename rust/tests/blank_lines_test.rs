@@ -43,10 +43,7 @@ fn test_blank_lines_nested_sequence() {
 
   document.enforce_blank_lines("tags", 1).unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "tags:\n  - ruby\n\n  - rust\n\n  - yaml\n"
-  );
+  assert_eq!(document.to_string(), "tags:\n  - ruby\n\n  - rust\n\n  - yaml\n");
 }
 
 #[test]
@@ -76,10 +73,7 @@ fn test_blank_lines_preserves_comments() {
 
   document.enforce_blank_lines("", 1).unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "# comment\n- id: a\n\n- id: b\n# end\n"
-  );
+  assert_eq!(document.to_string(), "# comment\n- id: a\n\n- id: b\n# end\n");
 }
 
 #[test]

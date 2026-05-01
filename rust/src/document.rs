@@ -11,9 +11,9 @@ use crate::error::YerbaError;
 use crate::QuoteStyle;
 
 use crate::syntax::{
-  extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
-  is_yaml_non_string, preceding_whitespace_indent, preceding_whitespace_token, removal_range,
-  unescape_double_quoted, unescape_single_quoted,
+  extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key, is_yaml_non_string,
+  preceding_whitespace_indent, preceding_whitespace_token, removal_range, unescape_double_quoted,
+  unescape_single_quoted,
 };
 
 #[derive(Debug)]
@@ -40,13 +40,9 @@ pub struct Document {
 
 impl Document {
   pub fn parse(source: &str) -> Result<Self, YerbaError> {
-    let tree =
-      yaml_parser::parse(source).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
+    let tree = yaml_parser::parse(source).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
 
-    Ok(Document {
-      root: tree,
-      path: None,
-    })
+    Ok(Document { root: tree, path: None })
   }
 
   pub fn parse_file(path: impl AsRef<Path>) -> Result<Self, YerbaError> {
@@ -129,29 +125,20 @@ impl Document {
     let left_path = left.strip_prefix('.').unwrap_or(&left);
     let target_nodes = navigate_from_node(node, left_path);
 
-    let values: Vec<String> = target_nodes
-      .iter()
-      .filter_map(extract_scalar_text)
-      .collect();
+    let values: Vec<String> = target_nodes.iter().filter_map(extract_scalar_text).collect();
 
     match operator {
       "==" => values.iter().any(|value| value == &right),
       "!=" => values.iter().all(|value| value != &right),
       "contains" => {
-        if values
-          .iter()
-          .any(|value| value == &right || value.contains(&right))
-        {
+        if values.iter().any(|value| value == &right || value.contains(&right)) {
           return true;
         }
 
         for node in &target_nodes {
           if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
             for entry in sequence.entries() {
-              if let Some(text) = entry
-                .flow()
-                .and_then(|flow| extract_scalar_text(flow.syntax()))
-              {
+              if let Some(text) = entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())) {
                 if text == right {
                   return true;
                 }
@@ -166,10 +153,7 @@ impl Document {
         for node in &target_nodes {
           if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
             for entry in sequence.entries() {
-              if let Some(text) = entry
-                .flow()
-                .and_then(|flow| extract_scalar_text(flow.syntax()))
-              {
+              if let Some(text) = entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())) {
                 if text == right {
                   return false;
                 }
@@ -178,9 +162,7 @@ impl Document {
           }
         }
 
-        !values
-          .iter()
-          .any(|value| value == &right || value.contains(&right))
+        !values.iter().any(|value| value == &right || value.contains(&right))
       }
       _ => false,
     }
@@ -285,11 +267,7 @@ impl Document {
 
     sequence
       .entries()
-      .filter_map(|entry| {
-        entry
-          .flow()
-          .and_then(|flow| extract_scalar_text(flow.syntax()))
-      })
+      .filter_map(|entry| entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())))
       .collect()
   }
 
@@ -297,8 +275,8 @@ impl Document {
     let keys: Vec<&str> = dot_path.split('.').collect();
     let current_node = self.navigate_to_path(&keys)?;
 
-    let scalar_token = find_scalar_token(&current_node)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+    let scalar_token =
+      find_scalar_token(&current_node).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
 
     let new_text = format_scalar_value(value, scalar_token.kind());
 
@@ -309,20 +287,11 @@ impl Document {
     self.insert_into(dot_path, value, InsertPosition::Last)
   }
 
-  pub fn insert_into(
-    &mut self,
-    dot_path: &str,
-    value: &str,
-    position: InsertPosition,
-  ) -> Result<(), YerbaError> {
+  pub fn insert_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     let keys: Vec<&str> = dot_path.split('.').collect();
 
     if let Ok(current_node) = self.navigate_to_path(&keys) {
-      if current_node
-        .descendants()
-        .find_map(BlockSeq::cast)
-        .is_some()
-      {
+      if current_node.descendants().find_map(BlockSeq::cast).is_some() {
         return self.insert_sequence_item(dot_path, value, position);
       }
     }
@@ -332,12 +301,7 @@ impl Document {
     self.insert_map_key(parent_path, key, value, position)
   }
 
-  fn insert_sequence_item(
-    &mut self,
-    dot_path: &str,
-    value: &str,
-    position: InsertPosition,
-  ) -> Result<(), YerbaError> {
+  fn insert_sequence_item(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     let keys: Vec<&str> = dot_path.split('.').collect();
     let current_node = self.navigate_to_path(&keys)?;
 
@@ -394,9 +358,7 @@ impl Document {
               .map(|text| text == target_value)
               .unwrap_or(false)
           })
-          .ok_or_else(|| {
-            YerbaError::PathNotFound(format!("{} item '{}'", dot_path, target_value))
-          })?;
+          .ok_or_else(|| YerbaError::PathNotFound(format!("{} item '{}'", dot_path, target_value)))?;
 
         let target_range = target_entry.syntax().text_range();
         let replacement = format!("{}\n{}", new_item, indent);
@@ -415,9 +377,7 @@ impl Document {
               .map(|text| text == target_value)
               .unwrap_or(false)
           })
-          .ok_or_else(|| {
-            YerbaError::PathNotFound(format!("{} item '{}'", dot_path, target_value))
-          })?;
+          .ok_or_else(|| YerbaError::PathNotFound(format!("{} item '{}'", dot_path, target_value)))?;
 
         let new_text = format!("\n{}{}", indent, new_item);
 
@@ -545,10 +505,7 @@ impl Document {
   }
 
   pub fn rename(&mut self, source_path: &str, destination_path: &str) -> Result<(), YerbaError> {
-    let source_parent = source_path
-      .rsplit_once('.')
-      .map(|(parent, _)| parent)
-      .unwrap_or("");
+    let source_parent = source_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
     let destination_parent = destination_path
       .rsplit_once('.')
@@ -570,15 +527,15 @@ impl Document {
         .find_map(BlockMap::cast)
         .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
 
-      let entry = find_entry_by_key(&map, source_key)
-        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+      let entry =
+        find_entry_by_key(&map, source_key).ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
 
       let key_node = entry
         .key()
         .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
 
-      let key_token = find_scalar_token(key_node.syntax())
-        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+      let key_token =
+        find_scalar_token(key_node.syntax()).ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
 
       let new_text = format_scalar_value(destination_key, key_token.kind());
 
@@ -603,8 +560,7 @@ impl Document {
       .find_map(BlockMap::cast)
       .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
 
-    let entry = find_entry_by_key(&map, last_key)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+    let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
 
     self.remove_node(entry.syntax())
   }
@@ -715,11 +671,7 @@ impl Document {
       .ok_or_else(|| YerbaError::PathNotFound(format!("{} key '{}'", dot_path, reference)))
   }
 
-  pub fn resolve_sequence_index(
-    &self,
-    dot_path: &str,
-    reference: &str,
-  ) -> Result<usize, YerbaError> {
+  pub fn resolve_sequence_index(&self, dot_path: &str, reference: &str) -> Result<usize, YerbaError> {
     let keys: Vec<&str> = dot_path.split('.').collect();
     let current_node = self.navigate_to_path(&keys)?;
 
@@ -773,11 +725,7 @@ impl Document {
 
     let unknown_keys: Vec<String> = map
       .entries()
-      .filter_map(|entry| {
-        entry
-          .key()
-          .and_then(|key_node| extract_scalar_text(key_node.syntax()))
-      })
+      .filter_map(|entry| entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())))
       .filter(|key_name| !key_order.contains(&key_name.as_str()))
       .collect();
 
@@ -956,11 +904,7 @@ impl Document {
     Ok(())
   }
 
-  pub fn validate_each_sort_keys(
-    &self,
-    dot_path: &str,
-    key_order: &[&str],
-  ) -> Result<(), YerbaError> {
+  pub fn validate_each_sort_keys(&self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
     let keys: Vec<&str> = dot_path.split('.').collect();
     let current_node = self.navigate_to_path(&keys)?;
 
@@ -993,11 +937,7 @@ impl Document {
     }
   }
 
-  pub fn enforce_blank_lines(
-    &mut self,
-    dot_path: &str,
-    blank_lines: usize,
-  ) -> Result<(), YerbaError> {
+  pub fn enforce_blank_lines(&mut self, dot_path: &str, blank_lines: usize) -> Result<(), YerbaError> {
     let keys: Vec<&str> = dot_path.split('.').collect();
     let current_node = self.navigate_to_path(&keys)?;
 
@@ -1019,10 +959,7 @@ impl Document {
       if let Some(whitespace_token) = preceding_whitespace_token(entry.syntax()) {
         let whitespace_text = whitespace_token.text();
 
-        let newline_count = whitespace_text
-          .chars()
-          .filter(|character| *character == '\n')
-          .count();
+        let newline_count = whitespace_text.chars().filter(|character| *character == '\n').count();
 
         let indent = whitespace_text
           .rfind('\n')
@@ -1061,11 +998,7 @@ impl Document {
     Ok(())
   }
 
-  pub fn enforce_key_style(
-    &mut self,
-    style: &QuoteStyle,
-    dot_path: Option<&str>,
-  ) -> Result<(), YerbaError> {
+  pub fn enforce_key_style(&mut self, style: &QuoteStyle, dot_path: Option<&str>) -> Result<(), YerbaError> {
     let source = self.root.text().to_string();
 
     let scope_node = match dot_path {
@@ -1093,9 +1026,7 @@ impl Document {
 
         if !matches!(
           current_kind,
-          SyntaxKind::PLAIN_SCALAR
-            | SyntaxKind::DOUBLE_QUOTED_SCALAR
-            | SyntaxKind::SINGLE_QUOTED_SCALAR
+          SyntaxKind::PLAIN_SCALAR | SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR
         ) {
           continue;
         }
@@ -1170,11 +1101,7 @@ impl Document {
     self.enforce_quotes_at(style, None)
   }
 
-  pub fn enforce_quotes_at(
-    &mut self,
-    style: &QuoteStyle,
-    dot_path: Option<&str>,
-  ) -> Result<(), YerbaError> {
+  pub fn enforce_quotes_at(&mut self, style: &QuoteStyle, dot_path: Option<&str>) -> Result<(), YerbaError> {
     let source = self.root.text().to_string();
 
     let scope_node = match dot_path {
@@ -1203,9 +1130,7 @@ impl Document {
 
         if !matches!(
           current_kind,
-          SyntaxKind::PLAIN_SCALAR
-            | SyntaxKind::DOUBLE_QUOTED_SCALAR
-            | SyntaxKind::SINGLE_QUOTED_SCALAR
+          SyntaxKind::PLAIN_SCALAR | SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR
         ) {
           continue;
         }
@@ -1252,10 +1177,7 @@ impl Document {
           }
 
           QuoteStyle::Plain => {
-            if raw_value.contains('"')
-              || raw_value.contains('\'')
-              || raw_value.contains(':')
-              || raw_value.contains('#')
+            if raw_value.contains('"') || raw_value.contains('\'') || raw_value.contains(':') || raw_value.contains('#')
             {
               continue;
             }
@@ -1330,10 +1252,7 @@ impl Document {
 
     if segments.is_empty() {
       if let Some(sequence) = document.syntax().descendants().find_map(BlockSeq::cast) {
-        current_nodes = sequence
-          .entries()
-          .map(|entry| entry.syntax().clone())
-          .collect();
+        current_nodes = sequence.entries().map(|entry| entry.syntax().clone()).collect();
       }
 
       return current_nodes;
@@ -1360,8 +1279,7 @@ impl Document {
     let keys: Vec<&&str> = keys.iter().filter(|key| !key.is_empty()).collect();
     let path_string = keys.iter().map(|key| **key).collect::<Vec<_>>().join(".");
 
-    let root =
-      Root::cast(self.root.clone()).ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
+    let root = Root::cast(self.root.clone()).ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
 
     let document = root
       .documents()
@@ -1376,8 +1294,7 @@ impl Document {
         .find_map(BlockMap::cast)
         .ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
 
-      let entry = find_entry_by_key(&map, key)
-        .ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
+      let entry = find_entry_by_key(&map, key).ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
 
       let map_value = entry
         .value()
@@ -1473,23 +1390,11 @@ fn parse_condition(condition: &str) -> Option<(String, &str, String)> {
       condition[index + 14..].trim(),
     )
   } else if let Some(index) = condition.find(" contains ") {
-    (
-      condition[..index].trim(),
-      "contains",
-      condition[index + 10..].trim(),
-    )
+    (condition[..index].trim(), "contains", condition[index + 10..].trim())
   } else if let Some(index) = condition.find("!=") {
-    (
-      condition[..index].trim(),
-      "!=",
-      condition[index + 2..].trim(),
-    )
+    (condition[..index].trim(), "!=", condition[index + 2..].trim())
   } else if let Some(index) = condition.find("==") {
-    (
-      condition[..index].trim(),
-      "==",
-      condition[index + 2..].trim(),
-    )
+    (condition[..index].trim(), "==", condition[index + 2..].trim())
   } else {
     return None;
   };
@@ -1576,10 +1481,7 @@ fn resolve_segment(node: &SyntaxNode, segment: &str) -> Vec<SyntaxNode> {
   if segment.starts_with('[') {
     if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
       match parse_bracket_index(segment) {
-        None => sequence
-          .entries()
-          .map(|entry| entry.syntax().clone())
-          .collect(),
+        None => sequence.entries().map(|entry| entry.syntax().clone()).collect(),
 
         Some(index) => sequence
           .entries()

@@ -17,10 +17,7 @@ fn test_delete_nested_key() {
 
   document.delete("database.port").unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "database:\n  host: localhost\n  name: myapp\n"
-  );
+  assert_eq!(document.to_string(), "database:\n  host: localhost\n  name: myapp\n");
 }
 
 #[test]

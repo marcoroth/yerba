@@ -67,10 +67,7 @@ fn test_get_all_nested_brackets() {
   let yaml = "- speakers:\n    - name: Alice\n    - name: Bob\n- speakers:\n    - name: Charlie\n";
   let document = Document::parse(yaml).unwrap();
 
-  assert_eq!(
-    document.get_all("[].speakers[].name"),
-    vec!["Alice", "Bob", "Charlie"]
-  );
+  assert_eq!(document.get_all("[].speakers[].name"), vec!["Alice", "Bob", "Charlie"]);
 }
 
 #[test]
@@ -78,10 +75,7 @@ fn test_get_all_with_key_prefix() {
   let yaml = "data:\n  items:\n    - name: first\n    - name: second\n";
   let document = Document::parse(yaml).unwrap();
 
-  assert_eq!(
-    document.get_all("data.items.[].name"),
-    vec!["first", "second"]
-  );
+  assert_eq!(document.get_all("data.items.[].name"), vec!["first", "second"]);
 }
 
 #[test]
@@ -89,10 +83,7 @@ fn test_get_sequence_values() {
   let yaml = "tags:\n  - ruby\n  - rust\n  - yaml\n";
   let document = Document::parse(yaml).unwrap();
 
-  assert_eq!(
-    document.get_sequence_values("tags"),
-    vec!["ruby", "rust", "yaml"]
-  );
+  assert_eq!(document.get_sequence_values("tags"), vec!["ruby", "rust", "yaml"]);
 }
 
 #[test]

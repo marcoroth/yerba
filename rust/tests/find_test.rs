@@ -2,8 +2,7 @@ use yerba::Document;
 
 #[test]
 fn test_find_items_by_equality() {
-  let yaml =
-    "- kind: keynote\n  title: Opening\n- kind: talk\n  title: Testing\n- kind: keynote\n  title: Closing\n";
+  let yaml = "- kind: keynote\n  title: Opening\n- kind: talk\n  title: Testing\n- kind: keynote\n  title: Closing\n";
   let document = Document::parse(yaml).unwrap();
 
   let results = document.find_items("[]", ".kind == keynote");
@@ -15,8 +14,7 @@ fn test_find_items_by_equality() {
 
 #[test]
 fn test_find_items_by_contains() {
-  let yaml =
-    "- title: Talk A\n  speakers:\n    - Alice\n    - Bob\n- title: Talk B\n  speakers:\n    - Charlie\n";
+  let yaml = "- title: Talk A\n  speakers:\n    - Alice\n    - Bob\n- title: Talk B\n  speakers:\n    - Charlie\n";
   let document = Document::parse(yaml).unwrap();
 
   let results = document.find_items("[]", ".speakers contains \"Alice\"");
@@ -37,8 +35,7 @@ fn test_find_items_no_matches() {
 
 #[test]
 fn test_find_items_nested_path() {
-  let yaml =
-    "conferences:\n  - name: RailsConf\n    year: 2024\n  - name: RubyKaigi\n    year: 2025\n";
+  let yaml = "conferences:\n  - name: RailsConf\n    year: 2024\n  - name: RubyKaigi\n    year: 2025\n";
   let document = Document::parse(yaml).unwrap();
 
   let results = document.find_items("conferences.[]", ".year == 2024");

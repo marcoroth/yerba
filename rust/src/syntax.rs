@@ -27,9 +27,7 @@ pub fn find_scalar_token(node: &SyntaxNode) -> Option<SyntaxToken> {
     .find(|token| {
       matches!(
         token.kind(),
-        SyntaxKind::PLAIN_SCALAR
-          | SyntaxKind::DOUBLE_QUOTED_SCALAR
-          | SyntaxKind::SINGLE_QUOTED_SCALAR
+        SyntaxKind::PLAIN_SCALAR | SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR
       )
     })
 }
@@ -149,32 +147,14 @@ pub fn is_yaml_non_string(value: &str) -> bool {
   }
 
   // Boolean (YAML 1.2)
-  if matches!(
-    value,
-    "true" | "True" | "TRUE" | "false" | "False" | "FALSE"
-  ) {
+  if matches!(value, "true" | "True" | "TRUE" | "false" | "False" | "FALSE") {
     return true;
   }
 
   // Boolean (YAML 1.1 extras)
   if matches!(
     value,
-    "yes"
-      | "Yes"
-      | "YES"
-      | "no"
-      | "No"
-      | "NO"
-      | "on"
-      | "On"
-      | "ON"
-      | "off"
-      | "Off"
-      | "OFF"
-      | "y"
-      | "Y"
-      | "n"
-      | "N"
+    "yes" | "Yes" | "YES" | "no" | "No" | "NO" | "on" | "On" | "ON" | "off" | "Off" | "OFF" | "y" | "Y" | "n" | "N"
   ) {
     return true;
   }
@@ -182,18 +162,7 @@ pub fn is_yaml_non_string(value: &str) -> bool {
   // Special floats (YAML 1.1 + 1.2)
   if matches!(
     value,
-    ".inf"
-      | ".Inf"
-      | ".INF"
-      | "-.inf"
-      | "-.Inf"
-      | "-.INF"
-      | "+.inf"
-      | "+.Inf"
-      | "+.INF"
-      | ".nan"
-      | ".NaN"
-      | ".NAN"
+    ".inf" | ".Inf" | ".INF" | "-.inf" | "-.Inf" | "-.INF" | "+.inf" | "+.Inf" | "+.INF" | ".nan" | ".NaN" | ".NAN"
   ) {
     return true;
   }
@@ -204,11 +173,7 @@ pub fn is_yaml_non_string(value: &str) -> bool {
   }
 
   // Octal (0o...) and hex (0x...)
-  if value.starts_with("0x")
-    || value.starts_with("0X")
-    || value.starts_with("0o")
-    || value.starts_with("0O")
-  {
+  if value.starts_with("0x") || value.starts_with("0X") || value.starts_with("0o") || value.starts_with("0O") {
     return true;
   }
 

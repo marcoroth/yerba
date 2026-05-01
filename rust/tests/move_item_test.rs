@@ -7,10 +7,7 @@ fn test_move_item_by_index() {
 
   document.move_item("tags", 2, 0).unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "tags:\n  - yaml\n  - ruby\n  - rust\n"
-  );
+  assert_eq!(document.to_string(), "tags:\n  - yaml\n  - ruby\n  - rust\n");
 }
 
 #[test]
@@ -20,10 +17,7 @@ fn test_move_item_forward() {
 
   document.move_item("tags", 0, 2).unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "tags:\n  - rust\n  - yaml\n  - ruby\n"
-  );
+  assert_eq!(document.to_string(), "tags:\n  - rust\n  - yaml\n  - ruby\n");
 }
 
 #[test]
@@ -51,10 +45,7 @@ fn test_move_item_preserves_comments() {
 
   document.move_item("tags", 1, 0).unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "# Tags\ntags:\n  - rust\n  - ruby\n# End\n"
-  );
+  assert_eq!(document.to_string(), "# Tags\ntags:\n  - rust\n  - ruby\n# End\n");
 }
 
 #[test]

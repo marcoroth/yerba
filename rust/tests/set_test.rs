@@ -34,10 +34,7 @@ fn test_set_nested_path() {
 
   document.set("database.host", "0.0.0.0").unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "database:\n  host: 0.0.0.0\n  port: 5432\n"
-  );
+  assert_eq!(document.to_string(), "database:\n  host: 0.0.0.0\n  port: 5432\n");
 }
 
 #[test]
@@ -59,10 +56,7 @@ fn test_set_escapes_double_quotes_in_double_quoted_field() {
 
   document.set("title", "something \"quoted\" here").unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "title: \"something \\\"quoted\\\" here\"\n"
-  );
+  assert_eq!(document.to_string(), "title: \"something \\\"quoted\\\" here\"\n");
 }
 
 #[test]

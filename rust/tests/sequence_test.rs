@@ -7,10 +7,7 @@ fn test_append_to_sequence() {
 
   document.append("tags", "yaml").unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "tags:\n  - ruby\n  - rust\n  - yaml\n"
-  );
+  assert_eq!(document.to_string(), "tags:\n  - ruby\n  - rust\n  - yaml\n");
 }
 
 #[test]
@@ -56,10 +53,7 @@ fn test_remove_from_nested_sequence() {
 
   document.remove("app.tags", "rust").unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "app:\n  tags:\n    - ruby\n    - yaml\n"
-  );
+  assert_eq!(document.to_string(), "app:\n  tags:\n    - ruby\n    - yaml\n");
 }
 
 #[test]

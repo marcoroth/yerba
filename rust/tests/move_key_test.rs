@@ -54,10 +54,7 @@ fn test_move_key_same_index_noop() {
 
   document.move_key("database", 0, 0).unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "database:\n  host: localhost\n  port: 5432\n"
-  );
+  assert_eq!(document.to_string(), "database:\n  host: localhost\n  port: 5432\n");
 }
 
 #[test]
@@ -67,10 +64,7 @@ fn test_move_key_root_level() {
 
   document.move_key("", 2, 0).unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "name: myapp\nhost: localhost\nport: 5432\n"
-  );
+  assert_eq!(document.to_string(), "name: myapp\nhost: localhost\nport: 5432\n");
 }
 
 #[test]

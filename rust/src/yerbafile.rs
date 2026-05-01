@@ -58,8 +58,8 @@ pub struct RuleResult {
 impl Yerbafile {
   pub fn load(path: impl AsRef<Path>) -> Result<Self, YerbaError> {
     let content = fs::read_to_string(path.as_ref())?;
-    let yerbafile: Yerbafile = serde_yaml::from_str(&content)
-      .map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
+    let yerbafile: Yerbafile =
+      serde_yaml::from_str(&content).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
     Ok(yerbafile)
   }
 
@@ -119,17 +119,10 @@ impl Yerbafile {
         }
       };
 
-      let file_strings: Vec<String> = files
-        .iter()
-        .map(|path| path.to_string_lossy().to_string())
-        .collect();
+      let file_strings: Vec<String> = files.iter().map(|path| path.to_string_lossy().to_string()).collect();
 
       if let Some(sort_keys_rule) = &rule.sort_keys {
-        let key_order: Vec<&str> = sort_keys_rule
-          .order
-          .iter()
-          .map(|key| key.as_str())
-          .collect();
+        let key_order: Vec<&str> = sort_keys_rule.order.iter().map(|key| key.as_str()).collect();
 
         let mut has_validation_error = false;
 
@@ -214,11 +207,7 @@ impl Yerbafile {
     }
 
     if let Some(sort_keys_rule) = &rule.sort_keys {
-      let key_order: Vec<&str> = sort_keys_rule
-        .order
-        .iter()
-        .map(|key| key.as_str())
-        .collect();
+      let key_order: Vec<&str> = sort_keys_rule.order.iter().map(|key| key.as_str()).collect();
 
       if let Err(error) = document.sort_keys(&sort_keys_rule.path, &key_order) {
         had_error = Some(format!("{}", error));
@@ -226,9 +215,7 @@ impl Yerbafile {
     }
 
     if let Some(blank_lines_rule) = &rule.blank_lines {
-      if let Err(error) =
-        document.enforce_blank_lines(&blank_lines_rule.path, blank_lines_rule.count)
-      {
+      if let Err(error) = document.enforce_blank_lines(&blank_lines_rule.path, blank_lines_rule.count) {
         had_error = Some(format!("{}", error));
       }
     }

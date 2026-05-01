@@ -15,14 +15,9 @@ fn test_rename_nested_key_same_level() {
   let yaml = "database:\n  host: localhost\n  port: 5432\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document
-    .rename("database.host", "database.hostname")
-    .unwrap();
+  document.rename("database.host", "database.hostname").unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "database:\n  hostname: localhost\n  port: 5432\n"
-  );
+  assert_eq!(document.to_string(), "database:\n  hostname: localhost\n  port: 5432\n");
 }
 
 #[test]
@@ -62,10 +57,7 @@ fn test_rename_relocate_to_root() {
 
   document.rename("database.host", "hostname").unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "database:\n  port: 5432\nhostname: localhost\n"
-  );
+  assert_eq!(document.to_string(), "database:\n  port: 5432\nhostname: localhost\n");
 }
 
 #[test]
@@ -73,9 +65,7 @@ fn test_rename_relocate_to_other_map() {
   let yaml = "database:\n  host: localhost\n  port: 5432\nsettings:\n  debug: true\n";
   let mut document = Document::parse(yaml).unwrap();
 
-  document
-    .rename("database.host", "settings.db_host")
-    .unwrap();
+  document.rename("database.host", "settings.db_host").unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -90,8 +80,5 @@ fn test_rename_relocate_from_root_to_nested() {
 
   document.rename("hostname", "database.host").unwrap();
 
-  assert_eq!(
-    document.to_string(),
-    "database:\n  port: 5432\n  host: localhost\n"
-  );
+  assert_eq!(document.to_string(), "database:\n  port: 5432\n  host: localhost\n");
 }

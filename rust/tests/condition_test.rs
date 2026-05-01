@@ -116,7 +116,8 @@ fn test_evaluate_condition_contains_empty_sequence() {
 
 #[test]
 fn test_evaluate_condition_nested_bracket_contains() {
-  let yaml = "talks:\n  - speakers:\n      - name: Marco Roth\n      - name: Nadia\n  - speakers:\n      - name: Alice\n";
+  let yaml =
+    "talks:\n  - speakers:\n      - name: Marco Roth\n      - name: Nadia\n  - speakers:\n      - name: Alice\n";
   let document = Document::parse(yaml).unwrap();
 
   assert!(document.evaluate_condition("", ".talks[].speakers[].name contains \"Marco Roth\""));

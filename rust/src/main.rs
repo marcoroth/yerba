@@ -305,19 +305,12 @@ fn main() {
   let cli = Cli::parse();
 
   match cli.command {
-    Command::Get {
-      file,
-      path,
-      condition,
-    } => {
+    Command::Get { file, path, condition } => {
       for resolved_file in resolve_files(&file) {
         let document = parse_file(&resolved_file);
 
         if let Some(condition) = &condition {
-          let parent_path = path
-            .rsplit_once('.')
-            .map(|(parent, _)| parent)
-            .unwrap_or("");
+          let parent_path = path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
           if !document.evaluate_condition(parent_path, condition) {
             continue;
@@ -344,8 +337,7 @@ fn main() {
       select,
       raw,
     } => {
-      let select_fields: Option<Vec<&str>> =
-        select.as_deref().map(|fields| fields.split(',').collect());
+      let select_fields: Option<Vec<&str>> = select.as_deref().map(|fields| fields.split(',').collect());
 
       if raw {
         for resolved_file in resolve_files(&file) {
@@ -383,15 +375,9 @@ fn main() {
               for value in parsed {
                 let mut result = serde_json::Map::new();
 
-                result.insert(
-                  "__file".to_string(),
-                  serde_json::Value::String(resolved_file.clone()),
-                );
+                result.insert("__file".to_string(), serde_json::Value::String(resolved_file.clone()));
 
-                result.insert(
-                  "__line".to_string(),
-                  serde_json::Value::Number(item.line.into()),
-                );
+                result.insert("__line".to_string(), serde_json::Value::Number(item.line.into()));
 
                 match &select_fields {
                   Some(fields) => {
@@ -440,10 +426,7 @@ fn main() {
       dry_run,
     } => {
       let mut document = parse_file(&file);
-      let parent_path = path
-        .rsplit_once('.')
-        .map(|(parent, _)| parent)
-        .unwrap_or("");
+      let parent_path = path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
       let should_set = if if_exists {
         document.exists(&path)
@@ -471,10 +454,7 @@ fn main() {
       at,
       dry_run,
     } => {
-      let parent_path = path
-        .rsplit_once('.')
-        .map(|(parent, _)| parent)
-        .unwrap_or("");
+      let parent_path = path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
       let position = if let Some(index) = at {
         yerba::InsertPosition::At(index)
@@ -506,11 +486,7 @@ fn main() {
       output(&file, &document, dry_run);
     }
 
-    Command::Delete {
-      file,
-      path,
-      dry_run,
-    } => {
+    Command::Delete { file, path, dry_run } => {
       let mut document = parse_file(&file);
       run(|| document.delete(&path));
       output(&file, &document, dry_run);

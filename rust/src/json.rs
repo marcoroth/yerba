@@ -15,9 +15,7 @@ pub fn yaml_to_json(value: &serde_yaml::Value) -> serde_json::Value {
 
     serde_yaml::Value::String(string) => serde_json::Value::String(string.clone()),
 
-    serde_yaml::Value::Sequence(sequence) => {
-      serde_json::Value::Array(sequence.iter().map(yaml_to_json).collect())
-    }
+    serde_yaml::Value::Sequence(sequence) => serde_json::Value::Array(sequence.iter().map(yaml_to_json).collect()),
 
     serde_yaml::Value::Mapping(mapping) => {
       let mut map = serde_json::Map::new();

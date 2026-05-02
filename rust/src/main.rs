@@ -1,5 +1,3 @@
-mod json;
-
 use std::fs;
 use std::process;
 
@@ -427,8 +425,8 @@ fn main() {
                 match &select_fields {
                   Some(fields) => {
                     for field in fields {
-                      let json_value = json::resolve_select_field(&value, field);
-                      let json_key = json::select_field_key(field);
+                      let json_value = yerba::json::resolve_select_field(&value, field);
+                      let json_key = yerba::json::select_field_key(field);
 
                       result.insert(json_key, json_value);
                     }
@@ -442,7 +440,7 @@ fn main() {
                           _ => format!("{:?}", key),
                         };
 
-                        result.insert(json_key, json::yaml_to_json(yaml_value));
+                        result.insert(json_key, yerba::json::yaml_to_json(yaml_value));
                       }
                     }
                   }

@@ -1,12 +1,17 @@
 mod document;
 mod error;
+pub mod ffi;
+pub mod json;
 mod quote_style;
 mod syntax;
+mod yaml_writer;
 pub mod yerbafile;
 
 pub use document::{Document, FindResult, InsertPosition, SortField};
 pub use error::YerbaError;
 pub use quote_style::QuoteStyle;
+pub use syntax::{detect_yaml_type, ScalarValue, YerbaValueType};
+pub use yaml_writer::json_to_yaml_text;
 pub use yerbafile::{resolve_template, Variable, Yerbafile};
 
 pub fn version() -> &'static str {

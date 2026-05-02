@@ -11,9 +11,9 @@ use crate::error::YerbaError;
 use crate::QuoteStyle;
 
 use crate::syntax::{
-  extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key, is_yaml_non_string,
-  preceding_whitespace_indent, preceding_whitespace_token, removal_range, unescape_double_quoted,
-  unescape_single_quoted,
+  extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
+  is_yaml_non_string, preceding_whitespace_indent, preceding_whitespace_token, removal_range, unescape_double_quoted,
+  unescape_single_quoted, ScalarValue,
 };
 
 #[derive(Debug)]
@@ -110,6 +110,36 @@ impl Document {
       .navigate_all(dot_path)
       .iter()
       .filter_map(extract_scalar_text)
+      .collect()
+  }
+
+  pub fn get_typed(&self, dot_path: &str) -> Option<ScalarValue> {
+    if dot_path.contains("[]") {
+      return self.get_all_typed(dot_path).into_iter().next();
+    }
+
+    let current_node = self.navigate(dot_path).ok()?;
+
+    if current_node
+      .descendants()
+      .any(|child| child.kind() == SyntaxKind::BLOCK_MAP || child.kind() == SyntaxKind::BLOCK_SEQ)
+    {
+      return None;
+    }
+
+    extract_scalar(&current_node)
+  }
+
+  pub fn get_all_typed(&self, dot_path: &str) -> Vec<ScalarValue> {
+    self
+      .navigate_all(dot_path)
+      .iter()
+      .filter(|node| {
+        !node
+          .descendants()
+          .any(|child| child.kind() == SyntaxKind::BLOCK_MAP || child.kind() == SyntaxKind::BLOCK_SEQ)
+      })
+      .filter_map(extract_scalar)
       .collect()
   }
 
@@ -334,6 +364,56 @@ impl Document {
     let new_text = format_scalar_value(value, scalar_token.kind());
 
     self.replace_token(&scalar_token, &new_text)
+  }
+
+  pub fn set_scalar_style(&mut self, dot_path: &str, style: &QuoteStyle) -> Result<(), YerbaError> {
+    let current_node = self.navigate(dot_path)?;
+    let scalar_token =
+      find_scalar_token(&current_node).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+
+    let current_kind = scalar_token.kind();
+    let target_kind = style.to_syntax_kind();
+
+    if current_kind == target_kind {
+      return Ok(());
+    }
+
+    let raw_value = match current_kind {
+      SyntaxKind::DOUBLE_QUOTED_SCALAR => {
+        let text = scalar_token.text();
+        unescape_double_quoted(&text[1..text.len() - 1])
+      }
+
+      SyntaxKind::SINGLE_QUOTED_SCALAR => {
+        let text = scalar_token.text();
+        unescape_single_quoted(&text[1..text.len() - 1])
+      }
+
+      SyntaxKind::PLAIN_SCALAR => scalar_token.text().to_string(),
+
+      _ => return Ok(()),
+    };
+
+    let new_text = format_scalar_value(&raw_value, target_kind);
+
+    self.replace_token(&scalar_token, &new_text)
+  }
+
+  pub fn set_plain(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
+    let current_node = self.navigate(dot_path)?;
+
+    if let Some(block_scalar) = current_node
+      .descendants()
+      .find(|node| node.kind() == SyntaxKind::BLOCK_SCALAR)
+    {
+      let range = block_scalar.text_range();
+      return self.apply_edit(range, value);
+    }
+
+    let scalar_token =
+      find_scalar_token(&current_node).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+
+    self.replace_token(&scalar_token, value)
   }
 
   pub fn append(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {

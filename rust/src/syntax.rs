@@ -4,6 +4,55 @@ use rowan::{TextRange, TextSize};
 use yaml_parser::ast::{BlockMap, BlockMapEntry};
 use yaml_parser::{SyntaxKind, SyntaxNode, SyntaxToken};
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScalarValue {
+  pub text: String,
+  pub kind: SyntaxKind,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum YerbaValueType {
+  Null = 0,
+  Boolean = 1,
+  Integer = 2,
+  Float = 3,
+  String = 4,
+}
+
+pub fn detect_yaml_type(scalar: &ScalarValue) -> YerbaValueType {
+  if scalar.kind != SyntaxKind::PLAIN_SCALAR {
+    return YerbaValueType::String;
+  }
+
+  detect_yaml_type_from_plain(&scalar.text)
+}
+
+pub fn extract_scalar(node: &SyntaxNode) -> Option<ScalarValue> {
+  let token = find_scalar_token(node)?;
+
+  let text = match token.kind() {
+    SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
+
+    SyntaxKind::DOUBLE_QUOTED_SCALAR => {
+      let raw = token.text();
+      unescape_double_quoted(&raw[1..raw.len() - 1])
+    }
+
+    SyntaxKind::SINGLE_QUOTED_SCALAR => {
+      let raw = token.text();
+      unescape_single_quoted(&raw[1..raw.len() - 1])
+    }
+
+    _ => return None,
+  };
+
+  Some(ScalarValue {
+    text,
+    kind: token.kind(),
+  })
+}
+
 pub fn is_map_key(token: &SyntaxToken) -> bool {
   token
     .parent_ancestors()
@@ -141,22 +190,52 @@ pub fn removal_range(node: &SyntaxNode) -> TextRange {
 }
 
 pub fn is_yaml_non_string(value: &str) -> bool {
+  detect_yaml_type_from_plain(value) != YerbaValueType::String
+}
+
+pub fn detect_yaml_type_from_plain(value: &str) -> YerbaValueType {
   // Null (YAML 1.1 + 1.2)
   if matches!(value, "null" | "Null" | "NULL" | "~" | "") {
-    return true;
+    return YerbaValueType::Null;
   }
 
-  // Boolean (YAML 1.2)
-  if matches!(value, "true" | "True" | "TRUE" | "false" | "False" | "FALSE") {
-    return true;
-  }
-
-  // Boolean (YAML 1.1 extras)
+  // Boolean (YAML 1.2 + 1.1)
   if matches!(
     value,
-    "yes" | "Yes" | "YES" | "no" | "No" | "NO" | "on" | "On" | "ON" | "off" | "Off" | "OFF" | "y" | "Y" | "n" | "N"
+    "true"
+      | "True"
+      | "TRUE"
+      | "false"
+      | "False"
+      | "FALSE"
+      | "yes"
+      | "Yes"
+      | "YES"
+      | "no"
+      | "No"
+      | "NO"
+      | "on"
+      | "On"
+      | "ON"
+      | "off"
+      | "Off"
+      | "OFF"
+      | "y"
+      | "Y"
+      | "n"
+      | "N"
   ) {
-    return true;
+    return YerbaValueType::Boolean;
+  }
+
+  // Integer
+  if value.parse::<i64>().is_ok() {
+    return YerbaValueType::Integer;
+  }
+
+  // Octal (0o...) and hex (0x...)
+  if value.starts_with("0x") || value.starts_with("0X") || value.starts_with("0o") || value.starts_with("0O") {
+    return YerbaValueType::Integer;
   }
 
   // Special floats (YAML 1.1 + 1.2)
@@ -164,23 +243,13 @@ pub fn is_yaml_non_string(value: &str) -> bool {
     value,
     ".inf" | ".Inf" | ".INF" | "-.inf" | "-.Inf" | "-.INF" | "+.inf" | "+.Inf" | "+.INF" | ".nan" | ".NaN" | ".NAN"
   ) {
-    return true;
-  }
-
-  // Integer
-  if value.parse::<i64>().is_ok() {
-    return true;
-  }
-
-  // Octal (0o...) and hex (0x...)
-  if value.starts_with("0x") || value.starts_with("0X") || value.starts_with("0o") || value.starts_with("0O") {
-    return true;
+    return YerbaValueType::Float;
   }
 
   // Float
   if value.parse::<f64>().is_ok() {
-    return true;
+    return YerbaValueType::Float;
   }
 
-  false
+  YerbaValueType::String
 }

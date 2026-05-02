@@ -18,6 +18,13 @@
 *.so
 *.dylib
 *.bundle
+*.dSYM/
+
+/ext/yerba/include/yerba.h
+/ext/yerba/Makefile
+/ext/yerba/mkmf.log
+/lib/yerba/yerba.bundle
+/lib/yerba/yerba.so
 
 # IDE
 .idea/

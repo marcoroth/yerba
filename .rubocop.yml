@@ -40,6 +40,9 @@ Metrics/AbcSize:
 Metrics/CyclomaticComplexity:
   Enabled: false
 
+Metrics/ClassLength:
+  Enabled: false
+
 Metrics/MethodLength:
   Enabled: false
 
@@ -60,3 +63,7 @@ Style/IfUnlessModifier:
 
 Style/DocumentDynamicEvalDefinition:
   Enabled: false
+
+Style/GlobalVars:
+  Exclude:
+    - ext/yerba/extconf.rb

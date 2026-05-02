@@ -1,6 +1,19 @@
 # frozen_string_literal: true
 
+require "yaml"
+
 require_relative "yerba/version"
+require_relative "yerba/scalar"
+require_relative "yerba/map"
+require_relative "yerba/sequence"
+require_relative "yerba/document"
+require_relative "yerba/collection"
+
+begin
+  require "yerba/yerba"
+rescue LoadError
+  # C extension not available, fall back to CLI mode
+end
 
 module Yerba
   class UnsupportedPlatformError < StandardError; end
@@ -32,11 +45,9 @@ module Yerba
         return install_dir_exe
       end
 
-      raise ExecutableNotFoundError,
-            "yerba executable not found at #{install_dir_exe} (set by YERBA_INSTALL_DIR)"
+      raise ExecutableNotFoundError, "yerba executable not found at #{install_dir_exe} (set by YERBA_INSTALL_DIR)"
     end
 
-    # Try platform-specific precompiled binary
     platform = Gem::Platform.local
     platform_key = "#{platform.cpu}-#{platform.os}"
 
@@ -51,7 +62,6 @@ module Yerba
       return exe_file if File.executable?(exe_file)
     end
 
-    # Try compiling from source if Rust source is bundled
     compiled = compile_from_source
 
     return compiled if compiled
@@ -102,4 +112,20 @@ module Yerba
   end
 
   private_class_method :compile_from_source
+
+  def self.parse(content)
+    Document.parse(content)
+  end
+
+  def self.parse_file(path)
+    Document.new(path)
+  end
+
+  def self.document(path)
+    Document.new(path)
+  end
+
+  def self.files(glob)
+    Collection.new(glob)
+  end
 end

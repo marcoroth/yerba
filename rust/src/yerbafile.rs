@@ -388,8 +388,12 @@ fn execute_step(
           glob::glob(file_pattern).map_err(|error| YerbaError::ParseError(format!("invalid glob: {}", error)))?;
 
         for entry in files.flatten() {
-          let external_document = Document::parse_file(&entry)?;
-          all_values.extend(external_document.get_all(&config.path));
+          match Document::parse_file(&entry) {
+            Ok(external_document) => {
+              all_values.extend(external_document.get_all(&config.path));
+            }
+            Err(_) => continue,
+          }
         }
 
         if all_values.len() == 1 && !config.path.contains('[') {

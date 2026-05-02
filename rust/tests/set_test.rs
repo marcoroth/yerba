@@ -76,3 +76,70 @@ fn test_set_plain_field_with_value_containing_quotes() {
 
   assert_eq!(document.to_string(), "title: something \"quoted\"\n");
 }
+
+#[test]
+fn test_set_with_bracket_index_path() {
+  let yaml = "- id: first\n  title: A\n- id: second\n  title: B\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.set("[1].title", "Updated").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    "- id: first\n  title: A\n- id: second\n  title: Updated\n"
+  );
+}
+
+#[test]
+fn test_set_with_bracket_index_first_item() {
+  let yaml = "- id: first\n  title: A\n- id: second\n  title: B\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.set("[0].title", "Updated").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    "- id: first\n  title: Updated\n- id: second\n  title: B\n"
+  );
+}
+
+#[test]
+fn test_set_block_scalar_to_empty() {
+  let yaml = "- id: talk-1\n  description: |-\n    Some long description\n    across multiple lines\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.set("[0].description", "").unwrap();
+
+  assert_eq!(document.to_string(), "- id: talk-1\n  description: \"\"\n");
+}
+
+#[test]
+fn test_set_block_scalar_to_new_value() {
+  let yaml = "description: |-\n  Old description\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  document.set("description", "New value").unwrap();
+
+  assert_eq!(document.to_string(), "description: \"New value\"\n");
+}
+
+#[test]
+fn test_set_bracket_index_out_of_bounds() {
+  let yaml = "- id: first\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  let result = document.set("[5].id", "test");
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_set_bracket_index_multiple_matches_error() {
+  let yaml = "- id: first\n  title: A\n- id: second\n  title: B\n";
+  let mut document = Document::parse(yaml).unwrap();
+
+  let result = document.set("[].title", "test");
+  assert!(
+    result.is_err(),
+    "setting on [] (all items) should error — use a specific index"
+  );
+}

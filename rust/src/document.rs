@@ -309,8 +309,43 @@ impl Document {
   }
 
   pub fn set(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = if dot_path.contains('[') {
+      let nodes = self.navigate_to_many(dot_path);
+
+      if nodes.is_empty() {
+        return Err(YerbaError::PathNotFound(dot_path.to_string()));
+      }
+
+      if nodes.len() > 1 {
+        return Err(YerbaError::PathNotFound(format!(
+          "{} (matched {} nodes, expected 1 — use a more specific path)",
+          dot_path,
+          nodes.len()
+        )));
+      }
+
+      nodes.into_iter().next().unwrap()
+    } else {
+      let keys: Vec<&str> = dot_path.split('.').collect();
+      self.navigate_to_path(&keys)?
+    };
+
+    if let Some(block_scalar) = current_node
+      .descendants()
+      .find(|node| node.kind() == SyntaxKind::BLOCK_SCALAR)
+    {
+      let new_text = if value.is_empty() {
+        "\"\"".to_string()
+      } else if value.contains('\n') {
+        format!("|-\n  {}", value.replace('\n', "\n  "))
+      } else {
+        format!("\"{}\"", value.replace('"', "\\\""))
+      };
+
+      let range = block_scalar.text_range();
+
+      return self.apply_edit(range, &new_text);
+    }
 
     let scalar_token =
       find_scalar_token(&current_node).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
@@ -798,6 +833,8 @@ impl Document {
       return Ok(());
     }
 
+    let source = self.root.text().to_string();
+
     let entry_data: Vec<(String, String)> = entries
       .iter()
       .map(|entry| {
@@ -805,7 +842,7 @@ impl Document {
           .key()
           .and_then(|key_node| extract_scalar_text(key_node.syntax()))
           .unwrap_or_default();
-        let text = entry.syntax().text().to_string();
+        let text = entry_text_with_trailing_comment(entry.syntax(), &source);
         (key_name, text)
       })
       .collect();
@@ -870,6 +907,8 @@ impl Document {
         continue;
       }
 
+      let source = self.root.text().to_string();
+
       let entry_data: Vec<(String, String)> = entries
         .iter()
         .map(|entry| {
@@ -877,7 +916,7 @@ impl Document {
             .key()
             .and_then(|key_node| extract_scalar_text(key_node.syntax()))
             .unwrap_or_default();
-          let text = entry.syntax().text().to_string();
+          let text = entry_text_with_trailing_comment(entry.syntax(), &source);
           (key_name, text)
         })
         .collect();
@@ -1259,20 +1298,27 @@ impl Document {
   pub fn enforce_key_style(&mut self, style: &QuoteStyle, dot_path: Option<&str>) -> Result<(), YerbaError> {
     let source = self.root.text().to_string();
 
-    let scope_node = match dot_path {
+    let scope_ranges: Vec<TextRange> = match dot_path {
+      Some(path) if !path.is_empty() && path.contains('[') => self
+        .navigate_to_many(path)
+        .iter()
+        .map(|node| node.text_range())
+        .collect(),
       Some(path) if !path.is_empty() => {
         let keys: Vec<&str> = path.split('.').collect();
-        self.navigate_to_path(&keys)?
+        vec![self.navigate_to_path(&keys)?.text_range()]
       }
-      _ => self.root.clone(),
+      _ => vec![self.root.text_range()],
     };
 
-    let scope_range = scope_node.text_range();
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
     for element in self.root.descendants_with_tokens() {
       if let Some(token) = element.into_token() {
-        if !scope_range.contains_range(token.text_range()) {
+        if !scope_ranges
+          .iter()
+          .any(|range| range.contains_range(token.text_range()))
+        {
           continue;
         }
 
@@ -1362,21 +1408,27 @@ impl Document {
   pub fn enforce_quotes_at(&mut self, style: &QuoteStyle, dot_path: Option<&str>) -> Result<(), YerbaError> {
     let source = self.root.text().to_string();
 
-    let scope_node = match dot_path {
+    let scope_ranges: Vec<TextRange> = match dot_path {
+      Some(path) if !path.is_empty() && path.contains('[') => self
+        .navigate_to_many(path)
+        .iter()
+        .map(|node| node.text_range())
+        .collect(),
       Some(path) if !path.is_empty() => {
         let keys: Vec<&str> = path.split('.').collect();
-        self.navigate_to_path(&keys)?
+        vec![self.navigate_to_path(&keys)?.text_range()]
       }
-      _ => self.root.clone(),
+      _ => vec![self.root.text_range()],
     };
-
-    let scope_range = scope_node.text_range();
 
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
     for element in self.root.descendants_with_tokens() {
       if let Some(token) = element.into_token() {
-        if !scope_range.contains_range(token.text_range()) {
+        if !scope_ranges
+          .iter()
+          .any(|range| range.contains_range(token.text_range()))
+        {
           continue;
         }
 
@@ -1790,6 +1842,47 @@ fn byte_offset_to_line(source: &str, offset: usize) -> usize {
     .filter(|character| *character == '\n')
     .count()
     + 1
+}
+
+fn entry_text_with_trailing_comment(entry: &SyntaxNode, source: &str) -> String {
+  let entry_end: usize = entry.text_range().end().into();
+  let entry_text = entry.text().to_string();
+  let entry_indent = preceding_whitespace_indent(entry).len();
+  let rest = &source[entry_end..];
+
+  let mut extra = String::new();
+  let mut first_line = true;
+
+  for line in rest.split('\n') {
+    if first_line {
+      first_line = false;
+
+      let trimmed = line.trim();
+
+      if !trimmed.is_empty() {
+        extra.push_str(line);
+      }
+
+      continue;
+    }
+
+    let trimmed = line.trim();
+
+    if trimmed.is_empty() {
+      break;
+    }
+
+    let line_indent = line.len() - line.trim_start().len();
+
+    if trimmed.starts_with('#') && line_indent == entry_indent {
+      extra.push('\n');
+      extra.push_str(line);
+    } else {
+      break;
+    }
+  }
+
+  format!("{}{}", entry_text, extra)
 }
 
 fn rebuild_entries<'a>(entries: impl Iterator<Item = &'a str>, indent: &str) -> String {

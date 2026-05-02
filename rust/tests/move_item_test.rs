@@ -172,3 +172,48 @@ fn test_move_item_preserves_preceding_section_comment() {
     "}
   );
 }
+
+#[test]
+fn test_resolve_sequence_index_by_condition() {
+  let document = parse(indoc! {"
+    - id: talk-a
+      title: First
+    - id: talk-b
+      title: Second
+    - id: talk-c
+      title: Third
+  "});
+
+  assert_eq!(document.resolve_sequence_index("", ".id == talk-a").unwrap(), 0);
+  assert_eq!(document.resolve_sequence_index("", ".id == talk-b").unwrap(), 1);
+  assert_eq!(document.resolve_sequence_index("", ".id == talk-c").unwrap(), 2);
+  assert!(document.resolve_sequence_index("", ".id == missing").is_err());
+}
+
+#[test]
+fn test_move_item_by_condition() {
+  let mut document = parse(indoc! {"
+    - id: talk-a
+      title: First
+    - id: talk-b
+      title: Second
+    - id: talk-c
+      title: Third
+  "});
+
+  let from = document.resolve_sequence_index("", ".id == talk-c").unwrap();
+  let to = document.resolve_sequence_index("", ".id == talk-a").unwrap();
+  document.move_item("", from, to).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: talk-c
+        title: Third
+      - id: talk-a
+        title: First
+      - id: talk-b
+        title: Second
+    "}
+  );
+}

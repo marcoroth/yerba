@@ -744,6 +744,15 @@ impl Document {
       return Ok(index);
     }
 
+    if reference.starts_with('.') {
+      return map
+        .entries()
+        .enumerate()
+        .find(|(_index, entry)| self.evaluate_condition_on_node(entry.syntax(), reference))
+        .map(|(index, _entry)| index)
+        .ok_or_else(|| YerbaError::PathNotFound(format!("{} condition '{}'", dot_path, reference)));
+    }
+
     map
       .entries()
       .enumerate()
@@ -774,6 +783,15 @@ impl Document {
       }
 
       return Ok(index);
+    }
+
+    if reference.starts_with('.') {
+      return sequence
+        .entries()
+        .enumerate()
+        .find(|(_index, entry)| self.evaluate_condition_on_node(entry.syntax(), reference))
+        .map(|(index, _entry)| index)
+        .ok_or_else(|| YerbaError::PathNotFound(format!("{} condition '{}'", dot_path, reference)));
     }
 
     sequence

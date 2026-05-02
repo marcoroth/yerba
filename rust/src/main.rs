@@ -194,6 +194,7 @@ enum Command {
         yerba move config.yml tags rust --before ruby
         yerba move config.yml tags rust --after yaml
         yerba move config.yml tags 2 --to 0
+        yerba move videos.yml "" ".id == talk-2" --after ".id == talk-1"
     "}
   )]
   Move {
@@ -213,11 +214,12 @@ enum Command {
   #[command(
     about = "Move a key to a new position within a map",
     arg_required_else_help = true,
-    after_help = indoc! {"
+    after_help = indoc! {r#"
       Examples:
         yerba move-key config.yml database.pool --before database.host
         yerba move-key config.yml database.name --to 0
-    "}
+        yerba move-key config.yml database.pool --before ".host == localhost"
+    "#}
   )]
   MoveKey {
     file: String,

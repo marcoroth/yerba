@@ -21,10 +21,14 @@ end
 RUST_TARGETS = {
   "aarch64-linux-gnu" => "aarch64-unknown-linux-gnu",
   "aarch64-linux-musl" => "aarch64-unknown-linux-musl",
+  "arm-linux-gnu" => "armv7-unknown-linux-gnueabihf",
+  "arm-linux-musl" => "armv7-unknown-linux-musleabihf",
   "arm64-darwin" => "aarch64-apple-darwin",
   "x86_64-darwin" => "x86_64-apple-darwin",
   "x86_64-linux-gnu" => "x86_64-unknown-linux-gnu",
   "x86_64-linux-musl" => "x86_64-unknown-linux-musl",
+  "x86-linux-gnu" => "i686-unknown-linux-gnu",
+  "x86-linux-musl" => "i686-unknown-linux-musl",
 }.freeze
 
 cross_compiling = ENV.key?("RUBY_CC_VERSION")

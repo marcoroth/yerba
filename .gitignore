@@ -10,8 +10,14 @@
 # Platform-specific binaries
 /exe/arm64-darwin/
 /exe/x86_64-darwin/
-/exe/aarch64-linux/
-/exe/x86_64-linux/
+/exe/aarch64-linux-gnu/
+/exe/aarch64-linux-musl/
+/exe/x86_64-linux-gnu/
+/exe/x86_64-linux-musl/
+/exe/arm-linux-gnu/
+/exe/arm-linux-musl/
+/exe/x86-linux-gnu/
+/exe/x86-linux-musl/
 
 # Build artifacts
 *.o

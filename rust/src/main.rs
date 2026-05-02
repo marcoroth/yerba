@@ -342,6 +342,8 @@ enum Command {
   Check,
   #[command(about = "Print the yerba version")]
   Version,
+  #[command(about = "🧉")]
+  Mate,
 }
 
 fn main() {
@@ -761,6 +763,60 @@ fn main() {
 
     Command::Version => {
       println!("🧉 yerba v{}", yerba::version());
+    }
+
+    Command::Mate => {
+      let g = "\x1b[32m";
+      let b = "\x1b[1m";
+      let d = "\x1b[2m";
+      let i = "\x1b[3m";
+      let y = "\x1b[33m";
+      let r = "\x1b[0m";
+      let hr = format!("    {d}──────────────────────────────────────────────────────────{r}");
+
+      println!();
+      println!("    {b}{g}🧉 YERBA MATE{r}");
+      println!();
+      println!("    {d}From the Guarani people of South America to the world.{r}");
+      println!("    {d}Brewed from the leaves of{r} {i}Ilex paraguariensis{r}{d}, shared{r}");
+      println!("    {d}in a hollowed calabaza, sipped through a metal bombilla.{r}");
+      println!("    {d}One cup, many rounds.{r}");
+      println!();
+      println!("{hr}");
+      println!();
+      println!("    {b}{g}yerba{r} {d}/ˈʒɛɾ.ba/{r} {y}noun{r}");
+      println!("    The dried leaves of {i}Ilex paraguariensis{r}, used to brew");
+      println!("    mate. From Guarani {i}ka'a{r}, meaning \"herb\".");
+      println!();
+      println!("    {b}{g}mate{r} {d}/ˈma.te/{r} {y}noun{r}");
+      println!("    A traditional South American caffeine-rich infusion.");
+      println!("    Also the hollowed calabaza (gourd) from which it is drunk.");
+      println!();
+      println!("    {b}{g}bombilla{r} {d}/bomˈbi.ʒa/{r} {y}noun{r}");
+      println!("    A metal straw with a filtered tip at the bottom, used");
+      println!("    to sip mate without swallowing the leaves.");
+      println!();
+      println!("    {b}{g}cebador{r} {d}/se.baˈðoɾ/{r} {y}noun{r}");
+      println!("    The person who prepares and serves mate to the group.");
+      println!("    A role of care, not hierarchy.");
+      println!();
+      println!("    {b}{g}ronda{r} {d}/ˈron.da/{r} {y}noun{r}");
+      println!("    The circle of people sharing mate. The cup passes");
+      println!("    from hand to hand until it returns to the cebador.");
+      println!();
+      println!("    {b}{g}cebar{r} {d}/seˈbaɾ/{r} {y}verb{r}");
+      println!("    To pour hot water over the yerba and serve a round.");
+      println!("    The act of preparing each individual serving.");
+      println!();
+      println!("    {b}{g}aprontar{r} {d}/apɾonˈtaɾ/{r} {y}verb{r}");
+      println!("    To set up mate before the first pour: arranging the");
+      println!("    yerba, heating the water, positioning the bombilla.");
+      println!();
+      println!("    {b}{g}ensillar{r} {d}/ensiˈʒaɾ/{r} {y}verb{r}");
+      println!("    To replace spent yerba with fresh leaves mid-session,");
+      println!("    extending the life of the mate.");
+      println!();
+      println!("{hr}");
     }
   }
 }

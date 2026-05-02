@@ -114,6 +114,8 @@ enum Command {
         yerba insert config.yml tags yaml
         yerba insert config.yml tags yaml --at 0
         yerba insert config.yml tags yaml --after ruby
+        yerba insert speakers.yml "" "name: Bob" --after ".name == Alice"
+        yerba insert videos.yml "[0].speakers" "Diana" --before ".name == Charlie"
     "#}
   )]
   Insert {
@@ -485,9 +487,17 @@ fn main() {
       let position = if let Some(index) = at {
         yerba::InsertPosition::At(index)
       } else if let Some(target) = before {
-        yerba::InsertPosition::Before(target)
+        if target.starts_with('.') {
+          yerba::InsertPosition::BeforeCondition(target)
+        } else {
+          yerba::InsertPosition::Before(target)
+        }
       } else if let Some(target) = after {
-        yerba::InsertPosition::After(target)
+        if target.starts_with('.') {
+          yerba::InsertPosition::AfterCondition(target)
+        } else {
+          yerba::InsertPosition::After(target)
+        }
       } else {
         yerba::Yerbafile::find()
           .and_then(|yerbafile_path| yerba::Yerbafile::load(&yerbafile_path).ok())

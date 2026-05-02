@@ -66,6 +66,8 @@ pub enum InsertPosition {
   Last,
   Before(String),
   After(String),
+  BeforeCondition(String),
+  AfterCondition(String),
   FromSortOrder(Vec<String>),
 }
 
@@ -432,6 +434,30 @@ impl Document {
         self.insert_after_node(target_entry.syntax(), &new_text)
       }
 
+      InsertPosition::BeforeCondition(condition) => {
+        let target_entry = entries
+          .iter()
+          .find(|entry| self.evaluate_condition_on_node(entry.syntax(), &condition))
+          .ok_or_else(|| YerbaError::PathNotFound(format!("{} condition '{}'", dot_path, condition)))?;
+
+        let target_range = target_entry.syntax().text_range();
+        let replacement = format!("{}\n{}", new_item, indent);
+        let insert_range = TextRange::new(target_range.start(), target_range.start());
+
+        self.apply_edit(insert_range, &replacement)
+      }
+
+      InsertPosition::AfterCondition(condition) => {
+        let target_entry = entries
+          .iter()
+          .find(|entry| self.evaluate_condition_on_node(entry.syntax(), &condition))
+          .ok_or_else(|| YerbaError::PathNotFound(format!("{} condition '{}'", dot_path, condition)))?;
+
+        let new_text = format!("\n{}{}", indent, new_item);
+
+        self.insert_after_node(target_entry.syntax(), &new_text)
+      }
+
       InsertPosition::FromSortOrder(_) => {
         let last_entry = entries.last().unwrap();
         let new_text = format!("\n{}{}", indent, new_item);
@@ -521,6 +547,10 @@ impl Document {
         let new_text = format!("\n{}{}", indent, new_entry_text);
 
         self.insert_after_node(target_entry.syntax(), &new_text)
+      }
+
+      InsertPosition::BeforeCondition(_) | InsertPosition::AfterCondition(_) => {
+        self.insert_map_key(dot_path, key, value, InsertPosition::Last)
       }
 
       InsertPosition::FromSortOrder(order) => {
@@ -1237,7 +1267,7 @@ impl Document {
       return Ok(());
     }
 
-    edits.sort_by(|a, b| b.0.start().cmp(&a.0.start()));
+    edits.sort_by_key(|edit| std::cmp::Reverse(edit.0.start()));
 
     let source = self.root.text().to_string();
     let mut new_source = source;

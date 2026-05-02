@@ -453,3 +453,108 @@ fn test_insert_with_bracket_index_before() {
     "}
   );
 }
+
+#[test]
+fn test_insert_after_condition_on_object_sequence() {
+  let mut document = parse(indoc! {"
+    - name: Alice
+      slug: alice
+    - name: Charlie
+      slug: charlie
+  "});
+
+  document
+    .insert_into(
+      "",
+      "name: Bob\n  slug: bob",
+      InsertPosition::AfterCondition(".name == Alice".to_string()),
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - name: Alice
+        slug: alice
+      - name: Bob
+        slug: bob
+      - name: Charlie
+        slug: charlie
+    "}
+  );
+}
+
+#[test]
+fn test_insert_before_condition_on_object_sequence() {
+  let mut document = parse(indoc! {"
+    - name: Alice
+      slug: alice
+    - name: Charlie
+      slug: charlie
+  "});
+
+  document
+    .insert_into(
+      "",
+      "name: Bob\n  slug: bob",
+      InsertPosition::BeforeCondition(".name == Charlie".to_string()),
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - name: Alice
+        slug: alice
+      - name: Bob
+        slug: bob
+      - name: Charlie
+        slug: charlie
+    "}
+  );
+}
+
+#[test]
+fn test_insert_after_condition_with_bracket_path() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+      speakers:
+        - name: Alice
+        - name: Charlie
+  "});
+
+  document
+    .insert_into(
+      "[0].speakers",
+      "name: Bob",
+      InsertPosition::AfterCondition(".name == Alice".to_string()),
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: talk-1
+        speakers:
+          - name: Alice
+          - name: Bob
+          - name: Charlie
+    "}
+  );
+}
+
+#[test]
+fn test_insert_condition_no_match_errors() {
+  let mut document = parse(indoc! {"
+    - name: Alice
+    - name: Bob
+  "});
+
+  let result = document.insert_into(
+    "",
+    "name: Charlie",
+    InsertPosition::AfterCondition(".name == Missing".to_string()),
+  );
+
+  assert!(result.is_err());
+}

@@ -17,10 +17,13 @@ use indoc::indoc;
   after_help = indoc! {r#"
     Examples:
       yerba get config.yml database.host
+      yerba get videos.yml "[0].title"
       yerba set config.yml database.host 0.0.0.0
-      yerba insert config.yml database.ssl true --after host
+      yerba insert config.yml tags yaml --after ruby
+      yerba insert speakers.yml "" --from speaker.yml --after ".name == Alice"
       yerba delete config.yml database.pool
       yerba find "data/**/videos.yml" "[]" --condition '.kind == keynote' --select 'id,title'
+      yerba move videos.yml "" ".id == talk-2" --after ".id == talk-1"
       yerba sort-keys config.yml database 'id,host,port,name'
       yerba quote-style "data/**/*.yml" double
       yerba apply
@@ -85,7 +88,7 @@ enum Command {
         yerba set config.yml database.host 0.0.0.0
         yerba set config.yml database.host 0.0.0.0 --if-exists
         yerba set config.yml database.host 0.0.0.0 --condition '.port == 5432'
-        yerba set config.yml database.host 0.0.0.0 --dry-run
+        yerba set videos.yml "[0].title" "New Title"
         yerba set "data/**/event.yml" website "" --if-exists
     "#}
   )]
@@ -126,9 +129,9 @@ enum Command {
     value: Option<String>,
     #[arg(long, help = "Read value from a file (use - for stdin)")]
     from: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "Insert before this value or condition (e.g. \".name == Alice\")")]
     before: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "Insert after this value or condition (e.g. \".name == Alice\")")]
     after: Option<String>,
     #[arg(long)]
     at: Option<usize>,
@@ -139,12 +142,13 @@ enum Command {
   #[command(
     about = "Rename a key in a map (preserves value and position)",
     arg_required_else_help = true,
-    after_help = indoc! {"
+    after_help = indoc! {r#"
       Examples:
         yerba rename config.yml database.host database.hostname
         yerba rename config.yml database.host hostname
         yerba rename config.yml database.host settings.db_host
-    "}
+        yerba rename videos.yml "[0].old_name" "[0].name"
+    "#}
   )]
   Rename {
     file: String,
@@ -157,11 +161,12 @@ enum Command {
   #[command(
     about = "Delete a key and its value from a map",
     arg_required_else_help = true,
-    after_help = indoc! {"
+    after_help = indoc! {r#"
       Examples:
         yerba delete config.yml database.pool
+        yerba delete videos.yml "[0].description"
         yerba delete config.yml database.pool --dry-run
-    "}
+    "#}
   )]
   Delete {
     file: String,
@@ -173,10 +178,11 @@ enum Command {
   #[command(
     about = "Remove an item from a sequence by its value",
     arg_required_else_help = true,
-    after_help = indoc! {"
+    after_help = indoc! {r#"
       Examples:
         yerba remove config.yml tags rust
-    "}
+        yerba remove videos.yml "[0].speakers" Alice
+    "#}
   )]
   Remove {
     file: String,
@@ -189,21 +195,22 @@ enum Command {
   #[command(
     about = "Move a sequence item to a new position",
     arg_required_else_help = true,
-    after_help = indoc! {"
+    after_help = indoc! {r#"
       Examples:
         yerba move config.yml tags rust --before ruby
         yerba move config.yml tags rust --after yaml
         yerba move config.yml tags 2 --to 0
         yerba move videos.yml "" ".id == talk-2" --after ".id == talk-1"
-    "}
+    "#}
   )]
   Move {
     file: String,
     path: String,
+    #[arg(help = "Item to move: name, index, or condition (e.g. \".id == talk-1\")")]
     item: String,
-    #[arg(long)]
+    #[arg(long, help = "Move before this item or condition (e.g. \".id == talk-2\")")]
     before: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "Move after this item or condition (e.g. \".id == talk-2\")")]
     after: Option<String>,
     #[arg(long)]
     to: Option<usize>,
@@ -224,9 +231,9 @@ enum Command {
   MoveKey {
     file: String,
     path: String,
-    #[arg(long)]
+    #[arg(long, help = "Move before this key or condition")]
     before: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "Move after this key or condition")]
     after: Option<String>,
     #[arg(long)]
     to: Option<usize>,
@@ -283,13 +290,14 @@ enum Command {
   #[command(
     about = "Enforce a consistent quote style on values, keys, or both",
     arg_required_else_help = true,
-    after_help = indoc! {"
+    after_help = indoc! {r#"
       Examples:
         yerba quote-style config.yml double
         yerba quote-style config.yml plain --keys
         yerba quote-style config.yml double --all
         yerba quote-style config.yml single --path database.host
-    "}
+        yerba quote-style videos.yml plain --path "[].speakers"
+    "#}
   )]
   QuoteStyle {
     file: String,
@@ -315,6 +323,7 @@ enum Command {
       Examples:
         yerba blank-lines videos.yml "" 1
         yerba blank-lines "data/**/videos.yml" "[]" 1
+        yerba blank-lines videos.yml "[].speakers" 1
         yerba blank-lines config.yml tags 0
     "#}
   )]

@@ -71,22 +71,11 @@ jobs:
     name: Push gems with trusted publishing
     if: github.event_name == 'release' && github.repository_owner == 'marcoroth'
     needs: build
-    timeout-minutes: 30
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - default
-          - aarch64-linux-gnu
-          - aarch64-linux-musl
-          - arm64-darwin
-          - x86_64-darwin
-          - x86_64-linux-gnu
-          - x86_64-linux-musl
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,11 +93,12 @@ jobs:
         with:
           bundler-cache: true
 
-      - name: Download gem artifacts
+      - name: Download all gem artifacts
         uses: actions/download-artifact@v4
         with:
-          name: gem-${{ matrix.target }}
+          pattern: gem-*
           path: pkg/
+          merge-multiple: true
 
       - name: Configure trusted publishing credentials
         uses: rubygems/configure-rubygems-credentials@v1.0.0

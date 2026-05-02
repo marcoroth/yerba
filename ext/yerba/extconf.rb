@@ -31,11 +31,9 @@ cross_compiling = ENV.key?("RUBY_CC_VERSION")
 target_platform = ENV.fetch("CARGO_BUILD_TARGET", nil)
 
 if cross_compiling && target_platform.nil?
-  # Prefer RCD_PLATFORM (set by our Rakefile) for reliable detection
   rcd_platform = ENV.fetch("RCD_PLATFORM", "")
   target_platform = RUST_TARGETS[rcd_platform]
 
-  # Fallback: infer from RbConfig
   if target_platform.nil?
     ruby_platform = RbConfig::CONFIG["arch"]
     target_platform = RUST_TARGETS.values.find { |t| ruby_platform.include?(t.split("-").first) }

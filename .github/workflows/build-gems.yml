@@ -23,9 +23,9 @@ jobs:
       matrix:
         include:
           - { platform: arm64-darwin, os: macos-latest }
-          - { platform: x86_64-darwin, os: macos-26 }
-          - { platform: aarch64-linux, os: ubuntu-latest, cross: true }
-          - { platform: x86_64-linux, os: ubuntu-latest }
+          - { platform: x86_64-darwin, os: macos-latest }
+          - { platform: aarch64-linux-gnu, os: ubuntu-latest, cross: true }
+          - { platform: x86_64-linux-gnu, os: ubuntu-latest }
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20

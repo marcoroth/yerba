@@ -421,6 +421,8 @@ impl Document {
   }
 
   pub fn insert_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
+    Self::validate_path(dot_path)?;
+
     if let Ok(current_node) = self.navigate(dot_path) {
       if current_node.descendants().find_map(BlockSeq::cast).is_some() {
         return self.insert_sequence_item(dot_path, value, position);
@@ -692,6 +694,9 @@ impl Document {
   }
 
   pub fn rename(&mut self, source_path: &str, destination_path: &str) -> Result<(), YerbaError> {
+    Self::validate_path(source_path)?;
+    Self::validate_path(destination_path)?;
+
     let source_parent = source_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
     let destination_parent = destination_path
@@ -737,6 +742,8 @@ impl Document {
   }
 
   pub fn delete(&mut self, dot_path: &str) -> Result<(), YerbaError> {
+    Self::validate_path(dot_path)?;
+
     let (parent_path, last_key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
     let parent_node = self.navigate(parent_path)?;
 
@@ -1649,6 +1656,8 @@ impl Document {
   }
 
   pub fn navigate(&self, dot_path: &str) -> Result<SyntaxNode, YerbaError> {
+    Self::validate_path(dot_path)?;
+
     if dot_path.is_empty() {
       let root = Root::cast(self.root.clone()).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
 
@@ -1673,7 +1682,43 @@ impl Document {
     }
   }
 
+  pub fn validate_path(dot_path: &str) -> Result<(), YerbaError> {
+    if dot_path.ends_with('.') {
+      return Err(YerbaError::ParseError(format!(
+        "invalid path: trailing dot in '{}'",
+        dot_path
+      )));
+    }
+
+    if dot_path.contains("..") {
+      return Err(YerbaError::ParseError(format!(
+        "invalid path: double dot in '{}'",
+        dot_path
+      )));
+    }
+
+    if dot_path.starts_with('.') {
+      return Err(YerbaError::ParseError(format!(
+        "invalid path: leading dot in '{}'",
+        dot_path
+      )));
+    }
+
+    if dot_path.contains('[') && !dot_path.contains(']') {
+      return Err(YerbaError::ParseError(format!(
+        "invalid path: unclosed bracket in '{}'",
+        dot_path
+      )));
+    }
+
+    Ok(())
+  }
+
   pub fn navigate_all(&self, dot_path: &str) -> Vec<SyntaxNode> {
+    if Document::validate_path(dot_path).is_err() {
+      return Vec::new();
+    }
+
     let segments = parse_path_segments(dot_path);
 
     let root = match Root::cast(self.root.clone()) {

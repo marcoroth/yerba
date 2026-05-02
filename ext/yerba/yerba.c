@@ -139,6 +139,13 @@ static VALUE document_get(VALUE self, VALUE path) {
   struct Document *document = get_document(self);
   YerbaGetResult result = yerba_document_get(document, StringValueCStr(path));
 
+  if (result.error) {
+    VALUE message = make_utf8_string(result.error);
+    yerba_get_result_free(result);
+
+    rb_raise(rb_eError, "%s", StringValueCStr(message));
+  }
+
   if (!result.is_list) {
     VALUE ruby_value = typed_value_to_ruby(result.single);
     yerba_get_result_free(result);
@@ -178,6 +185,13 @@ static VALUE document_get(VALUE self, VALUE path) {
 static VALUE document_bracket(VALUE self, VALUE path) {
   struct Document *document = get_document(self);
   YerbaGetResult result = yerba_document_get(document, StringValueCStr(path));
+
+  if (result.error) {
+    VALUE message = make_utf8_string(result.error);
+    yerba_get_result_free(result);
+
+    rb_raise(rb_eError, "%s", StringValueCStr(message));
+  }
 
   VALUE instance;
 

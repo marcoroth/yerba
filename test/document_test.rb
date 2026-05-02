@@ -320,6 +320,48 @@ class DocumentTest < Minitest::Spec
     assert_equal "Go", document.get("items[1].name")
   end
 
+  test "get raises on invalid path with trailing dot" do
+    document = Yerba::Document.parse("name: Alice")
+
+    assert_raises(Yerba::Error) { document.get("name.") }
+  end
+
+  test "get raises on invalid path with double dot" do
+    document = Yerba::Document.parse("name: Alice")
+
+    assert_raises(Yerba::Error) { document.get("name..x") }
+  end
+
+  test "get raises on invalid path with leading dot" do
+    document = Yerba::Document.parse("name: Alice")
+
+    assert_raises(Yerba::Error) { document.get(".name") }
+  end
+
+  test "get raises on invalid path with unclosed bracket" do
+    document = Yerba::Document.parse("name: Alice")
+
+    assert_raises(Yerba::Error) { document.get("[") }
+  end
+
+  test "set raises on invalid path" do
+    document = Yerba::Document.parse("name: Alice")
+
+    assert_raises(Yerba::Error) { document.set("name.", "Bob") }
+  end
+
+  test "delete raises on invalid path" do
+    document = Yerba::Document.parse("name: Alice")
+
+    assert_raises(Yerba::Error) { document.delete("name.") }
+  end
+
+  test "[] raises on invalid path" do
+    document = Yerba::Document.parse("name: Alice")
+
+    assert_raises(Yerba::Error) { document["name."] }
+  end
+
   test "to_h returns parsed Ruby object for map document" do
     document = Yerba::Document.parse("name: Alice\nport: 5432\nssl: true")
 

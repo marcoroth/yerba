@@ -72,6 +72,7 @@ pub struct YerbaGetResult {
   pub node_type: YerbaNodeType,
   pub single: YerbaTypedValue,
   pub list: YerbaTypedList,
+  pub error: *mut c_char,
 }
 
 #[no_mangle]
@@ -154,6 +155,22 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
   let document = &*document;
   let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
 
+  if let Err(e) = Document::validate_path(path_string) {
+    return YerbaGetResult {
+      is_list: false,
+      node_type: YerbaNodeType::NotFound,
+      single: YerbaTypedValue {
+        text: ptr::null_mut(),
+        value_type: YerbaValueType::Null,
+      },
+      list: YerbaTypedList {
+        json: ptr::null_mut(),
+        length: 0,
+      },
+      error: CString::new(e.to_string()).unwrap_or_default().into_raw(),
+    };
+  }
+
   if path_string.contains("[]") {
     let values = document.get_all_typed(path_string);
 
@@ -181,6 +198,7 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
         json: CString::new(json).unwrap_or_default().into_raw(),
         length,
       },
+      error: ptr::null_mut(),
     }
   } else {
     match document.get_typed(path_string) {
@@ -198,6 +216,7 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
             json: ptr::null_mut(),
             length: 0,
           },
+          error: ptr::null_mut(),
         }
       }
 
@@ -234,6 +253,7 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
             json: ptr::null_mut(),
             length: 0,
           },
+          error: ptr::null_mut(),
         }
       }
     }

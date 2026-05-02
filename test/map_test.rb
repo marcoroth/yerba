@@ -56,6 +56,87 @@ class MapTest < Minitest::Spec
     assert_equal "changed", document.get("database.host")
   end
 
+  test "map.insert adds new key at end" do
+    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document["database"].insert("ssl", "true")
+
+    expected = <<~YAML.chomp
+      database:
+        host: localhost
+        port: 5432
+        ssl: true
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "map.insert adds new key after specified key" do
+    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document["database"].insert("ssl", "true", after: "host")
+
+    expected = <<~YAML.chomp
+      database:
+        host: localhost
+        ssl: true
+        port: 5432
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "map.insert adds new key before specified key" do
+    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document["database"].insert("ssl", "true", before: "port")
+
+    expected = <<~YAML.chomp
+      database:
+        host: localhost
+        ssl: true
+        port: 5432
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "map.sort_keys orders keys" do
+    document = Yerba::Document.parse("database:\n  port: 5432\n  host: localhost")
+    document["database"].sort_keys(["host", "port"])
+
+    expected = <<~YAML.chomp
+      database:
+        host: localhost
+        port: 5432
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "map.delete removes a key" do
+    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432\n  pool: 10")
+    document["database"].delete("pool")
+
+    expected = <<~YAML.chomp
+      database:
+        host: localhost
+        port: 5432
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "map.key? returns true for existing key" do
+    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+
+    assert document["database"].key?("host")
+    assert document["database"].key?("port")
+  end
+
+  test "map.key? returns false for missing key" do
+    document = Yerba::Document.parse("database:\n  host: localhost")
+
+    refute document["database"].key?("missing")
+  end
+
   test "standalone map from hash" do
     map = Yerba::Map.new(name: "Alice", age: 30)
 

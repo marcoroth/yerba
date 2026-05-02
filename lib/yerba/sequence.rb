@@ -84,12 +84,42 @@ module Yerba
       self[length - 1] # rubocop:disable Style/NegativeArrayIndex
     end
 
-    def delete
-      @document&.delete(@path)
+    def remove(value)
+      @document&.remove(@path, value.to_s)
+
+      self
     end
 
-    def exists?
-      @document ? @document.exists?(@path) : !@data.nil?
+    def delete_at(index)
+      @document&.remove_at(@path, index)
+
+      self
+    end
+
+    def delete_if
+      return enum_for(:delete_if) unless block_given?
+
+      indices_to_remove = []
+
+      length.times do |index|
+        indices_to_remove << index if yield self[index]
+      end
+
+      indices_to_remove.reverse_each do |index|
+        @document&.remove_at(@path, index)
+      end
+
+      self
+    end
+
+    def sort(by: nil, case_sensitive: false)
+      @document&.sort(@path, by: by, case_sensitive: case_sensitive)
+
+      self
+    end
+
+    def delete
+      @document&.delete(@path)
     end
 
     def value

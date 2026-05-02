@@ -665,6 +665,7 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "insert_object", document_insert_object, -1);
   rb_define_method(rb_cDocument, "delete", document_delete, -1);
   rb_define_method(rb_cDocument, "remove", document_remove, 2);
+  rb_define_method(rb_cDocument, "remove_at", document_remove_at, 2);
   rb_define_method(rb_cDocument, "rename", document_rename, 2);
   rb_define_method(rb_cDocument, "sort", document_sort, -1);
   rb_define_method(rb_cDocument, "sort_keys", document_sort_keys, 2);

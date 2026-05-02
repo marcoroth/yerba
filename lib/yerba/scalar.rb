@@ -83,10 +83,6 @@ module Yerba
       @document&.delete(@path)
     end
 
-    def exists?
-      @document ? @document.exists?(@path) : !@value.nil?
-    end
-
     def inspect
       if @path
         "#<Yerba::Scalar path=#{@path.inspect} value=#{value.inspect}>"

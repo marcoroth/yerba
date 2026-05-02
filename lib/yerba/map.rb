@@ -43,6 +43,23 @@ module Yerba
       end
     end
 
+    def insert(key, value, before: nil, after: nil)
+      if @document
+        new_path = @path.empty? ? key.to_s : "#{@path}.#{key}"
+        @document.insert(new_path, value.to_s, before: before, after: after)
+      else
+        @data[key] = value
+      end
+
+      self
+    end
+
+    def sort_keys(order)
+      @document&.sort_keys(@path, order)
+
+      self
+    end
+
     def keys
       if @document
         results = @document.find(@path)
@@ -72,6 +89,30 @@ module Yerba
         @data.dig(*keys)
       end
     end
+
+    def delete(key = nil)
+      if key && @document
+        new_path = @path.empty? ? key.to_s : "#{@path}.#{key}"
+        @document.delete(new_path)
+      elsif @document
+        @document.delete(@path)
+      else
+        @data.delete(key)
+      end
+
+      self
+    end
+
+    def key?(key)
+      if @document
+        new_path = @path.empty? ? key.to_s : "#{@path}.#{key}"
+        @document.exists?(new_path)
+      else
+        @data.key?(key)
+      end
+    end
+    alias has_key? key?
+    alias include? key?
 
     def value
       @data || nil

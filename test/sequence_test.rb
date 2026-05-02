@@ -105,6 +105,48 @@ class SequenceTest < Minitest::Spec
     assert_equal "Go", document.get("items[0].name")
   end
 
+  test "remove deletes item by value" do
+    document = Yerba::Document.parse("tags:\n  - ruby\n  - rust\n  - go")
+    document["tags"].remove("rust")
+
+    refute_includes document.to_s, "rust"
+    assert_includes document.to_s, "ruby"
+    assert_includes document.to_s, "go"
+  end
+
+  test "sort orders scalar items" do
+    document = Yerba::Document.parse("tags:\n  - rust\n  - go\n  - ruby")
+    document["tags"].sort
+
+    lines = document.to_s.lines.map(&:strip).select { |line| line.start_with?("- ") }
+
+    assert_equal ["- go", "- ruby", "- rust"], lines
+  end
+
+  test "sort with by: orders by field" do
+    document = Yerba::Document.parse("items:\n  - name: Rust\n    year: 2015\n  - name: Go\n    year: 2009")
+    document["items"].sort(by: "name")
+
+    assert_equal "Go", document.get("items[0].name")
+    assert_equal "Rust", document.get("items[1].name")
+  end
+
+  test "delete_at removes item by index" do
+    document = Yerba::Document.parse("items:\n  - name: Ruby\n  - name: Rust\n  - name: Go")
+    document["items"].delete_at(1)
+
+    assert_equal "Ruby", document.get("items[0].name")
+    assert_equal "Go", document.get("items[1].name")
+  end
+
+  test "delete_if removes items matching block" do
+    document = Yerba::Document.parse("items:\n  - name: Ruby\n    year: 1995\n  - name: Rust\n    year: 2015\n  - name: Go\n    year: 2009")
+    document["items"].delete_if { |item| item["year"].value > 2000 }
+
+    assert_equal 1, document["items"].length
+    assert_equal "Ruby", document.get("items[0].name")
+  end
+
   test "standalone sequence from array" do
     seq = Yerba::Sequence.new(["ruby", "rust", "go"])
 

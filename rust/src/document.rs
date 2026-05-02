@@ -779,6 +779,25 @@ impl Document {
     self.remove_node(target_entry.syntax())
   }
 
+  pub fn remove_at(&mut self, dot_path: &str, index: usize) -> Result<(), YerbaError> {
+    Self::validate_path(dot_path)?;
+
+    let current_node = self.navigate(dot_path)?;
+
+    let sequence = current_node
+      .descendants()
+      .find_map(BlockSeq::cast)
+      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+
+    let entries: Vec<_> = sequence.entries().collect();
+
+    if index >= entries.len() {
+      return Err(YerbaError::IndexOutOfBounds(index, entries.len()));
+    }
+
+    self.remove_node(entries[index].syntax())
+  }
+
   pub fn move_item(&mut self, dot_path: &str, from: usize, to: usize) -> Result<(), YerbaError> {
     if from == to {
       return Ok(());

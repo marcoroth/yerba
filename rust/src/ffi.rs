@@ -486,6 +486,21 @@ pub unsafe extern "C" fn yerba_document_remove(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_remove_at(
+  document: *mut Document,
+  path: *const c_char,
+  index: usize,
+) -> YerbaResult {
+  let document = &mut *document;
+  let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  match document.remove_at(path_string, index) {
+    Ok(()) => YerbaResult::ok(),
+    Err(e) => YerbaResult::err(&e.to_string()),
+  }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_rename(
   document: *mut Document,
   source: *const c_char,

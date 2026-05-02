@@ -184,19 +184,6 @@ fn test_resolve_key_index_out_of_bounds() {
 }
 
 #[test]
-fn test_resolve_key_index_by_condition() {
-  let document = parse(indoc! {"
-    - id: talk-a
-      title: First
-    - id: talk-b
-      title: Second
-  "});
-
-  assert_eq!(document.resolve_sequence_index("", ".id == talk-a").unwrap(), 0);
-  assert_eq!(document.resolve_sequence_index("", ".title == Second").unwrap(), 1);
-}
-
-#[test]
 fn test_move_key_preserves_trailing_comment() {
   let mut document = parse(indoc! {"
     id: test

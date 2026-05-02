@@ -10,15 +10,15 @@ use super::{output, parse_file, resolve_files};
   arg_required_else_help = true,
   after_help = indoc! {r#"
     Examples:
-      yerba sort-keys config.yml database 'host,port,name,pool'
+      yerba sort-keys config.yml "database" "host,port,name,pool"
       yerba sort-keys "data/**/event.yml" "" "id,title,kind,location"
       yerba sort-keys "data/**/videos.yml" "[]" "id,title,speakers"
-      yerba sort-keys config.yml database 'host,port' --dry-run
+      yerba sort-keys config.yml "database" "host,port" --dry-run
   "#}
 )]
 pub struct Args {
   file: String,
-  path: String,
+  selector: String,
   /// Comma-separated key order
   order: String,
   #[arg(long)]
@@ -35,7 +35,7 @@ impl Args {
     for resolved_file in &files {
       let document = parse_file(resolved_file);
 
-      if let Err(error) = document.validate_sort_keys(&self.path, &key_order) {
+      if let Err(error) = document.validate_sort_keys(&self.selector, &key_order) {
         use super::color::*;
         eprintln!("{RED}Error in {}{RESET}: {}", resolved_file, error);
         has_errors = true;
@@ -49,7 +49,7 @@ impl Args {
     for resolved_file in &files {
       let mut document = parse_file(resolved_file);
 
-      if document.sort_keys(&self.path, &key_order).is_ok() {
+      if document.sort_keys(&self.selector, &key_order).is_ok() {
         output(resolved_file, &document, self.dry_run);
       }
     }

@@ -8,15 +8,15 @@ use super::{output, parse_file, resolve_move_indexes, run_op};
   arg_required_else_help = true,
   after_help = indoc! {r#"
     Examples:
-      yerba move config.yml tags rust --before ruby
-      yerba move config.yml tags rust --after yaml
-      yerba move config.yml tags 2 --to 0
+      yerba move config.yml "tags" "rust" --before "ruby"
+      yerba move config.yml "tags" "rust" --after "yaml"
+      yerba move config.yml "tags" 2 --to 0
       yerba move videos.yml "" ".id == talk-2" --after ".id == talk-1"
   "#}
 )]
 pub struct Args {
   file: String,
-  path: String,
+  selector: String,
   #[arg(help = "Item to move: name, index, or condition (e.g. \".id == talk-1\")")]
   item: String,
   #[arg(long, help = "Move before this item or condition (e.g. \".id == talk-2\")")]
@@ -34,7 +34,7 @@ impl Args {
     let mut document = parse_file(&self.file);
     let (from_index, to_index) = resolve_move_indexes(
       &document,
-      &self.path,
+      &self.selector,
       &self.item,
       self.before,
       self.after,
@@ -42,7 +42,7 @@ impl Args {
       |document, path, reference| document.resolve_sequence_index(path, reference),
     );
 
-    run_op(|| document.move_item(&self.path, from_index, to_index));
+    run_op(|| document.move_item(&self.selector, from_index, to_index));
     output(&self.file, &document, self.dry_run);
   }
 }

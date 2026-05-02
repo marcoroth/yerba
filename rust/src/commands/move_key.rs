@@ -10,17 +10,17 @@ use super::{output, parse_file, resolve_move_indexes, run_op};
   arg_required_else_help = true,
   after_help = indoc! {r#"
     Examples:
-      yerba move-key config.yml database.pool --before database.host
-      yerba move-key config.yml database.name --to 0
-      yerba move-key config.yml database.pool --before ".host == localhost"
+      yerba move-key config.yml "database.name" --to 0
+      yerba move-key config.yml "database.pool" --before "database.host"
+      yerba move-key config.yml "database.pool" --after "database.name"
   "#}
 )]
 pub struct Args {
   file: String,
-  path: String,
-  #[arg(long, help = "Move before this key or condition")]
+  selector: String,
+  #[arg(long, help = "Move before this key")]
   before: Option<String>,
-  #[arg(long, help = "Move after this key or condition")]
+  #[arg(long, help = "Move after this key")]
   after: Option<String>,
   #[arg(long)]
   to: Option<usize>,
@@ -30,7 +30,7 @@ pub struct Args {
 
 impl Args {
   pub fn run(self) {
-    let (parent_path, key) = self.path.rsplit_once('.').unwrap_or(("", &self.path));
+    let (parent_path, key) = self.selector.rsplit_once('.').unwrap_or(("", &self.selector));
 
     let mut document = parse_file(&self.file);
 
@@ -41,7 +41,7 @@ impl Args {
         use super::color::*;
         eprintln!(
           "{RED}Error:{RESET} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
-          self.path, target
+          self.selector, target
         );
 
         process::exit(1);
@@ -57,7 +57,7 @@ impl Args {
         use super::color::*;
         eprintln!(
           "{RED}Error:{RESET} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
-          self.path, target
+          self.selector, target
         );
 
         process::exit(1);

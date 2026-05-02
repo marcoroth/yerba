@@ -8,21 +8,21 @@ use super::{output, parse_file, run_op};
   arg_required_else_help = true,
   after_help = indoc! {r#"
     Examples:
-      yerba insert config.yml database.ssl true
-      yerba insert config.yml database.ssl true --after host
-      yerba insert config.yml database.ssl true --before port
-      yerba insert config.yml tags yaml
-      yerba insert config.yml tags yaml --at 0
-      yerba insert config.yml tags yaml --after ruby
+      yerba insert config.yml "database.ssl" true
+      yerba insert config.yml "database.ssl" true --after "host"
+      yerba insert config.yml "database.ssl" true --before "port"
+      yerba insert config.yml "tags" "yaml"
+      yerba insert config.yml "tags" "yaml" --at 0
+      yerba insert config.yml "tags" "yaml" --after "ruby"
       yerba insert speakers.yml "" "name: Bob" --after ".name == Alice"
       yerba insert videos.yml "[0].speakers" "Diana" --before ".name == Charlie"
-      yerba insert videos.yml "" --from new_talk.yml --after ".id == first-talk"
+      yerba insert videos.yml "" --from "new_talk.yml" --after ".id == first-talk"
       cat talk.yml | yerba insert videos.yml "" --from - --after ".id == first-talk"
   "#}
 )]
 pub struct Args {
   file: String,
-  path: String,
+  selector: String,
   value: Option<String>,
   #[arg(long, help = "Read value from a file (use - for stdin)")]
   from: Option<String>,
@@ -70,7 +70,7 @@ impl Args {
       std::process::exit(1);
     };
 
-    let parent_path = self.path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+    let parent_path = self.selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
     let position = if let Some(index) = self.at {
       yerba::InsertPosition::At(index)
@@ -95,7 +95,7 @@ impl Args {
     };
 
     let mut document = parse_file(&self.file);
-    run_op(|| document.insert_into(&self.path, &resolved_value, position));
+    run_op(|| document.insert_into(&self.selector, &resolved_value, position));
     output(&self.file, &document, self.dry_run);
   }
 }

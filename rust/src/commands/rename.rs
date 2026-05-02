@@ -8,9 +8,9 @@ use super::{output, parse_file, run_op};
   arg_required_else_help = true,
   after_help = indoc! {r#"
     Examples:
-      yerba rename config.yml database.host database.hostname
-      yerba rename config.yml database.host hostname
-      yerba rename config.yml database.host settings.db_host
+      yerba rename config.yml "database.host" "database.hostname"
+      yerba rename config.yml "database.host" "hostname"
+      yerba rename config.yml "database.host" "settings.db_host"
       yerba rename videos.yml "[0].old_name" "[0].name"
   "#}
 )]

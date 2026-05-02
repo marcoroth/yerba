@@ -8,13 +8,13 @@ use super::{output, parse_file, run_op};
   arg_required_else_help = true,
   after_help = indoc! {r#"
     Examples:
-      yerba remove config.yml tags rust
-      yerba remove videos.yml "[0].speakers" Alice
+      yerba remove config.yml "tags" "rust"
+      yerba remove videos.yml "[0].speakers" "Alice"
   "#}
 )]
 pub struct Args {
   file: String,
-  path: String,
+  selector: String,
   value: String,
   #[arg(long)]
   dry_run: bool,
@@ -23,7 +23,7 @@ pub struct Args {
 impl Args {
   pub fn run(self) {
     let mut document = parse_file(&self.file);
-    run_op(|| document.remove(&self.path, &self.value));
+    run_op(|| document.remove(&self.selector, &self.value));
     output(&self.file, &document, self.dry_run);
   }
 }

@@ -11,7 +11,7 @@ use super::{output, parse_file, resolve_files};
       yerba quote-style config.yml double
       yerba quote-style config.yml plain --keys
       yerba quote-style config.yml double --all
-      yerba quote-style config.yml single --path database.host
+      yerba quote-style config.yml single --path "database.host"
       yerba quote-style videos.yml plain --path "[].speakers"
   "#}
 )]

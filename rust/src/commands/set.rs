@@ -8,16 +8,16 @@ use super::{output, parse_file, run_op};
   arg_required_else_help = true,
   after_help = indoc! {r#"
     Examples:
-      yerba set config.yml database.host 0.0.0.0
-      yerba set config.yml database.host 0.0.0.0 --if-exists
-      yerba set config.yml database.host 0.0.0.0 --condition '.port == 5432'
+      yerba set config.yml "database.host" "0.0.0.0"
+      yerba set config.yml "database.host" "0.0.0.0" --if-exists
+      yerba set config.yml "database.host" "0.0.0.0" --condition ".port == 5432"
       yerba set videos.yml "[0].title" "New Title"
-      yerba set "data/**/event.yml" website "" --if-exists
+      yerba set "data/**/event.yml" "website" "" --if-exists
   "#}
 )]
 pub struct Args {
   file: String,
-  path: String,
+  selector: String,
   value: String,
   #[arg(long)]
   if_exists: bool,
@@ -32,12 +32,12 @@ pub struct Args {
 impl Args {
   pub fn run(self) {
     let mut document = parse_file(&self.file);
-    let parent_path = self.path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+    let parent_path = self.selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
     let should_set = if self.if_exists {
-      document.exists(&self.path)
+      document.exists(&self.selector)
     } else if self.if_missing {
-      !document.exists(&self.path)
+      !document.exists(&self.selector)
     } else if let Some(condition) = &self.condition {
       document.evaluate_condition(parent_path, condition)
     } else {
@@ -45,7 +45,7 @@ impl Args {
     };
 
     if should_set {
-      run_op(|| document.set(&self.path, &self.value));
+      run_op(|| document.set(&self.selector, &self.value));
     }
 
     output(&self.file, &document, self.dry_run);

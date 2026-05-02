@@ -10,19 +10,19 @@ use super::{parse_file, resolve_files};
   arg_required_else_help = true,
   after_help = indoc! {r#"
     Examples:
-      yerba get config.yml database.host
+      yerba get config.yml "database.host"
       yerba get videos.yml "[].title"
       yerba get videos.yml "[0].title"
       yerba get "data/**/videos.yml" "[].speakers[].name"
-      yerba get videos.yml "[]" --select title,speakers
+      yerba get videos.yml "[]" --select "title,speakers"
       yerba get videos.yml "[]" --condition ".kind == keynote"
-      yerba get videos.yml "[]" --select title --condition ".kind == keynote"
+      yerba get videos.yml "[]" --select "title" --condition ".kind == keynote"
       yerba get videos.yml "[]" --condition ".speakers contains Matz" --raw
   "#}
 )]
 pub struct Args {
   file: String,
-  path: String,
+  selector: String,
   /// Filter items by condition (e.g. '.kind == keynote', '.title contains Ruby')
   #[arg(long)]
   condition: Option<String>,
@@ -55,11 +55,11 @@ impl Args {
     for resolved_file in resolve_files(&self.file) {
       let document = parse_file(&resolved_file);
 
-      let values = document.get_all(&self.path);
+      let values = document.get_all(&self.selector);
 
-      if values.is_empty() && !self.path.contains('[') && !document.exists(&self.path) {
+      if values.is_empty() && !self.selector.contains('[') && !document.exists(&self.selector) {
         use super::color::*;
-        eprintln!("{RED}Error:{RESET} path not found: {}", self.path);
+        eprintln!("{RED}Error:{RESET} path not found: {}", self.selector);
         process::exit(1);
       }
 
@@ -91,8 +91,8 @@ impl Args {
         let document = parse_file(&resolved_file);
 
         let matches = match &self.condition {
-          Some(condition) => document.find_items(&self.path, condition),
-          None => document.find_all(&self.path),
+          Some(condition) => document.find_items(&self.selector, condition),
+          None => document.find_all(&self.selector),
         };
 
         for (index, item) in matches.iter().enumerate() {
@@ -111,8 +111,8 @@ impl Args {
         let document = parse_file(&resolved_file);
 
         let matches = match &self.condition {
-          Some(condition) => document.find_items(&self.path, condition),
-          None => document.find_all(&self.path),
+          Some(condition) => document.find_items(&self.selector, condition),
+          None => document.find_all(&self.selector),
         };
 
         for item in &matches {

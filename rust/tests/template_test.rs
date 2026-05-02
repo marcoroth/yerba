@@ -1,9 +1,12 @@
+mod support;
+use indoc::indoc;
 use std::collections::HashMap;
-use yerba::{resolve_template, Document, Variable};
+use support::parse;
+use yerba::{resolve_template, Variable};
 
 #[test]
 fn test_template_no_references() {
-  let document = Document::parse("id: test\n").unwrap();
+  let document = parse("id: test\n");
   let variables = HashMap::new();
 
   let result = resolve_template("plain text", &document, None, &variables).unwrap();
@@ -13,7 +16,7 @@ fn test_template_no_references() {
 
 #[test]
 fn test_template_simple_reference() {
-  let document = Document::parse("id: my-talk\n").unwrap();
+  let document = parse("id: my-talk\n");
   let variables = HashMap::new();
 
   let result = resolve_template("${id}", &document, None, &variables).unwrap();
@@ -23,7 +26,7 @@ fn test_template_simple_reference() {
 
 #[test]
 fn test_template_mixed_literal_and_reference() {
-  let document = Document::parse("id: my-talk\n").unwrap();
+  let document = parse("id: my-talk\n");
   let variables = HashMap::new();
 
   let result = resolve_template("https://example.com/${id}", &document, None, &variables).unwrap();
@@ -33,7 +36,10 @@ fn test_template_mixed_literal_and_reference() {
 
 #[test]
 fn test_template_multiple_references() {
-  let document = Document::parse("first: hello\nlast: world\n").unwrap();
+  let document = parse(indoc! {"
+    first: hello
+    last: world
+  "});
   let variables = HashMap::new();
 
   let result = resolve_template("${first}-${last}", &document, None, &variables).unwrap();
@@ -43,7 +49,10 @@ fn test_template_multiple_references() {
 
 #[test]
 fn test_template_nested_path() {
-  let document = Document::parse("database:\n  host: localhost\n").unwrap();
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+  "});
   let variables = HashMap::new();
 
   let result = resolve_template("${database.host}", &document, None, &variables).unwrap();
@@ -53,7 +62,11 @@ fn test_template_nested_path() {
 
 #[test]
 fn test_template_with_index() {
-  let document = Document::parse("tags:\n  - ruby\n  - rust\n").unwrap();
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+  "});
   let variables = HashMap::new();
 
   let result = resolve_template("${tags[0]}", &document, None, &variables).unwrap();
@@ -63,7 +76,7 @@ fn test_template_with_index() {
 
 #[test]
 fn test_template_missing_reference_errors() {
-  let document = Document::parse("id: test\n").unwrap();
+  let document = parse("id: test\n");
   let variables = HashMap::new();
 
   let result = resolve_template("${missing}", &document, None, &variables);
@@ -74,7 +87,7 @@ fn test_template_missing_reference_errors() {
 
 #[test]
 fn test_template_unclosed_bracket_errors() {
-  let document = Document::parse("id: test\n").unwrap();
+  let document = parse("id: test\n");
   let variables = HashMap::new();
 
   let result = resolve_template("${unclosed", &document, None, &variables);
@@ -84,7 +97,7 @@ fn test_template_unclosed_bracket_errors() {
 
 #[test]
 fn test_template_resolves_single_variable() {
-  let document = Document::parse("id: test\n").unwrap();
+  let document = parse("id: test\n");
   let mut variables = HashMap::new();
 
   variables.insert("my_var".to_string(), Variable::Single("stored_value".to_string()));
@@ -96,7 +109,7 @@ fn test_template_resolves_single_variable() {
 
 #[test]
 fn test_template_resolves_list_variable() {
-  let document = Document::parse("id: test\n").unwrap();
+  let document = parse("id: test\n");
   let mut variables = HashMap::new();
 
   variables.insert(
@@ -111,7 +124,7 @@ fn test_template_resolves_list_variable() {
 
 #[test]
 fn test_template_variable_takes_precedence_over_document() {
-  let document = Document::parse("id: from-document\n").unwrap();
+  let document = parse("id: from-document\n");
   let mut variables = HashMap::new();
 
   variables.insert("id".to_string(), Variable::Single("from-variable".to_string()));
@@ -123,7 +136,11 @@ fn test_template_variable_takes_precedence_over_document() {
 
 #[test]
 fn test_template_with_base_path() {
-  let document = Document::parse("database:\n  host: localhost\n  port: 5432\n").unwrap();
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "});
   let variables = HashMap::new();
 
   let result = resolve_template("${host}", &document, Some("database"), &variables).unwrap();
@@ -133,8 +150,10 @@ fn test_template_with_base_path() {
 
 #[test]
 fn test_simulated_get_then_set_pipeline() {
-  let yaml = "id: my-talk\nslug: placeholder\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    id: my-talk
+    slug: placeholder
+  "});
   let mut variables = HashMap::new();
 
   let value = document.get("id").unwrap();
@@ -148,8 +167,10 @@ fn test_simulated_get_then_set_pipeline() {
 
 #[test]
 fn test_simulated_get_then_set_with_prefix() {
-  let yaml = "id: my-talk\nurl: placeholder\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    id: my-talk
+    url: placeholder
+  "});
   let mut variables = HashMap::new();
 
   let value = document.get("id").unwrap();
@@ -166,8 +187,10 @@ fn test_simulated_get_then_set_with_prefix() {
 
 #[test]
 fn test_template_resolves_after_mutation() {
-  let yaml = "name: old\ntitle: placeholder\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    name: old
+    title: placeholder
+  "});
   let variables = HashMap::new();
 
   document.set("name", "new").unwrap();

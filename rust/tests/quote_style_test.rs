@@ -1,120 +1,219 @@
-use yerba::Document;
+mod support;
+use indoc::indoc;
+use support::parse;
 
 #[test]
 fn test_enforce_quotes_to_double() {
-  let yaml = "host: localhost\nname: 'myapp'\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    host: localhost
+    name: 'myapp'
+  "});
 
   document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
 
-  assert_eq!(document.to_string(), "host: \"localhost\"\nname: \"myapp\"\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      host: "localhost"
+      name: "myapp"
+    "#}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_to_single() {
-  let yaml = "host: localhost\nname: \"myapp\"\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    host: localhost
+    name: "myapp"
+  "#});
 
   document.enforce_quotes(&yerba::QuoteStyle::Single).unwrap();
 
-  assert_eq!(document.to_string(), "host: 'localhost'\nname: 'myapp'\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      host: 'localhost'
+      name: 'myapp'
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_to_plain() {
-  let yaml = "host: \"localhost\"\nname: 'myapp'\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    host: "localhost"
+    name: 'myapp'
+  "#});
 
   document.enforce_quotes(&yerba::QuoteStyle::Plain).unwrap();
 
-  assert_eq!(document.to_string(), "host: localhost\nname: myapp\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      host: localhost
+      name: myapp
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_preserves_comments() {
-  let yaml = "# Config\nhost: localhost\n# End\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    # Config
+    host: localhost
+    # End
+  "});
 
   document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
 
-  assert_eq!(document.to_string(), "# Config\nhost: \"localhost\"\n# End\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      # Config
+      host: "localhost"
+      # End
+    "#}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_noop_when_already_correct() {
-  let yaml = "\"host\": \"localhost\"\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    "host": "localhost"
+  "#});
 
   document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
 
-  assert_eq!(document.to_string(), "\"host\": \"localhost\"\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      "host": "localhost"
+    "#}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_roundtrip() {
-  let yaml = "host: localhost\nname: 'myapp'\ndesc: \"hello\"\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    host: localhost
+    name: 'myapp'
+    desc: "hello"
+  "#});
 
   document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
   document.enforce_quotes(&yerba::QuoteStyle::Plain).unwrap();
 
-  assert_eq!(document.to_string(), "host: localhost\nname: myapp\ndesc: hello\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      host: localhost
+      name: myapp
+      desc: hello
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_skips_numbers() {
-  let yaml = "port: 5432\ncount: 10\nprice: 9.99\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    port: 5432
+    count: 10
+    price: 9.99
+  "});
 
   document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
 
-  assert_eq!(document.to_string(), "port: 5432\ncount: 10\nprice: 9.99\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      port: 5432
+      count: 10
+      price: 9.99
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_skips_booleans() {
-  let yaml = "debug: true\nverbose: false\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    debug: true
+    verbose: false
+  "});
 
   document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
 
-  assert_eq!(document.to_string(), "debug: true\nverbose: false\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      debug: true
+      verbose: false
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_key_style() {
-  let yaml = "\"host\": localhost\n'port': 5432\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    "host": localhost
+    'port': 5432
+  "#});
 
   document.enforce_key_style(&yerba::QuoteStyle::Plain, None).unwrap();
 
-  assert_eq!(document.to_string(), "host: localhost\nport: 5432\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      host: localhost
+      port: 5432
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_key_style_to_double() {
-  let yaml = "host: localhost\nport: 5432\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    host: localhost
+    port: 5432
+  "});
 
   document.enforce_key_style(&yerba::QuoteStyle::Double, None).unwrap();
 
-  assert_eq!(document.to_string(), "\"host\": localhost\n\"port\": 5432\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      "host": localhost
+      "port": 5432
+    "#}
+  );
 }
 
 #[test]
 fn test_enforce_key_style_to_single() {
-  let yaml = "host: localhost\nport: 5432\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    host: localhost
+    port: 5432
+  "});
 
   document.enforce_key_style(&yerba::QuoteStyle::Single, None).unwrap();
 
-  assert_eq!(document.to_string(), "'host': localhost\n'port': 5432\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      'host': localhost
+      'port': 5432
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_key_style_scoped_to_path() {
-  let yaml = "database:\n  host: localhost\n  port: 5432\napp:\n  name: myapp\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+    app:
+      name: myapp
+  "});
 
   document
     .enforce_key_style(&yerba::QuoteStyle::Double, Some("database"))
@@ -122,68 +221,123 @@ fn test_enforce_key_style_scoped_to_path() {
 
   assert_eq!(
     document.to_string(),
-    "database:\n  \"host\": localhost\n  \"port\": 5432\napp:\n  name: myapp\n"
+    indoc! {r#"
+      database:
+        "host": localhost
+        "port": 5432
+      app:
+        name: myapp
+    "#}
   );
 }
 
 #[test]
 fn test_enforce_key_style_preserves_values() {
-  let yaml = "host: \"localhost\"\nport: 5432\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    host: "localhost"
+    port: 5432
+  "#});
 
   document.enforce_key_style(&yerba::QuoteStyle::Double, None).unwrap();
 
-  assert_eq!(document.to_string(), "\"host\": \"localhost\"\n\"port\": 5432\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      "host": "localhost"
+      "port": 5432
+    "#}
+  );
 }
 
 #[test]
 fn test_enforce_key_style_nested() {
-  let yaml = "\"database\":\n  \"host\": localhost\n  'port': 5432\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    "database":
+      "host": localhost
+      'port': 5432
+  "#});
 
   document.enforce_key_style(&yerba::QuoteStyle::Plain, None).unwrap();
 
-  assert_eq!(document.to_string(), "database:\n  host: localhost\n  port: 5432\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      database:
+        host: localhost
+        port: 5432
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_both_key_and_value_style() {
-  let yaml = "host: localhost\nname: myapp\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    host: localhost
+    name: myapp
+  "});
 
   document.enforce_key_style(&yerba::QuoteStyle::Double, None).unwrap();
   document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
 
-  assert_eq!(document.to_string(), "\"host\": \"localhost\"\n\"name\": \"myapp\"\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      "host": "localhost"
+      "name": "myapp"
+    "#}
+  );
 }
 
 #[test]
 fn test_enforce_keys_double_values_single() {
-  let yaml = "host: localhost\nname: myapp\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    host: localhost
+    name: myapp
+  "});
 
   document.enforce_key_style(&yerba::QuoteStyle::Double, None).unwrap();
   document.enforce_quotes(&yerba::QuoteStyle::Single).unwrap();
 
-  assert_eq!(document.to_string(), "\"host\": 'localhost'\n\"name\": 'myapp'\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      "host": 'localhost'
+      "name": 'myapp'
+    "#}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_scoped_to_single_key() {
-  let yaml = "host: localhost\nport: 5432\nname: myapp\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    host: localhost
+    port: 5432
+    name: myapp
+  "});
 
   document
     .enforce_quotes_at(&yerba::QuoteStyle::Single, Some("host"))
     .unwrap();
 
-  assert_eq!(document.to_string(), "host: 'localhost'\nport: 5432\nname: myapp\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      host: 'localhost'
+      port: 5432
+      name: myapp
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_scoped_to_nested_key() {
-  let yaml = "database:\n  host: localhost\n  port: 5432\napp:\n  name: myapp\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+    app:
+      name: myapp
+  "});
 
   document
     .enforce_quotes_at(&yerba::QuoteStyle::Double, Some("database"))
@@ -191,27 +345,37 @@ fn test_enforce_quotes_scoped_to_nested_key() {
 
   assert_eq!(
     document.to_string(),
-    "database:\n  host: \"localhost\"\n  port: 5432\napp:\n  name: myapp\n"
+    indoc! {r#"
+      database:
+        host: "localhost"
+        port: 5432
+      app:
+        name: myapp
+    "#}
   );
 }
 
 #[test]
 fn test_enforce_quotes_skips_value_with_inner_double_quotes() {
-  let yaml = "title: 'Panel \"Post-Rails world\" - wroc_love.rb'\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    title: 'Panel "Post-Rails world" - wroc_love.rb'
+  "#});
 
   document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
 
   assert_eq!(
     document.to_string(),
-    "title: 'Panel \"Post-Rails world\" - wroc_love.rb'\n"
+    indoc! {r#"
+      title: 'Panel "Post-Rails world" - wroc_love.rb'
+    "#}
   );
 }
 
 #[test]
 fn test_enforce_quotes_single_escapes_inner_single_quotes() {
-  let yaml = "title: \"it's a test\"\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    title: "it's a test"
+  "#});
 
   document.enforce_quotes(&yerba::QuoteStyle::Single).unwrap();
 
@@ -220,31 +384,43 @@ fn test_enforce_quotes_single_escapes_inner_single_quotes() {
 
 #[test]
 fn test_enforce_quotes_plain_skips_value_with_special_chars() {
-  let yaml = "title: \"hello: world\"\nsubtitle: \"no # comment\"\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    title: "hello: world"
+    subtitle: "no # comment"
+  "#});
 
   document.enforce_quotes(&yerba::QuoteStyle::Plain).unwrap();
 
   assert_eq!(
     document.to_string(),
-    "title: \"hello: world\"\nsubtitle: \"no # comment\"\n"
+    indoc! {r#"
+      title: "hello: world"
+      subtitle: "no # comment"
+    "#}
   );
 }
 
 #[test]
 fn test_enforce_quotes_plain_strips_safe_values() {
-  let yaml = "title: \"hello world\"\nname: \"myapp\"\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {r#"
+    title: "hello world"
+    name: "myapp"
+  "#});
 
   document.enforce_quotes(&yerba::QuoteStyle::Plain).unwrap();
 
-  assert_eq!(document.to_string(), "title: hello world\nname: myapp\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      title: hello world
+      name: myapp
+    "}
+  );
 }
 
 #[test]
 fn test_enforce_quotes_double_with_plain_containing_quotes() {
-  let yaml = "name: simple\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse("name: simple\n");
 
   document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
 

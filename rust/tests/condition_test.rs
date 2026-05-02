@@ -1,8 +1,14 @@
-use yerba::Document;
+mod support;
+use indoc::indoc;
+use support::parse;
 
 #[test]
 fn test_evaluate_condition_equal() {
-  let document = Document::parse("database:\n  host: localhost\n  port: 5432\n").unwrap();
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "});
 
   assert!(document.evaluate_condition("database", ".host == \"localhost\""));
   assert!(!document.evaluate_condition("database", ".host == \"other\""));
@@ -10,7 +16,11 @@ fn test_evaluate_condition_equal() {
 
 #[test]
 fn test_evaluate_condition_not_equal() {
-  let document = Document::parse("database:\n  host: localhost\n  port: 5432\n").unwrap();
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "});
 
   assert!(document.evaluate_condition("database", ".host != \"other\""));
   assert!(!document.evaluate_condition("database", ".host != \"localhost\""));
@@ -18,7 +28,11 @@ fn test_evaluate_condition_not_equal() {
 
 #[test]
 fn test_evaluate_condition_with_number() {
-  let document = Document::parse("database:\n  host: localhost\n  port: 5432\n").unwrap();
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "});
 
   assert!(document.evaluate_condition("database", ".port == \"5432\""));
   assert!(document.evaluate_condition("database", ".port == 5432"));
@@ -26,21 +40,32 @@ fn test_evaluate_condition_with_number() {
 
 #[test]
 fn test_evaluate_condition_single_quoted_value() {
-  let document = Document::parse("database:\n  host: localhost\n  port: 5432\n").unwrap();
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "});
 
   assert!(document.evaluate_condition("database", ".host == 'localhost'"));
 }
 
 #[test]
 fn test_evaluate_condition_unquoted_value() {
-  let document = Document::parse("database:\n  host: localhost\n  port: 5432\n").unwrap();
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "});
 
   assert!(document.evaluate_condition("database", ".host == localhost"));
 }
 
 #[test]
 fn test_evaluate_condition_root_level() {
-  let document = Document::parse("host: localhost\nport: 5432\n").unwrap();
+  let document = parse(indoc! {"
+    host: localhost
+    port: 5432
+  "});
 
   assert!(document.evaluate_condition("", ".host == \"localhost\""));
   assert!(document.evaluate_condition("", ".port == 5432"));
@@ -48,14 +73,18 @@ fn test_evaluate_condition_root_level() {
 
 #[test]
 fn test_evaluate_condition_missing_key_returns_false() {
-  let document = Document::parse("host: localhost\n").unwrap();
+  let document = parse("host: localhost\n");
 
   assert!(!document.evaluate_condition("", ".missing == \"value\""));
 }
 
 #[test]
 fn test_evaluate_condition_boolean_value() {
-  let document = Document::parse("app:\n  debug: true\n  verbose: false\n").unwrap();
+  let document = parse(indoc! {"
+    app:
+      debug: true
+      verbose: false
+  "});
 
   assert!(document.evaluate_condition("app", ".debug == true"));
   assert!(document.evaluate_condition("app", ".verbose == false"));
@@ -64,7 +93,9 @@ fn test_evaluate_condition_boolean_value() {
 
 #[test]
 fn test_evaluate_condition_quoted_yaml_value() {
-  let document = Document::parse("name: \"myapp\"\n").unwrap();
+  let document = parse(indoc! {r#"
+    name: "myapp"
+  "#});
 
   assert!(document.evaluate_condition("", ".name == \"myapp\""));
   assert!(document.evaluate_condition("", ".name == myapp"));
@@ -72,7 +103,7 @@ fn test_evaluate_condition_quoted_yaml_value() {
 
 #[test]
 fn test_evaluate_condition_invalid_condition() {
-  let document = Document::parse("host: localhost\n").unwrap();
+  let document = parse("host: localhost\n");
 
   assert!(!document.evaluate_condition("", "not a condition"));
   assert!(!document.evaluate_condition("", ""));
@@ -80,8 +111,13 @@ fn test_evaluate_condition_invalid_condition() {
 
 #[test]
 fn test_evaluate_condition_contains() {
-  let yaml = "app:\n  tags:\n    - ruby\n    - rust\n    - yaml\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    app:
+      tags:
+        - ruby
+        - rust
+        - yaml
+  "});
 
   assert!(document.evaluate_condition("app", ".tags contains \"ruby\""));
   assert!(document.evaluate_condition("app", ".tags contains rust"));
@@ -90,8 +126,12 @@ fn test_evaluate_condition_contains() {
 
 #[test]
 fn test_evaluate_condition_not_contains() {
-  let yaml = "app:\n  tags:\n    - ruby\n    - rust\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    app:
+      tags:
+        - ruby
+        - rust
+  "});
 
   assert!(document.evaluate_condition("app", ".tags not_contains python"));
   assert!(!document.evaluate_condition("app", ".tags not_contains ruby"));
@@ -99,8 +139,11 @@ fn test_evaluate_condition_not_contains() {
 
 #[test]
 fn test_evaluate_condition_contains_root_level() {
-  let yaml = "speakers:\n  - Marco Roth\n  - Nadia Odunayo\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    speakers:
+      - Marco Roth
+      - Nadia Odunayo
+  "});
 
   assert!(document.evaluate_condition("", ".speakers contains \"Marco Roth\""));
   assert!(!document.evaluate_condition("", ".speakers contains \"Unknown\""));
@@ -108,17 +151,24 @@ fn test_evaluate_condition_contains_root_level() {
 
 #[test]
 fn test_evaluate_condition_contains_empty_sequence() {
-  let yaml = "tags:\n  - ruby\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+  "});
 
   assert!(!document.evaluate_condition("", ".missing contains ruby"));
 }
 
 #[test]
 fn test_evaluate_condition_nested_bracket_contains() {
-  let yaml =
-    "talks:\n  - speakers:\n      - name: Marco Roth\n      - name: Nadia\n  - speakers:\n      - name: Alice\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    talks:
+      - speakers:
+          - name: Marco Roth
+          - name: Nadia
+      - speakers:
+          - name: Alice
+  "});
 
   assert!(document.evaluate_condition("", ".talks[].speakers[].name contains \"Marco Roth\""));
   assert!(!document.evaluate_condition("", ".talks[].speakers[].name contains \"Unknown\""));
@@ -126,8 +176,12 @@ fn test_evaluate_condition_nested_bracket_contains() {
 
 #[test]
 fn test_evaluate_condition_bracket_equals() {
-  let yaml = "- kind: keynote\n  title: A\n- kind: talk\n  title: B\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    - kind: keynote
+      title: A
+    - kind: talk
+      title: B
+  "});
 
   assert!(document.evaluate_condition("", ".[].kind == keynote"));
   assert!(document.evaluate_condition("", ".[].kind == talk"));
@@ -136,8 +190,10 @@ fn test_evaluate_condition_bracket_equals() {
 
 #[test]
 fn test_evaluate_condition_bracket_not_equals() {
-  let yaml = "- kind: keynote\n- kind: keynote\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    - kind: keynote
+    - kind: keynote
+  "});
 
   assert!(document.evaluate_condition("", ".[].kind != talk"));
   assert!(!document.evaluate_condition("", ".[].kind != keynote"));
@@ -145,8 +201,11 @@ fn test_evaluate_condition_bracket_not_equals() {
 
 #[test]
 fn test_evaluate_condition_flat_speakers_contains() {
-  let yaml = "speakers:\n  - Marco Roth\n  - Nadia Odunayo\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    speakers:
+      - Marco Roth
+      - Nadia Odunayo
+  "});
 
   assert!(document.evaluate_condition("", ".speakers contains \"Marco Roth\""));
   assert!(document.evaluate_condition("", ".speakers[] contains \"Marco Roth\""));
@@ -154,7 +213,7 @@ fn test_evaluate_condition_flat_speakers_contains() {
 
 #[test]
 fn test_evaluate_condition_contains_substring() {
-  let document = Document::parse("title: Ruby on Rails\n").unwrap();
+  let document = parse("title: Ruby on Rails\n");
 
   assert!(document.evaluate_condition("", ".title contains Ruby"));
   assert!(document.evaluate_condition("", ".title contains Rails"));
@@ -164,7 +223,7 @@ fn test_evaluate_condition_contains_substring() {
 
 #[test]
 fn test_evaluate_condition_not_contains_substring() {
-  let document = Document::parse("title: Ruby on Rails\n").unwrap();
+  let document = parse("title: Ruby on Rails\n");
 
   assert!(document.evaluate_condition("", ".title not_contains Python"));
   assert!(!document.evaluate_condition("", ".title not_contains Ruby"));
@@ -172,8 +231,11 @@ fn test_evaluate_condition_not_contains_substring() {
 
 #[test]
 fn test_evaluate_condition_contains_still_works_for_arrays() {
-  let yaml = "tags:\n  - ruby\n  - rust\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+  "});
 
   assert!(document.evaluate_condition("", ".tags contains ruby"));
   assert!(!document.evaluate_condition("", ".tags contains rub"));
@@ -181,8 +243,11 @@ fn test_evaluate_condition_contains_still_works_for_arrays() {
 
 #[test]
 fn test_evaluate_condition_contains_substring_nested() {
-  let yaml = "database:\n  host: localhost\n  name: myapp_development\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      name: myapp_development
+  "});
 
   assert!(document.evaluate_condition("database", ".name contains development"));
   assert!(document.evaluate_condition("database", ".name contains myapp"));

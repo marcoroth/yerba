@@ -1,9 +1,17 @@
-use yerba::Document;
+mod support;
+use indoc::indoc;
+use support::parse;
 
 #[test]
 fn test_find_items_by_equality() {
-  let yaml = "- kind: keynote\n  title: Opening\n- kind: talk\n  title: Testing\n- kind: keynote\n  title: Closing\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    - kind: keynote
+      title: Opening
+    - kind: talk
+      title: Testing
+    - kind: keynote
+      title: Closing
+  "});
 
   let results = document.find_items("[]", ".kind == keynote");
 
@@ -14,8 +22,15 @@ fn test_find_items_by_equality() {
 
 #[test]
 fn test_find_items_by_contains() {
-  let yaml = "- title: Talk A\n  speakers:\n    - Alice\n    - Bob\n- title: Talk B\n  speakers:\n    - Charlie\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    - title: Talk A
+      speakers:
+        - Alice
+        - Bob
+    - title: Talk B
+      speakers:
+        - Charlie
+  "});
 
   let results = document.find_items("[]", ".speakers contains \"Alice\"");
 
@@ -25,8 +40,12 @@ fn test_find_items_by_contains() {
 
 #[test]
 fn test_find_items_no_matches() {
-  let yaml = "- kind: talk\n  title: A\n- kind: talk\n  title: B\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    - kind: talk
+      title: A
+    - kind: talk
+      title: B
+  "});
 
   let results = document.find_items("[]", ".kind == keynote");
 
@@ -35,8 +54,13 @@ fn test_find_items_no_matches() {
 
 #[test]
 fn test_find_items_nested_path() {
-  let yaml = "conferences:\n  - name: RailsConf\n    year: 2024\n  - name: RubyKaigi\n    year: 2025\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    conferences:
+      - name: RailsConf
+        year: 2024
+      - name: RubyKaigi
+        year: 2025
+  "});
 
   let results = document.find_items("conferences.[]", ".year == 2024");
 
@@ -46,8 +70,14 @@ fn test_find_items_nested_path() {
 
 #[test]
 fn test_find_items_by_not_equals() {
-  let yaml = "- kind: keynote\n  title: A\n- kind: talk\n  title: B\n- kind: talk\n  title: C\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    - kind: keynote
+      title: A
+    - kind: talk
+      title: B
+    - kind: talk
+      title: C
+  "});
 
   let results = document.find_items("[]", ".kind != keynote");
 
@@ -58,8 +88,14 @@ fn test_find_items_by_not_equals() {
 
 #[test]
 fn test_find_items_returns_line_numbers() {
-  let yaml = "- id: first\n  title: A\n- id: second\n  title: B\n- id: third\n  title: C\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    - id: first
+      title: A
+    - id: second
+      title: B
+    - id: third
+      title: C
+  "});
 
   let results = document.find_items("[]", ".id == second");
 
@@ -69,8 +105,11 @@ fn test_find_items_returns_line_numbers() {
 
 #[test]
 fn test_find_all_returns_line_numbers() {
-  let yaml = "- id: first\n- id: second\n- id: third\n";
-  let document = Document::parse(yaml).unwrap();
+  let document = parse(indoc! {"
+    - id: first
+    - id: second
+    - id: third
+  "});
 
   let results = document.find_all("[]");
 

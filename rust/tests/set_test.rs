@@ -1,8 +1,10 @@
-use yerba::Document;
+mod support;
+use indoc::indoc;
+use support::parse;
 
 #[test]
 fn test_set_plain_scalar() {
-  let mut document = Document::parse("host: localhost").unwrap();
+  let mut document = parse("host: localhost");
 
   document.set("host", "0.0.0.0").unwrap();
 
@@ -11,7 +13,7 @@ fn test_set_plain_scalar() {
 
 #[test]
 fn test_set_preserves_double_quotes() {
-  let mut document = Document::parse("name: \"myapp\"").unwrap();
+  let mut document = parse("name: \"myapp\"");
 
   document.set("name", "newapp").unwrap();
 
@@ -20,7 +22,7 @@ fn test_set_preserves_double_quotes() {
 
 #[test]
 fn test_set_preserves_single_quotes() {
-  let mut document = Document::parse("name: 'myapp'").unwrap();
+  let mut document = parse("name: 'myapp'");
 
   document.set("name", "newapp").unwrap();
 
@@ -29,30 +31,51 @@ fn test_set_preserves_single_quotes() {
 
 #[test]
 fn test_set_nested_path() {
-  let yaml = "database:\n  host: localhost\n  port: 5432\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let yaml = indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "};
+  let mut document = parse(yaml);
 
   document.set("database.host", "0.0.0.0").unwrap();
 
-  assert_eq!(document.to_string(), "database:\n  host: 0.0.0.0\n  port: 5432\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      database:
+        host: 0.0.0.0
+        port: 5432
+    "}
+  );
 }
 
 #[test]
 fn test_set_preserves_comments() {
-  let yaml = "# Database config\nhost: localhost\n# Port\nport: 5432\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let yaml = indoc! {"
+    # Database config
+    host: localhost
+    # Port
+    port: 5432
+  "};
+  let mut document = parse(yaml);
 
   document.set("host", "0.0.0.0").unwrap();
 
   assert_eq!(
     document.to_string(),
-    "# Database config\nhost: 0.0.0.0\n# Port\nport: 5432\n"
+    indoc! {"
+      # Database config
+      host: 0.0.0.0
+      # Port
+      port: 5432
+    "}
   );
 }
 
 #[test]
 fn test_set_escapes_double_quotes_in_double_quoted_field() {
-  let mut document = Document::parse("title: \"old title\"\n").unwrap();
+  let mut document = parse("title: \"old title\"\n");
 
   document.set("title", "something \"quoted\" here").unwrap();
 
@@ -61,7 +84,7 @@ fn test_set_escapes_double_quotes_in_double_quoted_field() {
 
 #[test]
 fn test_set_escapes_single_quotes_in_single_quoted_field() {
-  let mut document = Document::parse("title: 'old title'\n").unwrap();
+  let mut document = parse("title: 'old title'\n");
 
   document.set("title", "it's a test").unwrap();
 
@@ -70,7 +93,7 @@ fn test_set_escapes_single_quotes_in_single_quoted_field() {
 
 #[test]
 fn test_set_plain_field_with_value_containing_quotes() {
-  let mut document = Document::parse("title: old\n").unwrap();
+  let mut document = parse("title: old\n");
 
   document.set("title", "something \"quoted\"").unwrap();
 
@@ -79,44 +102,78 @@ fn test_set_plain_field_with_value_containing_quotes() {
 
 #[test]
 fn test_set_with_bracket_index_path() {
-  let yaml = "- id: first\n  title: A\n- id: second\n  title: B\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let yaml = indoc! {"
+    - id: first
+      title: A
+    - id: second
+      title: B
+  "};
+  let mut document = parse(yaml);
 
   document.set("[1].title", "Updated").unwrap();
 
   assert_eq!(
     document.to_string(),
-    "- id: first\n  title: A\n- id: second\n  title: Updated\n"
+    indoc! {"
+      - id: first
+        title: A
+      - id: second
+        title: Updated
+    "}
   );
 }
 
 #[test]
 fn test_set_with_bracket_index_first_item() {
-  let yaml = "- id: first\n  title: A\n- id: second\n  title: B\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let yaml = indoc! {"
+    - id: first
+      title: A
+    - id: second
+      title: B
+  "};
+  let mut document = parse(yaml);
 
   document.set("[0].title", "Updated").unwrap();
 
   assert_eq!(
     document.to_string(),
-    "- id: first\n  title: Updated\n- id: second\n  title: B\n"
+    indoc! {"
+      - id: first
+        title: Updated
+      - id: second
+        title: B
+    "}
   );
 }
 
 #[test]
 fn test_set_block_scalar_to_empty() {
-  let yaml = "- id: talk-1\n  description: |-\n    Some long description\n    across multiple lines\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let yaml = indoc! {"
+    - id: talk-1
+      description: |-
+        Some long description
+        across multiple lines
+  "};
+  let mut document = parse(yaml);
 
   document.set("[0].description", "").unwrap();
 
-  assert_eq!(document.to_string(), "- id: talk-1\n  description: \"\"\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: talk-1
+        description: \"\"
+    "}
+  );
 }
 
 #[test]
 fn test_set_block_scalar_to_new_value() {
-  let yaml = "description: |-\n  Old description\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let yaml = indoc! {"
+    description: |-
+      Old description
+  "};
+  let mut document = parse(yaml);
 
   document.set("description", "New value").unwrap();
 
@@ -125,8 +182,7 @@ fn test_set_block_scalar_to_new_value() {
 
 #[test]
 fn test_set_bracket_index_out_of_bounds() {
-  let yaml = "- id: first\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse("- id: first\n");
 
   let result = document.set("[5].id", "test");
   assert!(result.is_err());
@@ -134,8 +190,12 @@ fn test_set_bracket_index_out_of_bounds() {
 
 #[test]
 fn test_set_bracket_index_multiple_matches_error() {
-  let yaml = "- id: first\n  title: A\n- id: second\n  title: B\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    - id: first
+      title: A
+    - id: second
+      title: B
+  "});
 
   let result = document.set("[].title", "test");
   assert!(

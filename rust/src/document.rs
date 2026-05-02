@@ -98,15 +98,14 @@ impl Document {
       return self.get_all(dot_path).into_iter().next();
     }
 
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys).ok()?;
+    let current_node = self.navigate(dot_path).ok()?;
 
     extract_scalar_text(&current_node)
   }
 
   pub fn get_all(&self, dot_path: &str) -> Vec<String> {
     self
-      .navigate_to_many(dot_path)
+      .navigate_all(dot_path)
       .iter()
       .filter_map(extract_scalar_text)
       .collect()
@@ -114,7 +113,7 @@ impl Document {
 
   pub fn find_items(&self, dot_path: &str, condition: &str) -> Vec<FindResult> {
     let source = self.root.text().to_string();
-    let nodes = self.navigate_to_many(dot_path);
+    let nodes = self.navigate_all(dot_path);
 
     nodes
       .iter()
@@ -136,7 +135,7 @@ impl Document {
     let source = self.root.text().to_string();
 
     self
-      .navigate_to_many(dot_path)
+      .navigate_all(dot_path)
       .iter()
       .map(|node| {
         let start_offset: usize = node.text_range().start().into();
@@ -207,7 +206,7 @@ impl Document {
 
   pub fn exists(&self, dot_path: &str) -> bool {
     if dot_path.contains('[') {
-      return !self.navigate_to_many(dot_path).is_empty();
+      return !self.navigate_all(dot_path).is_empty();
     }
 
     self.get(dot_path).is_some()
@@ -291,8 +290,7 @@ impl Document {
   }
 
   pub fn get_sequence_values(&self, dot_path: &str) -> Vec<String> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = match self.navigate_to_path(&keys) {
+    let current_node = match self.navigate(dot_path) {
       Ok(node) => node,
       Err(_) => return Vec::new(),
     };
@@ -309,26 +307,7 @@ impl Document {
   }
 
   pub fn set(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    let current_node = if dot_path.contains('[') {
-      let nodes = self.navigate_to_many(dot_path);
-
-      if nodes.is_empty() {
-        return Err(YerbaError::PathNotFound(dot_path.to_string()));
-      }
-
-      if nodes.len() > 1 {
-        return Err(YerbaError::PathNotFound(format!(
-          "{} (matched {} nodes, expected 1 — use a more specific path)",
-          dot_path,
-          nodes.len()
-        )));
-      }
-
-      nodes.into_iter().next().unwrap()
-    } else {
-      let keys: Vec<&str> = dot_path.split('.').collect();
-      self.navigate_to_path(&keys)?
-    };
+    let current_node = self.navigate(dot_path)?;
 
     if let Some(block_scalar) = current_node
       .descendants()
@@ -360,9 +339,7 @@ impl Document {
   }
 
   pub fn insert_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-
-    if let Ok(current_node) = self.navigate_to_path(&keys) {
+    if let Ok(current_node) = self.navigate(dot_path) {
       if current_node.descendants().find_map(BlockSeq::cast).is_some() {
         return self.insert_sequence_item(dot_path, value, position);
       }
@@ -374,8 +351,7 @@ impl Document {
   }
 
   fn insert_sequence_item(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let sequence = current_node
       .descendants()
@@ -472,8 +448,7 @@ impl Document {
     value: &str,
     position: InsertPosition,
   ) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let map = current_node
       .descendants()
@@ -590,9 +565,8 @@ impl Document {
       .unwrap_or(destination_path);
 
     if source_parent == destination_parent {
-      let keys: Vec<&str> = source_path.split('.').collect();
-      let parent_node = self.navigate_to_path(&keys[..keys.len() - 1])?;
-      let source_key = keys.last().unwrap();
+      let (parent_path, source_key) = source_path.rsplit_once('.').unwrap_or(("", source_path));
+      let parent_node = self.navigate(parent_path)?;
 
       let map = parent_node
         .descendants()
@@ -623,9 +597,8 @@ impl Document {
   }
 
   pub fn delete(&mut self, dot_path: &str) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let parent_node = self.navigate_to_path(&keys[..keys.len() - 1])?;
-    let last_key = keys.last().unwrap();
+    let (parent_path, last_key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
+    let parent_node = self.navigate(parent_path)?;
 
     let map = parent_node
       .descendants()
@@ -638,8 +611,7 @@ impl Document {
   }
 
   pub fn remove(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let sequence = current_node
       .descendants()
@@ -665,8 +637,7 @@ impl Document {
       return Ok(());
     }
 
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let sequence = current_node
       .descendants()
@@ -675,14 +646,7 @@ impl Document {
 
     let entries: Vec<_> = sequence.entries().collect();
 
-    self.reorder_entries(
-      &entries,
-      from,
-      to,
-      |entry| entry.syntax().text().to_string(),
-      |entry| preceding_whitespace_indent(entry.syntax()),
-      sequence.syntax().text_range(),
-    )
+    self.reorder_entries(sequence.syntax(), &entries, from, to)
   }
 
   pub fn move_key(&mut self, dot_path: &str, from: usize, to: usize) -> Result<(), YerbaError> {
@@ -690,8 +654,7 @@ impl Document {
       return Ok(());
     }
 
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let map = current_node
       .descendants()
@@ -700,19 +663,11 @@ impl Document {
 
     let entries: Vec<_> = map.entries().collect();
 
-    self.reorder_entries(
-      &entries,
-      from,
-      to,
-      |entry| entry.syntax().text().to_string(),
-      |entry| preceding_whitespace_indent(entry.syntax()),
-      map.syntax().text_range(),
-    )
+    self.reorder_entries(map.syntax(), &entries, from, to)
   }
 
   pub fn resolve_key_index(&self, dot_path: &str, reference: &str) -> Result<usize, YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let map = current_node
       .descendants()
@@ -744,8 +699,7 @@ impl Document {
   }
 
   pub fn resolve_sequence_index(&self, dot_path: &str, reference: &str) -> Result<usize, YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let sequence = current_node
       .descendants()
@@ -787,8 +741,7 @@ impl Document {
       return self.validate_each_sort_keys(seq_path, key_order);
     }
 
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let map = current_node
       .descendants()
@@ -819,8 +772,7 @@ impl Document {
       return self.sort_each_keys(seq_path, key_order);
     }
 
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let map = current_node
       .descendants()
@@ -833,23 +785,23 @@ impl Document {
       return Ok(());
     }
 
-    let source = self.root.text().to_string();
+    let (groups, range) = collect_groups_with_range(map.syntax());
 
-    let entry_data: Vec<(String, String)> = entries
+    let mut keyed: Vec<(String, EntryGroup)> = entries
       .iter()
-      .map(|entry| {
+      .zip(groups)
+      .map(|(entry, group)| {
         let key_name = entry
           .key()
           .and_then(|key_node| extract_scalar_text(key_node.syntax()))
           .unwrap_or_default();
-        let text = entry_text_with_trailing_comment(entry.syntax(), &source);
-        (key_name, text)
+        (key_name, group)
       })
       .collect();
 
-    let mut sorted = entry_data.clone();
+    let original_keys: Vec<String> = keyed.iter().map(|(key, _)| key.clone()).collect();
 
-    sorted.sort_by(|(key_a, _), (key_b, _)| {
+    keyed.sort_by(|(key_a, _), (key_b, _)| {
       let position_a = key_order.iter().position(|&key| key == key_a);
       let position_b = key_order.iter().position(|&key| key == key_b);
 
@@ -858,16 +810,17 @@ impl Document {
         (Some(_), None) => std::cmp::Ordering::Less,
         (None, Some(_)) => std::cmp::Ordering::Greater,
         (None, None) => {
-          let original_a = entry_data.iter().position(|(key, _)| key == key_a).unwrap();
-          let original_b = entry_data.iter().position(|(key, _)| key == key_b).unwrap();
+          let original_a = original_keys.iter().position(|key| key == key_a).unwrap();
+          let original_b = original_keys.iter().position(|key| key == key_b).unwrap();
           original_a.cmp(&original_b)
         }
       }
     });
 
-    if sorted.iter().map(|(key, _)| key).collect::<Vec<_>>()
-      == entry_data.iter().map(|(key, _)| key).collect::<Vec<_>>()
-    {
+    let sorted_keys: Vec<&str> = keyed.iter().map(|(key, _)| key.as_str()).collect();
+    let orig_refs: Vec<&str> = original_keys.iter().map(|key| key.as_str()).collect();
+
+    if sorted_keys == orig_refs {
       return Ok(());
     }
 
@@ -876,15 +829,14 @@ impl Document {
       .map(|entry| preceding_whitespace_indent(entry.syntax()))
       .unwrap_or_default();
 
-    let map_text = rebuild_entries(sorted.iter().map(|(_key, text)| text.as_str()), &indent);
-    let map_range = map.syntax().text_range();
+    let sorted_groups: Vec<EntryGroup> = keyed.into_iter().map(|(_, group)| group).collect();
+    let map_text = rebuild_from_groups(&sorted_groups, &indent);
 
-    self.apply_edit(map_range, &map_text)
+    self.apply_edit(range, &map_text)
   }
 
   pub fn sort_each_keys(&mut self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
       Some(sequence) => sequence,
@@ -907,23 +859,23 @@ impl Document {
         continue;
       }
 
-      let source = self.root.text().to_string();
+      let (groups, group_range) = collect_groups_with_range(map.syntax());
 
-      let entry_data: Vec<(String, String)> = entries
+      let mut keyed: Vec<(String, EntryGroup)> = entries
         .iter()
-        .map(|entry| {
+        .zip(groups)
+        .map(|(entry, group)| {
           let key_name = entry
             .key()
             .and_then(|key_node| extract_scalar_text(key_node.syntax()))
             .unwrap_or_default();
-          let text = entry_text_with_trailing_comment(entry.syntax(), &source);
-          (key_name, text)
+          (key_name, group)
         })
         .collect();
 
-      let mut sorted = entry_data.clone();
+      let original_keys: Vec<String> = keyed.iter().map(|(key, _)| key.clone()).collect();
 
-      sorted.sort_by(|(key_a, _), (key_b, _)| {
+      keyed.sort_by(|(key_a, _), (key_b, _)| {
         let position_a = key_order.iter().position(|&key| key == key_a);
         let position_b = key_order.iter().position(|&key| key == key_b);
 
@@ -933,17 +885,18 @@ impl Document {
           (None, Some(_)) => std::cmp::Ordering::Greater,
 
           (None, None) => {
-            let original_a = entry_data.iter().position(|(key, _)| key == key_a).unwrap();
-            let original_b = entry_data.iter().position(|(key, _)| key == key_b).unwrap();
+            let original_a = original_keys.iter().position(|key| key == key_a).unwrap();
+            let original_b = original_keys.iter().position(|key| key == key_b).unwrap();
 
             original_a.cmp(&original_b)
           }
         }
       });
 
-      if sorted.iter().map(|(key, _)| key).collect::<Vec<_>>()
-        == entry_data.iter().map(|(key, _)| key).collect::<Vec<_>>()
-      {
+      let sorted_keys: Vec<&str> = keyed.iter().map(|(key, _)| key.as_str()).collect();
+      let orig_refs: Vec<&str> = original_keys.iter().map(|key| key.as_str()).collect();
+
+      if sorted_keys == orig_refs {
         continue;
       }
 
@@ -952,9 +905,9 @@ impl Document {
         .map(|entry| preceding_whitespace_indent(entry.syntax()))
         .unwrap_or_default();
 
-      let map_text = rebuild_entries(sorted.iter().map(|(_key, text)| text.as_str()), &indent);
-
-      edits.push((map.syntax().text_range(), map_text));
+      let sorted_groups: Vec<EntryGroup> = keyed.into_iter().map(|(_, group)| group).collect();
+      let map_text = rebuild_from_groups(&sorted_groups, &indent);
+      edits.push((group_range, map_text));
     }
 
     if edits.is_empty() {
@@ -981,8 +934,7 @@ impl Document {
   }
 
   pub fn validate_each_sort_keys(&self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
       Some(sequence) => sequence,
@@ -1023,8 +975,7 @@ impl Document {
       return self.sort_each_items(dot_path, sort_fields, case_sensitive);
     }
 
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
+    let current_node = self.navigate(dot_path)?;
 
     let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
       Some(sequence) => sequence,
@@ -1037,9 +988,12 @@ impl Document {
       return Ok(());
     }
 
-    let mut sortable: Vec<(Vec<String>, String)> = entries
+    let (groups, range) = collect_groups_with_range(sequence.syntax());
+
+    let mut sortable: Vec<(Vec<String>, EntryGroup)> = entries
       .iter()
-      .map(|entry| {
+      .zip(groups)
+      .map(|(entry, group)| {
         let sort_values = if sort_fields.is_empty() {
           vec![entry
             .flow()
@@ -1055,11 +1009,11 @@ impl Document {
             .collect()
         };
 
-        (sort_values, entry.syntax().text().to_string())
+        (sort_values, group)
       })
       .collect();
 
-    let original_order: Vec<String> = sortable.iter().map(|(_, text)| text.clone()).collect();
+    let original_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
 
     sortable.sort_by(|(values_a, _), (values_b, _)| {
       for (index, field) in sort_fields.iter().enumerate().take(values_a.len()) {
@@ -1090,9 +1044,9 @@ impl Document {
       std::cmp::Ordering::Equal
     });
 
-    let sorted_texts: Vec<String> = sortable.into_iter().map(|(_, text)| text).collect();
+    let sorted_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
 
-    if sorted_texts == original_order {
+    if sorted_bodies == original_bodies {
       return Ok(());
     }
 
@@ -1101,10 +1055,10 @@ impl Document {
       .map(|entry| preceding_whitespace_indent(entry.syntax()))
       .unwrap_or_default();
 
-    let sequence_text = rebuild_entries(sorted_texts.iter().map(|text| text.as_str()), &indent);
-    let sequence_range = sequence.syntax().text_range();
+    let sorted_groups: Vec<EntryGroup> = sortable.into_iter().map(|(_, group)| group).collect();
+    let sequence_text = rebuild_from_groups(&sorted_groups, &indent);
 
-    self.apply_edit(sequence_range, &sequence_text)
+    self.apply_edit(range, &sequence_text)
   }
 
   fn sort_each_items(
@@ -1119,7 +1073,7 @@ impl Document {
       (dot_path, "")
     };
 
-    let parent_nodes = self.navigate_to_many(parent_path);
+    let parent_nodes = self.navigate_all(parent_path);
     let source = self.root.text().to_string();
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
@@ -1142,9 +1096,12 @@ impl Document {
           continue;
         }
 
-        let mut sortable: Vec<(Vec<String>, String)> = entries
+        let (groups, group_range) = collect_groups_with_range(sequence.syntax());
+
+        let mut sortable: Vec<(Vec<String>, EntryGroup)> = entries
           .iter()
-          .map(|entry| {
+          .zip(groups)
+          .map(|(entry, group)| {
             let sort_values = if sort_fields.is_empty() {
               vec![entry
                 .flow()
@@ -1160,11 +1117,11 @@ impl Document {
                 .collect()
             };
 
-            (sort_values, entry.syntax().text().to_string())
+            (sort_values, group)
           })
           .collect();
 
-        let original_order: Vec<String> = sortable.iter().map(|(_, text)| text.clone()).collect();
+        let original_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
 
         sortable.sort_by(|(values_a, _), (values_b, _)| {
           for (index, field) in sort_fields.iter().enumerate().take(values_a.len()) {
@@ -1195,9 +1152,9 @@ impl Document {
           std::cmp::Ordering::Equal
         });
 
-        let sorted_texts: Vec<String> = sortable.into_iter().map(|(_, text)| text).collect();
+        let sorted_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
 
-        if sorted_texts == original_order {
+        if sorted_bodies == original_bodies {
           continue;
         }
 
@@ -1206,9 +1163,9 @@ impl Document {
           .map(|entry| preceding_whitespace_indent(entry.syntax()))
           .unwrap_or_default();
 
-        let sequence_text = rebuild_entries(sorted_texts.iter().map(|text| text.as_str()), &indent);
-
-        edits.push((sequence.syntax().text_range(), sequence_text));
+        let sorted_groups: Vec<EntryGroup> = sortable.into_iter().map(|(_, group)| group).collect();
+        let sequence_text = rebuild_from_groups(&sorted_groups, &indent);
+        edits.push((group_range, sequence_text));
       }
     }
 
@@ -1235,40 +1192,43 @@ impl Document {
   }
 
   pub fn enforce_blank_lines(&mut self, dot_path: &str, blank_lines: usize) -> Result<(), YerbaError> {
-    let keys: Vec<&str> = dot_path.split('.').collect();
-    let current_node = self.navigate_to_path(&keys)?;
-
-    let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
-      Some(sequence) => sequence,
-      None => return Ok(()),
+    let nodes = if dot_path.contains('[') {
+      self.navigate_all(dot_path)
+    } else {
+      vec![self.navigate(dot_path)?]
     };
 
-    let entries: Vec<_> = sequence.entries().collect();
-
-    if entries.len() <= 1 {
-      return Ok(());
-    }
-
-    let source = self.root.text().to_string();
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
-    for entry in entries.iter().skip(1) {
-      if let Some(whitespace_token) = preceding_whitespace_token(entry.syntax()) {
-        let whitespace_text = whitespace_token.text();
+    for current_node in &nodes {
+      let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+        Some(sequence) => sequence,
+        None => continue,
+      };
 
-        let newline_count = whitespace_text.chars().filter(|character| *character == '\n').count();
+      let entries: Vec<_> = sequence.entries().collect();
 
-        let indent = whitespace_text
-          .rfind('\n')
-          .map(|position| &whitespace_text[position + 1..])
-          .unwrap_or("");
+      if entries.len() <= 1 {
+        continue;
+      }
 
-        let desired_newlines = blank_lines + 1;
+      for entry in entries.iter().skip(1) {
+        if let Some(whitespace_token) = preceding_whitespace_token(entry.syntax()) {
+          let whitespace_text = whitespace_token.text();
+          let newline_count = whitespace_text.chars().filter(|character| *character == '\n').count();
 
-        if newline_count != desired_newlines {
-          let new_whitespace = format!("{}{}", "\n".repeat(desired_newlines), indent);
+          let indent = whitespace_text
+            .rfind('\n')
+            .map(|position| &whitespace_text[position + 1..])
+            .unwrap_or("");
 
-          edits.push((whitespace_token.text_range(), new_whitespace));
+          let desired_newlines = blank_lines + 1;
+
+          if newline_count != desired_newlines {
+            let new_whitespace = format!("{}{}", "\n".repeat(desired_newlines), indent);
+
+            edits.push((whitespace_token.text_range(), new_whitespace));
+          }
         }
       }
     }
@@ -1277,8 +1237,9 @@ impl Document {
       return Ok(());
     }
 
-    edits.reverse();
+    edits.sort_by(|a, b| b.0.start().cmp(&a.0.start()));
 
+    let source = self.root.text().to_string();
     let mut new_source = source;
 
     for (range, replacement) in edits {
@@ -1299,15 +1260,7 @@ impl Document {
     let source = self.root.text().to_string();
 
     let scope_ranges: Vec<TextRange> = match dot_path {
-      Some(path) if !path.is_empty() && path.contains('[') => self
-        .navigate_to_many(path)
-        .iter()
-        .map(|node| node.text_range())
-        .collect(),
-      Some(path) if !path.is_empty() => {
-        let keys: Vec<&str> = path.split('.').collect();
-        vec![self.navigate_to_path(&keys)?.text_range()]
-      }
+      Some(path) if !path.is_empty() => self.navigate_all(path).iter().map(|node| node.text_range()).collect(),
       _ => vec![self.root.text_range()],
     };
 
@@ -1409,15 +1362,7 @@ impl Document {
     let source = self.root.text().to_string();
 
     let scope_ranges: Vec<TextRange> = match dot_path {
-      Some(path) if !path.is_empty() && path.contains('[') => self
-        .navigate_to_many(path)
-        .iter()
-        .map(|node| node.text_range())
-        .collect(),
-      Some(path) if !path.is_empty() => {
-        let keys: Vec<&str> = path.split('.').collect();
-        vec![self.navigate_to_path(&keys)?.text_range()]
-      }
+      Some(path) if !path.is_empty() => self.navigate_all(path).iter().map(|node| node.text_range()).collect(),
       _ => vec![self.root.text_range()],
     };
 
@@ -1545,7 +1490,32 @@ impl Document {
     Ok(())
   }
 
-  pub fn navigate_to_many(&self, dot_path: &str) -> Vec<SyntaxNode> {
+  pub fn navigate(&self, dot_path: &str) -> Result<SyntaxNode, YerbaError> {
+    if dot_path.is_empty() {
+      let root = Root::cast(self.root.clone()).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+
+      let document = root
+        .documents()
+        .next()
+        .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+
+      return Ok(document.syntax().clone());
+    }
+
+    let nodes = self.navigate_all(dot_path);
+
+    match nodes.len() {
+      0 => Err(YerbaError::PathNotFound(dot_path.to_string())),
+      1 => Ok(nodes.into_iter().next().unwrap()),
+      _ => Err(YerbaError::PathNotFound(format!(
+        "{} (matched {} nodes, expected 1)",
+        dot_path,
+        nodes.len()
+      ))),
+    }
+  }
+
+  pub fn navigate_all(&self, dot_path: &str) -> Vec<SyntaxNode> {
     let segments = parse_path_segments(dot_path);
 
     let root = match Root::cast(self.root.clone()) {
@@ -1585,37 +1555,6 @@ impl Document {
     current_nodes
   }
 
-  fn navigate_to_path(&self, keys: &[&str]) -> Result<SyntaxNode, YerbaError> {
-    let keys: Vec<&&str> = keys.iter().filter(|key| !key.is_empty()).collect();
-    let path_string = keys.iter().map(|key| **key).collect::<Vec<_>>().join(".");
-
-    let root = Root::cast(self.root.clone()).ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
-
-    let document = root
-      .documents()
-      .next()
-      .ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
-
-    let mut current_node = document.syntax().clone();
-
-    for key in &keys {
-      let map = current_node
-        .descendants()
-        .find_map(BlockMap::cast)
-        .ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
-
-      let entry = find_entry_by_key(&map, key).ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
-
-      let map_value = entry
-        .value()
-        .ok_or_else(|| YerbaError::PathNotFound(path_string.clone()))?;
-
-      current_node = map_value.syntax().clone();
-    }
-
-    Ok(current_node)
-  }
-
   fn replace_token(&mut self, token: &SyntaxToken, new_text: &str) -> Result<(), YerbaError> {
     let range = token.text_range();
 
@@ -1630,22 +1569,51 @@ impl Document {
   }
 
   fn remove_node(&mut self, node: &SyntaxNode) -> Result<(), YerbaError> {
+    let inline_comment = self.find_inline_comment(node);
     let range = removal_range(node);
 
-    self.apply_edit(range, "")
+    if let Some((comment_text, comment_end)) = inline_comment {
+      let indent = preceding_whitespace_indent(node);
+      let replacement = format!("\n{}{}", indent, comment_text);
+      let expanded_range = TextRange::new(range.start(), comment_end);
+
+      self.apply_edit(expanded_range, &replacement)
+    } else {
+      self.apply_edit(range, "")
+    }
   }
 
-  fn reorder_entries<T>(
-    &mut self,
-    entries: &[T],
-    from: usize,
-    to: usize,
-    get_text: impl Fn(&T) -> String,
-    get_indent: impl Fn(&T) -> String,
-    range: TextRange,
-  ) -> Result<(), YerbaError>
+  fn find_inline_comment(&self, node: &SyntaxNode) -> Option<(String, rowan::TextSize)> {
+    let mut sibling = node.next_sibling_or_token();
+
+    while let Some(ref element) = sibling {
+      match element {
+        rowan::NodeOrToken::Token(token) => {
+          if token.kind() == SyntaxKind::COMMENT {
+            return Some((token.text().to_string(), token.text_range().end()));
+          } else if token.kind() == SyntaxKind::WHITESPACE {
+            if token.text().contains('\n') {
+              return None;
+            }
+          } else {
+            return None;
+          }
+        }
+        _ => return None,
+      }
+
+      sibling = match element {
+        rowan::NodeOrToken::Token(token) => token.next_sibling_or_token(),
+        rowan::NodeOrToken::Node(node) => node.next_sibling_or_token(),
+      };
+    }
+
+    None
+  }
+
+  fn reorder_entries<T>(&mut self, parent: &SyntaxNode, entries: &[T], from: usize, to: usize) -> Result<(), YerbaError>
   where
-    T: rowan::ast::AstNode,
+    T: rowan::ast::AstNode<Language = yaml_parser::YamlLanguage>,
   {
     let length = entries.len();
 
@@ -1657,15 +1625,18 @@ impl Document {
       return Err(YerbaError::IndexOutOfBounds(to, length));
     }
 
-    let entry_texts: Vec<String> = entries.iter().map(&get_text).collect();
+    let (groups, range) = collect_groups_with_range(parent);
 
-    let mut reordered = entry_texts.clone();
+    let mut reordered = groups.clone();
     let item = reordered.remove(from);
-
     reordered.insert(to, item);
 
-    let indent = entries.get(1).map(&get_indent).unwrap_or_default();
-    let text = rebuild_entries(reordered.iter().map(|text| text.as_str()), &indent);
+    let indent = entries
+      .get(1)
+      .map(|entry| preceding_whitespace_indent(entry.syntax()))
+      .unwrap_or_default();
+
+    let text = rebuild_from_groups(&reordered, &indent);
 
     self.apply_edit(range, &text)
   }
@@ -1844,55 +1815,191 @@ fn byte_offset_to_line(source: &str, offset: usize) -> usize {
     + 1
 }
 
-fn entry_text_with_trailing_comment(entry: &SyntaxNode, source: &str) -> String {
-  let entry_end: usize = entry.text_range().end().into();
-  let entry_text = entry.text().to_string();
-  let entry_indent = preceding_whitespace_indent(entry).len();
-  let rest = &source[entry_end..];
+#[derive(Debug, Clone)]
+struct EntryGroup {
+  separator: String,
+  preceding: String,
+  body: String,
+}
 
-  let mut extra = String::new();
-  let mut first_line = true;
+impl EntryGroup {
+  fn full_text(&self) -> String {
+    if self.preceding.is_empty() {
+      self.body.clone()
+    } else {
+      format!("{}\n{}", self.preceding, self.body)
+    }
+  }
+}
 
-  for line in rest.split('\n') {
-    if first_line {
-      first_line = false;
+fn collect_entry_groups(parent: &SyntaxNode) -> Vec<EntryGroup> {
+  let mut groups: Vec<EntryGroup> = Vec::new();
+  let mut buffer = String::new();
 
-      let trimmed = line.trim();
+  for child in parent.children_with_tokens() {
+    let is_entry = child.as_node().is_some()
+      && matches!(
+        child.as_node().unwrap().kind(),
+        SyntaxKind::BLOCK_MAP_ENTRY | SyntaxKind::BLOCK_SEQ_ENTRY
+      );
 
-      if !trimmed.is_empty() {
-        extra.push_str(line);
+    if is_entry {
+      let entry_text = child.as_node().unwrap().text().to_string();
+
+      if groups.is_empty() {
+        let preceding = buffer.trim_start_matches('\n').to_string();
+
+        groups.push(EntryGroup {
+          separator: String::new(),
+          preceding,
+          body: entry_text,
+        });
+      } else {
+        let (trailing, separator, preceding) = split_at_blank_line(&buffer);
+
+        if let Some(last) = groups.last_mut() {
+          last.body.push_str(&trailing);
+        }
+
+        groups.push(EntryGroup {
+          separator,
+          preceding,
+          body: entry_text,
+        });
       }
 
-      continue;
-    }
-
-    let trimmed = line.trim();
-
-    if trimmed.is_empty() {
-      break;
-    }
-
-    let line_indent = line.len() - line.trim_start().len();
-
-    if trimmed.starts_with('#') && line_indent == entry_indent {
-      extra.push('\n');
-      extra.push_str(line);
+      buffer.clear();
     } else {
-      break;
+      let text = match &child {
+        rowan::NodeOrToken::Node(node) => node.text().to_string(),
+        rowan::NodeOrToken::Token(token) => token.text().to_string(),
+      };
+
+      buffer.push_str(&text);
     }
   }
 
-  format!("{}{}", entry_text, extra)
+  if let Some(last) = groups.last_mut() {
+    let trimmed = buffer.trim_end_matches(['\n', ' ', '\t']);
+
+    if !trimmed.is_empty() {
+      last.body.push_str(trimmed);
+    }
+  }
+
+  for group in &mut groups {
+    let trimmed = group.body.trim_end_matches(['\n', ' ', '\t']);
+
+    group.body = trimmed.to_string();
+  }
+
+  groups
 }
 
-fn rebuild_entries<'a>(entries: impl Iterator<Item = &'a str>, indent: &str) -> String {
-  entries
-    .enumerate()
-    .map(|(index, text)| {
-      if index == 0 {
-        text.to_string()
+fn split_at_blank_line(text: &str) -> (String, String, String) {
+  if let Some(position) = text.find("\n\n") {
+    let trailing = text[..position].to_string();
+    let rest = &text[position..];
+    let content_start = rest.len() - rest.trim_start_matches('\n').len();
+    let separator = rest[..content_start].to_string();
+    let preceding = rest[content_start..].trim_end_matches(['\n', ' ', '\t']).to_string();
+
+    (trailing, separator, preceding)
+  } else {
+    (text.to_string(), String::new(), String::new())
+  }
+}
+
+fn collect_preceding_sibling_comments(parent: &SyntaxNode) -> (String, Option<rowan::TextSize>) {
+  let mut comments: Vec<String> = Vec::new();
+  let mut earliest_start = None;
+  let mut node = parent.clone();
+
+  loop {
+    let mut sibling = node.prev_sibling_or_token();
+
+    while let Some(ref element) = sibling {
+      match element {
+        rowan::NodeOrToken::Token(token) => {
+          if token.kind() == SyntaxKind::COMMENT {
+            comments.push(token.text().to_string());
+            earliest_start = Some(token.text_range().start());
+          } else if token.kind() == SyntaxKind::WHITESPACE {
+            // Keep looking past whitespace
+          } else {
+            break;
+          }
+        }
+        _ => break,
+      }
+
+      sibling = match element {
+        rowan::NodeOrToken::Token(token) => token.prev_sibling_or_token(),
+        rowan::NodeOrToken::Node(node) => node.prev_sibling_or_token(),
+      };
+    }
+
+    if !comments.is_empty() {
+      break;
+    }
+
+    match node.parent() {
+      Some(parent)
+        if parent.kind() == SyntaxKind::BLOCK
+          || parent.kind() == SyntaxKind::DOCUMENT
+          || parent.kind() == SyntaxKind::BLOCK_MAP_VALUE
+          || parent.kind() == SyntaxKind::BLOCK_SEQ_ENTRY =>
+      {
+        node = parent
+      }
+      _ => break,
+    }
+  }
+
+  comments.reverse();
+  (comments.join("\n"), earliest_start)
+}
+
+fn collect_groups_with_range(parent: &SyntaxNode) -> (Vec<EntryGroup>, TextRange) {
+  let mut groups = collect_entry_groups(parent);
+
+  let (sibling_comments, earliest_start) = collect_preceding_sibling_comments(parent);
+
+  if !sibling_comments.is_empty() {
+    if let Some(first) = groups.first_mut() {
+      if first.preceding.is_empty() {
+        first.preceding = sibling_comments;
       } else {
-        format!("\n{}{}", indent, text)
+        first.preceding = format!("{}\n{}", sibling_comments, first.preceding);
+      }
+    }
+  }
+
+  let range = match earliest_start {
+    Some(start) => TextRange::new(start, parent.text_range().end()),
+    None => parent.text_range(),
+  };
+
+  (groups, range)
+}
+
+fn rebuild_from_groups(groups: &[EntryGroup], indent: &str) -> String {
+  let default_separator = groups
+    .iter()
+    .find(|group| !group.separator.is_empty())
+    .map(|group| group.separator.clone())
+    .unwrap_or_else(|| "\n".to_string());
+
+  groups
+    .iter()
+    .enumerate()
+    .map(|(index, group)| {
+      if index == 0 {
+        group.full_text()
+      } else if group.preceding.is_empty() {
+        format!("{}{}{}", default_separator, indent, group.body)
+      } else {
+        format!("{}{}\n{}{}", default_separator, group.preceding, indent, group.body)
       }
     })
     .collect()

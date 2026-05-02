@@ -1,3 +1,4 @@
+mod support;
 use yerba::version;
 
 #[test]

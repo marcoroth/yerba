@@ -1,72 +1,157 @@
-use yerba::Document;
+mod support;
+use indoc::indoc;
+use support::parse;
 
 #[test]
 fn test_append_to_sequence() {
-  let yaml = "tags:\n  - ruby\n  - rust\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+  "});
 
   document.append("tags", "yaml").unwrap();
 
-  assert_eq!(document.to_string(), "tags:\n  - ruby\n  - rust\n  - yaml\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tags:
+        - ruby
+        - rust
+        - yaml
+    "}
+  );
 }
 
 #[test]
 fn test_append_to_nested_sequence() {
-  let yaml = "app:\n  tags:\n    - ruby\n    - rust\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    app:
+      tags:
+        - ruby
+        - rust
+  "});
 
   document.append("app.tags", "yaml").unwrap();
 
   assert_eq!(
     document.to_string(),
-    "app:\n  tags:\n    - ruby\n    - rust\n    - yaml\n"
+    indoc! {"
+      app:
+        tags:
+          - ruby
+          - rust
+          - yaml
+    "}
   );
 }
 
 #[test]
 fn test_append_preserves_comments() {
-  let yaml = "# Tags\ntags:\n  - ruby\n  - rust\n# End\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    # Tags
+    tags:
+      - ruby
+      - rust
+    # End
+  "});
 
   document.append("tags", "yaml").unwrap();
 
   assert_eq!(
     document.to_string(),
-    "# Tags\ntags:\n  - ruby\n  - rust\n  - yaml\n# End\n"
+    indoc! {"
+      # Tags
+      tags:
+        - ruby
+        - rust
+        - yaml
+      # End
+    "}
   );
 }
 
 #[test]
 fn test_remove_from_sequence() {
-  let yaml = "tags:\n  - ruby\n  - rust\n  - yaml\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+      - yaml
+  "});
 
   document.remove("tags", "rust").unwrap();
 
-  assert_eq!(document.to_string(), "tags:\n  - ruby\n  - yaml\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tags:
+        - ruby
+        - yaml
+    "}
+  );
 }
 
 #[test]
 fn test_remove_from_nested_sequence() {
-  let yaml = "app:\n  tags:\n    - ruby\n    - rust\n    - yaml\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    app:
+      tags:
+        - ruby
+        - rust
+        - yaml
+  "});
 
   document.remove("app.tags", "rust").unwrap();
 
-  assert_eq!(document.to_string(), "app:\n  tags:\n    - ruby\n    - yaml\n");
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      app:
+        tags:
+          - ruby
+          - yaml
+    "}
+  );
 }
 
 #[test]
 fn test_remove_nonexistent_item() {
-  let yaml = "tags:\n  - ruby\n  - rust\n";
-  let mut document = Document::parse(yaml).unwrap();
+  let mut document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+  "});
 
   assert!(document.remove("tags", "missing").is_err());
 }
 
 #[test]
 fn test_remove_from_non_sequence() {
-  let mut document = Document::parse("host: localhost\n").unwrap();
+  let mut document = parse("host: localhost\n");
 
   assert!(document.remove("host", "value").is_err());
+}
+
+// Inline comments on a removed sequence item are preserved on their own line.
+#[test]
+fn test_remove_preserves_inline_comment_on_own_line() {
+  let mut document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust # important
+      - yaml
+  "});
+
+  document.remove("tags", "rust").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tags:
+        - ruby
+        # important
+        - yaml
+    "}
+  );
 }

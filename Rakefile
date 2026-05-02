@@ -5,6 +5,7 @@ require "rake/testtask"
 
 begin
   require "rake/extensiontask"
+  require "rb_sys"
 
   PLATFORMS = [
     "aarch64-linux-gnu",
@@ -14,6 +15,15 @@ begin
     "x86_64-linux-gnu",
     "x86_64-linux-musl"
   ].freeze
+
+  RB_SYS_PLATFORM_MAP = {
+    "aarch64-linux-gnu" => "aarch64-linux",
+    "aarch64-linux-musl" => "aarch64-linux-musl",
+    "arm64-darwin" => "arm64-darwin",
+    "x86_64-darwin" => "x86_64-darwin",
+    "x86_64-linux-gnu" => "x86_64-linux",
+    "x86_64-linux-musl" => "x86_64-linux-musl",
+  }.freeze
 
   exttask = Rake::ExtensionTask.new do |ext|
     ext.name = "yerba"
@@ -39,26 +49,28 @@ begin
       abort "rake_compiler_dock is required for this task"
     end
 
-    exttask.cross_platform.each do |platform|
+    PLATFORMS.each do |platform|
       desc "Build all native binary gems in parallel"
       multitask "native" => platform
 
       desc "Build the native gem for #{platform}"
       task platform => "prepare" do
+        rb_sys_platform = RB_SYS_PLATFORM_MAP.fetch(platform)
+
         RakeCompilerDock.sh(
-          "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && " \
-          "export PATH=\"$HOME/.cargo/bin:$PATH\" && " \
-          "export RCD_PLATFORM=#{platform} && " \
           "bundle --local && rake native:#{platform} gem RUBY_CC_VERSION='#{ENV.fetch("RUBY_CC_VERSION", nil)}'",
-          platform: platform
+          platform: platform,
+          image: "rbsys/#{rb_sys_platform}:#{RbSys::VERSION}"
         )
       end
     end
   end
-rescue LoadError
+rescue LoadError => e
+  warn "WARNING: Failed to load extension tasks: #{e.message}"
+
   desc "Compile task not available (rake-compiler not installed)"
   task :compile do
-    abort "rake-compiler is required. Run: bundle install"
+    abort "rake-compiler is required: #{e.message}\n\nRun: bundle install"
   end
 end
 

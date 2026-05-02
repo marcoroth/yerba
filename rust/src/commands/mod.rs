@@ -2,7 +2,6 @@ pub mod apply;
 pub mod blank_lines;
 pub mod check;
 pub mod delete;
-pub mod find;
 pub mod get;
 pub mod insert;
 pub mod mate;
@@ -33,7 +32,6 @@ pub(crate) mod color {
 #[derive(Subcommand)]
 pub enum Command {
   Get(get::Args),
-  Find(find::Args),
   Set(set::Args),
   Insert(insert::Args),
   Rename(rename::Args),
@@ -59,7 +57,6 @@ impl Command {
   pub fn run(self) {
     match self {
       Command::Get(args) => args.run(),
-      Command::Find(args) => args.run(),
       Command::Set(args) => args.run(),
       Command::Insert(args) => args.run(),
       Command::Rename(args) => args.run(),

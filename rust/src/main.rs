@@ -24,11 +24,12 @@ const STYLES: Styles = Styles::styled()
     Examples:
       yerba get config.yml database.host
       yerba get videos.yml "[0].title"
+      yerba get videos.yml "[]" --select title,speakers
+      yerba get "data/**/videos.yml" "[]" --condition ".kind == keynote" --select "id,title"
       yerba set config.yml database.host 0.0.0.0
       yerba insert config.yml tags yaml --after ruby
       yerba insert speakers.yml "" --from speaker.yml --after ".name == Alice"
       yerba delete config.yml database.pool
-      yerba find "data/**/videos.yml" "[]" --condition '.kind == keynote' --select 'id,title'
       yerba move videos.yml "" ".id == talk-2" --after ".id == talk-1"
       yerba sort-keys config.yml database 'id,host,port,name'
       yerba quote-style "data/**/*.yml" double

@@ -558,3 +558,141 @@ fn test_insert_condition_no_match_errors() {
 
   assert!(result.is_err());
 }
+
+#[test]
+fn test_insert_multiline_map_into_sequence() {
+  let mut document = parse(indoc! {"
+    - name: Alice
+      slug: alice
+  "});
+
+  document
+    .insert_into("", "name: Bob\nslug: bob\ngithub: bob", InsertPosition::Last)
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - name: Alice
+        slug: alice
+      - name: Bob
+        slug: bob
+        github: bob
+    "}
+  );
+}
+
+#[test]
+fn test_insert_multiline_map_with_nested_array() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+      title: First
+  "});
+
+  document
+    .insert_into(
+      "",
+      "id: talk-2\ntitle: Second\nspeakers:\n  - Alice\n  - Bob",
+      InsertPosition::Last,
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: talk-1
+        title: First
+      - id: talk-2
+        title: Second
+        speakers:
+          - Alice
+          - Bob
+    "}
+  );
+}
+
+#[test]
+fn test_insert_multiline_at_position() {
+  let mut document = parse(indoc! {"
+    - name: Alice
+      slug: alice
+    - name: Charlie
+      slug: charlie
+  "});
+
+  document
+    .insert_into("", "name: Bob\nslug: bob", InsertPosition::At(1))
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - name: Alice
+        slug: alice
+      - name: Bob
+        slug: bob
+      - name: Charlie
+        slug: charlie
+    "}
+  );
+}
+
+#[test]
+fn test_insert_multiline_after_condition() {
+  let mut document = parse(indoc! {"
+    - name: Alice
+      slug: alice
+    - name: Charlie
+      slug: charlie
+  "});
+
+  document
+    .insert_into(
+      "",
+      "name: Bob\nslug: bob",
+      InsertPosition::AfterCondition(".name == Alice".to_string()),
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - name: Alice
+        slug: alice
+      - name: Bob
+        slug: bob
+      - name: Charlie
+        slug: charlie
+    "}
+  );
+}
+
+#[test]
+fn test_insert_multiline_into_nested_sequence() {
+  let mut document = parse(indoc! {"
+    talks:
+      - id: talk-1
+        title: First
+  "});
+
+  document
+    .insert_into(
+      "talks",
+      "id: talk-2\ntitle: Second\nspeakers:\n  - Alice",
+      InsertPosition::Last,
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      talks:
+        - id: talk-1
+          title: First
+        - id: talk-2
+          title: Second
+          speakers:
+            - Alice
+    "}
+  );
+}

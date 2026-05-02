@@ -372,7 +372,37 @@ impl Document {
       .map(|entry| preceding_whitespace_indent(entry.syntax()))
       .unwrap_or_default();
 
-    let new_item = format!("- {}", value);
+    let new_item = if value.contains('\n') {
+      let item_indent = format!("{}  ", indent);
+      let lines: Vec<&str> = value.split('\n').collect();
+
+      let min_indent = lines
+        .iter()
+        .skip(1)
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.len() - line.trim_start().len())
+        .min()
+        .unwrap_or(0);
+
+      let indented: Vec<String> = lines
+        .iter()
+        .enumerate()
+        .map(|(index, line)| {
+          if index == 0 {
+            line.to_string()
+          } else if line.trim().is_empty() {
+            String::new()
+          } else {
+            let relative = &line[min_indent..];
+            format!("{}{}", item_indent, relative)
+          }
+        })
+        .collect();
+
+      format!("- {}", indented.join("\n"))
+    } else {
+      format!("- {}", value)
+    };
 
     match position {
       InsertPosition::Last => {

@@ -116,12 +116,16 @@ enum Command {
         yerba insert config.yml tags yaml --after ruby
         yerba insert speakers.yml "" "name: Bob" --after ".name == Alice"
         yerba insert videos.yml "[0].speakers" "Diana" --before ".name == Charlie"
+        yerba insert videos.yml "" --from new_talk.yml --after ".id == first-talk"
+        cat talk.yml | yerba insert videos.yml "" --from - --after ".id == first-talk"
     "#}
   )]
   Insert {
     file: String,
     path: String,
-    value: String,
+    value: Option<String>,
+    #[arg(long, help = "Read value from a file (use - for stdin)")]
+    from: Option<String>,
     #[arg(long)]
     before: Option<String>,
     #[arg(long)]
@@ -477,11 +481,41 @@ fn main() {
       file,
       path,
       value,
+      from,
       before,
       after,
       at,
       dry_run,
     } => {
+      let resolved_value = if let Some(from_path) = from {
+        if from_path == "-" {
+          use std::io::Read;
+          let mut buffer = String::new();
+
+          std::io::stdin().read_to_string(&mut buffer).unwrap_or_else(|error| {
+            eprintln!("Error reading stdin: {}", error);
+
+            std::process::exit(1);
+          });
+
+          buffer.trim().to_string()
+        } else {
+          std::fs::read_to_string(&from_path)
+            .unwrap_or_else(|error| {
+              eprintln!("Error reading {}: {}", from_path, error);
+              std::process::exit(1);
+            })
+            .trim()
+            .to_string()
+        }
+      } else if let Some(val) = value {
+        val
+      } else {
+        eprintln!("Error: either a value argument or --from is required");
+
+        std::process::exit(1);
+      };
+
       let parent_path = path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
       let position = if let Some(index) = at {
@@ -507,7 +541,7 @@ fn main() {
       };
 
       let mut document = parse_file(&file);
-      run(|| document.insert_into(&path, &value, position));
+      run(|| document.insert_into(&path, &resolved_value, position));
       output(&file, &document, dry_run);
     }
 

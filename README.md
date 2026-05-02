@@ -1,4 +1,8 @@
-<h2 align="center">🧉 Yerba</h2>
+<p align="center">
+  <img src="assets/logo.png" alt="Yerba Logo" width="150px">
+</p>
+
+<h2 align="center">Yerba</h2>
 
 <h4 align="center"><u>Y</u>AML <u>E</u>diting and <u>R</u>efactoring with <u>B</u>etter <u>A</u>ccuracy</h4>
 

@@ -323,43 +323,43 @@ class DocumentTest < Minitest::Spec
   test "get raises on invalid path with trailing dot" do
     document = Yerba::Document.parse("name: Alice")
 
-    assert_raises(Yerba::Error) { document.get("name.") }
+    assert_raises(Yerba::PathValidationError) { document.get("name.") }
   end
 
   test "get raises on invalid path with double dot" do
     document = Yerba::Document.parse("name: Alice")
 
-    assert_raises(Yerba::Error) { document.get("name..x") }
+    assert_raises(Yerba::PathValidationError) { document.get("name..x") }
   end
 
   test "get raises on invalid path with leading dot" do
     document = Yerba::Document.parse("name: Alice")
 
-    assert_raises(Yerba::Error) { document.get(".name") }
+    assert_raises(Yerba::PathValidationError) { document.get(".name") }
   end
 
   test "get raises on invalid path with unclosed bracket" do
     document = Yerba::Document.parse("name: Alice")
 
-    assert_raises(Yerba::Error) { document.get("[") }
+    assert_raises(Yerba::PathValidationError) { document.get("[") }
   end
 
   test "set raises on invalid path" do
     document = Yerba::Document.parse("name: Alice")
 
-    assert_raises(Yerba::Error) { document.set("name.", "Bob") }
+    assert_raises(Yerba::PathValidationError) { document.set("name.", "Bob") }
   end
 
   test "delete raises on invalid path" do
     document = Yerba::Document.parse("name: Alice")
 
-    assert_raises(Yerba::Error) { document.delete("name.") }
+    assert_raises(Yerba::PathValidationError) { document.delete("name.") }
   end
 
   test "[] raises on invalid path" do
     document = Yerba::Document.parse("name: Alice")
 
-    assert_raises(Yerba::Error) { document["name."] }
+    assert_raises(Yerba::PathValidationError) { document["name."] }
   end
 
   test "to_h returns parsed Ruby object for map document" do

@@ -7,6 +7,8 @@ static VALUE rb_mYerba;
 static VALUE rb_cDocument;
 static VALUE rb_eError;
 static VALUE rb_ePathNotFoundError;
+static VALUE rb_eParseError;
+static VALUE rb_ePathValidationError;
 
 static void document_dfree(void *pointer) {
   if (pointer) yerba_document_free(pointer);
@@ -44,9 +46,19 @@ static VALUE make_utf8_string(const char *cstring) {
 static void check_result(YerbaResult result) {
   if (!result.success) {
     VALUE message = make_utf8_string(result.error);
+    VALUE error_class = rb_eError;
+
+    if (strstr(result.error, "invalid path")) {
+      error_class = rb_ePathValidationError;
+    } else if (strstr(result.error, "path not found") || strstr(result.error, "not a sequence")) {
+      error_class = rb_ePathNotFoundError;
+    } else if (strstr(result.error, "parse error")) {
+      error_class = rb_eParseError;
+    }
+
     yerba_result_free(result);
 
-    rb_raise(rb_eError, "%s", StringValueCStr(message));
+    rb_raise(error_class, "%s", StringValueCStr(message));
   }
 }
 
@@ -106,7 +118,7 @@ static VALUE document_initialize(VALUE self, VALUE path) {
     VALUE message = make_utf8_string(result.error);
     yerba_string_free(result.error);
 
-    rb_raise(rb_eError, "%s", StringValueCStr(message));
+    rb_raise(rb_eParseError, "%s", StringValueCStr(message));
   }
 
   RTYPEDDATA_DATA(self) = result.document;
@@ -124,7 +136,7 @@ static VALUE document_s_parse(VALUE klass, VALUE content) {
     VALUE message = make_utf8_string(result.error);
     yerba_string_free(result.error);
 
-    rb_raise(rb_eError, "%s", StringValueCStr(message));
+    rb_raise(rb_eParseError, "%s", StringValueCStr(message));
   }
 
   VALUE instance = document_alloc(klass);
@@ -143,7 +155,7 @@ static VALUE document_get(VALUE self, VALUE path) {
     VALUE message = make_utf8_string(result.error);
     yerba_get_result_free(result);
 
-    rb_raise(rb_eError, "%s", StringValueCStr(message));
+    rb_raise(rb_ePathValidationError, "%s", StringValueCStr(message));
   }
 
   if (!result.is_list) {
@@ -190,7 +202,7 @@ static VALUE document_bracket(VALUE self, VALUE path) {
     VALUE message = make_utf8_string(result.error);
     yerba_get_result_free(result);
 
-    rb_raise(rb_eError, "%s", StringValueCStr(message));
+    rb_raise(rb_ePathValidationError, "%s", StringValueCStr(message));
   }
 
   VALUE instance;
@@ -446,6 +458,16 @@ static VALUE document_remove(VALUE self, VALUE path, VALUE value) {
   return self;
 }
 
+/* document.remove_at(path, index) */
+static VALUE document_remove_at(VALUE self, VALUE path, VALUE index) {
+  struct Document *document = get_document(self);
+  YerbaResult result = yerba_document_remove_at(document, StringValueCStr(path), NUM2SIZET(index));
+
+  check_result(result);
+
+  return self;
+}
+
 /* document.rename(source, destination) */
 static VALUE document_rename(VALUE self, VALUE source, VALUE destination) {
   struct Document *document = get_document(self);
@@ -643,6 +665,8 @@ void Init_yerba(void) {
   rb_mYerba = rb_define_module("Yerba");
   rb_eError = rb_define_class_under(rb_mYerba, "Error", rb_eStandardError);
   rb_ePathNotFoundError = rb_define_class_under(rb_mYerba, "PathNotFoundError", rb_eError);
+  rb_eParseError = rb_define_class_under(rb_mYerba, "ParseError", rb_eError);
+  rb_ePathValidationError = rb_define_class_under(rb_mYerba, "PathValidationError", rb_eError);
 
   VALUE rb_cCollection = rb_define_class_under(rb_mYerba, "Collection", rb_cObject);
   rb_define_singleton_method(rb_cCollection, "get", collection_s_get, 2);

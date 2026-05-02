@@ -56,12 +56,16 @@ unless system("cd #{rust_dir} && cargo build #{cargo_args}")
   abort "ERROR: Failed to compile yerba from Rust source."
 end
 
-platform = Gem::Platform.local
-platform_key = "#{platform.cpu}-#{platform.os}"
+if target_platform
+  platform_key = ENV.fetch("RCD_PLATFORM", "")
+else
+  platform = Gem::Platform.local
+  platform_key = "#{platform.cpu}-#{platform.os}"
+end
+
 exe_directory = File.join(root_dir, "exe", platform_key)
 exe_file = File.join(exe_directory, "yerba")
-source_binary = File.join(lib_dir, "..", "..", "release", "yerba")
-source_binary = File.join(lib_dir, "yerba") unless File.exist?(source_binary)
+source_binary = File.join(lib_dir, "yerba")
 
 if File.exist?(source_binary)
   FileUtils.mkdir_p(exe_directory)

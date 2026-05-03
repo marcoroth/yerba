@@ -224,7 +224,7 @@ pub(crate) fn run_yerbafile(write: bool) {
   }
 
   if !has_changes && !has_errors {
-    eprintln!("  {GREEN}All files match the rules.{RESET}");
+    eprintln!("\n{BOLD}{GREEN}All files match the rules.{RESET}");
   }
 
   if !write && has_changes {

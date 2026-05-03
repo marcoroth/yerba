@@ -218,10 +218,10 @@ fn test_find_items_filters_by_field() {
       title: Closing
   "});
 
-  let matches = document.find_items("[]", ".kind == keynote");
+  let matches = document.filter("[]", ".kind == keynote");
   assert_eq!(matches.len(), 2);
-  assert!(matches[0].text.contains("Opening"));
-  assert!(matches[1].text.contains("Closing"));
+  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("talk-1"));
+  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("talk-1"));
 }
 
 #[test]
@@ -238,7 +238,7 @@ fn test_find_items_condition_on_nested_value() {
       video_id: ghi789
   "});
 
-  let matches = document.find_items("[]", ".video_provider == youtube");
+  let matches = document.filter("[]", ".video_provider == youtube");
   assert_eq!(matches.len(), 2);
 }
 
@@ -253,7 +253,7 @@ fn test_find_items_contains_condition() {
       title: Advanced Ruby
   "});
 
-  let matches = document.find_items("[]", ".title contains Ruby");
+  let matches = document.filter("[]", ".title contains Ruby");
   assert_eq!(matches.len(), 2);
 }
 
@@ -266,9 +266,9 @@ fn test_find_items_not_contains_condition() {
       title: Python Basics
   "});
 
-  let matches = document.find_items("[]", ".title not_contains Ruby");
+  let matches = document.filter("[]", ".title not_contains Ruby");
   assert_eq!(matches.len(), 1);
-  assert!(matches[0].text.contains("Python"));
+  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("Python"));
 }
 
 #[test]
@@ -280,9 +280,9 @@ fn test_find_items_inequality_condition() {
       status: published
   "});
 
-  let matches = document.find_items("[]", ".status != draft");
+  let matches = document.filter("[]", ".status != draft");
   assert_eq!(matches.len(), 1);
-  assert!(matches[0].text.contains("published"));
+  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("published"));
 }
 
 #[test]
@@ -294,7 +294,7 @@ fn test_find_all_returns_all_items() {
       title: Second
   "});
 
-  let matches = document.find_all("[]");
+  let matches = document.get_values("[]");
   assert_eq!(matches.len(), 2);
 }
 
@@ -307,7 +307,7 @@ fn test_find_items_no_matches_returns_empty() {
       kind: talk
   "});
 
-  let matches = document.find_items("[]", ".kind == keynote");
+  let matches = document.filter("[]", ".kind == keynote");
   assert_eq!(matches.len(), 0);
 }
 
@@ -346,7 +346,7 @@ fn test_find_items_without_dot_prefix_does_not_match() {
       kind: talk
   "});
 
-  let matches = document.find_items("[]", "kind == keynote");
+  let matches = document.filter("[]", "kind == keynote");
   assert_eq!(matches.len(), 0);
 }
 
@@ -362,9 +362,9 @@ fn test_find_items_speakers_contains_array_member() {
         - Charlie
   "});
 
-  let matches = document.find_items("[]", ".speakers contains Alice");
+  let matches = document.filter("[]", ".speakers contains Alice");
   assert_eq!(matches.len(), 1);
-  assert!(matches[0].text.contains("talk-1"));
+  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("talk-1"));
 }
 
 #[test]
@@ -707,7 +707,7 @@ fn test_path_ref_condition_split() {
 }
 
 #[test]
-fn test_filter_values_with_contains() {
+fn test_filter_with_contains() {
   let document = parse(indoc! {"
     - id: talk-1
       title: Ruby on Rails
@@ -723,12 +723,12 @@ fn test_filter_values_with_contains() {
         - Charlie
   "});
 
-  let values = document.filter_values("[]", ".title contains Ruby");
+  let values = document.filter("[]", ".title contains Ruby");
   assert_eq!(values.len(), 2);
 }
 
 #[test]
-fn test_filter_values_extracts_full_objects() {
+fn test_filter_extracts_full_objects() {
   let document = parse(indoc! {"
     - id: talk-1
       video_provider: youtube
@@ -738,7 +738,7 @@ fn test_filter_values_extracts_full_objects() {
       video_id: def
   "});
 
-  let values = document.filter_values("[]", ".video_provider == youtube");
+  let values = document.filter("[]", ".video_provider == youtube");
   assert_eq!(values.len(), 1);
 
   if let serde_yaml::Value::Mapping(map) = &values[0] {

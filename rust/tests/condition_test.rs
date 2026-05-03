@@ -263,15 +263,15 @@ fn test_find_items_requires_dot_prefix() {
       kind: talk
   "});
 
-  let matches = document.find_items("[]", ".kind == keynote");
+  let matches = document.filter("[]", ".kind == keynote");
   assert_eq!(matches.len(), 1);
 
-  let matches = document.find_items("[]", "kind == keynote");
+  let matches = document.filter("[]", "kind == keynote");
   assert_eq!(matches.len(), 0);
 }
 
 #[test]
-fn test_filter_values_returns_structured_values() {
+fn test_filter_returns_structured_values() {
   let document = parse(indoc! {"
     - id: talk-1
       kind: keynote
@@ -284,7 +284,7 @@ fn test_filter_values_returns_structured_values() {
       title: Closing
   "});
 
-  let values = document.filter_values("[]", ".kind == keynote");
+  let values = document.filter("[]", ".kind == keynote");
   assert_eq!(values.len(), 2);
 
   if let serde_yaml::Value::Mapping(map) = &values[0] {
@@ -298,13 +298,13 @@ fn test_filter_values_returns_structured_values() {
 }
 
 #[test]
-fn test_filter_values_empty_on_no_match() {
+fn test_filter_empty_on_no_match() {
   let document = parse(indoc! {"
     - id: talk-1
       kind: talk
   "});
 
-  let values = document.filter_values("[]", ".kind == keynote");
+  let values = document.filter("[]", ".kind == keynote");
   assert!(values.is_empty());
 }
 

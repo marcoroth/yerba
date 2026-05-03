@@ -69,7 +69,7 @@ impl Args {
       let document = parse_file(&resolved_file);
 
       let values: Vec<serde_yaml::Value> = if let Some(condition) = &normalized_condition {
-        document.filter_values(&search_path_string, condition)
+        document.filter(&search_path_string, condition)
       } else {
         document.get_values(&search_path_string)
       };

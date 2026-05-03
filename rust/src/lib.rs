@@ -14,7 +14,7 @@ pub use quote_style::QuoteStyle;
 pub use selector::Selector;
 pub use syntax::{detect_yaml_type, ScalarValue, YerbaValueType};
 pub use yaml_writer::json_to_yaml_text;
-pub use yerbafile::{resolve_template, Variable, Yerbafile};
+pub use yerbafile::Yerbafile;
 
 pub fn version() -> &'static str {
   env!("CARGO_PKG_VERSION")

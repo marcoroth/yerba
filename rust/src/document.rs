@@ -160,7 +160,7 @@ impl Document {
     self.navigate_all(dot_path).iter().map(node_to_yaml_value).collect()
   }
 
-  pub fn filter_values(&self, dot_path: &str, condition: &str) -> Vec<serde_yaml::Value> {
+  pub fn filter(&self, dot_path: &str, condition: &str) -> Vec<serde_yaml::Value> {
     self
       .navigate_all(dot_path)
       .iter()
@@ -2044,14 +2044,6 @@ fn navigate_from_node(node: &SyntaxNode, path: &str) -> Vec<SyntaxNode> {
   }
 
   current_nodes
-}
-
-fn byte_offset_to_line(source: &str, offset: usize) -> usize {
-  source[..offset.min(source.len())]
-    .chars()
-    .filter(|character| *character == '\n')
-    .count()
-    + 1
 }
 
 #[derive(Debug, Clone)]

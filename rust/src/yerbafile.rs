@@ -1,6 +1,5 @@
 use rayon::prelude::*;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -22,7 +21,6 @@ pub struct Rule {
 
 #[derive(Debug, Clone)]
 pub enum PipelineStep {
-  Get(GetConfig),
   SortKeys(SortKeysConfig),
   QuoteStyle(QuoteStyleConfig),
   Set(SetConfig),
@@ -52,22 +50,6 @@ pub struct BlankLinesConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct GetConfig {
-  pub path: String,
-  #[serde(rename = "as")]
-  pub as_name: String,
-  #[serde(default)]
-  pub file: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub enum Variable {
-  Single(String),
-  List(Vec<String>),
-  Value(serde_yaml::Value),
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct RenameConfig {
   pub from: String,
   pub to: String,
@@ -89,11 +71,6 @@ impl<'de> Deserialize<'de> for PipelineStep {
     D: serde::Deserializer<'de>,
   {
     let mapping = serde_yaml::Mapping::deserialize(deserializer)?;
-
-    if let Some(value) = mapping.get(serde_yaml::Value::String("get".to_string())) {
-      let config: GetConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
-      return Ok(PipelineStep::Get(config));
-    }
 
     if let Some(value) = mapping.get(serde_yaml::Value::String("sort_keys".to_string())) {
       let config: SortKeysConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
@@ -141,7 +118,7 @@ impl<'de> Deserialize<'de> for PipelineStep {
     }
 
     Err(serde::de::Error::custom(
-      "unknown pipeline step: expected get, sort_keys, quote_style, set, insert, delete, rename, remove, blank_lines, or sort",
+      "unknown pipeline step: expected sort_keys, quote_style, set, insert, delete, rename, remove, blank_lines, or sort",
     ))
   }
 }
@@ -339,10 +316,9 @@ impl Yerbafile {
 
     let original = document.to_string();
     let base_path = rule.path.as_deref();
-    let mut variables: HashMap<String, Variable> = HashMap::new();
 
     for step in &rule.pipeline {
-      if let Err(error) = execute_step(&mut document, step, base_path, &mut variables) {
+      if let Err(error) = execute_step(&mut document, step, base_path) {
         return RuleResult {
           file: file.to_string(),
           changed: false,
@@ -372,50 +348,8 @@ impl Yerbafile {
   }
 }
 
-fn execute_step(
-  document: &mut Document,
-  step: &PipelineStep,
-  base_path: Option<&str>,
-  variables: &mut HashMap<String, Variable>,
-) -> Result<(), YerbaError> {
+fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<&str>) -> Result<(), YerbaError> {
   match step {
-    PipelineStep::Get(config) => {
-      let full_path = resolve_step_path(base_path, Some(&config.path));
-
-      if let Some(file_pattern) = &config.file {
-        let mut all_values = Vec::new();
-
-        let files =
-          glob::glob(file_pattern).map_err(|error| YerbaError::ParseError(format!("invalid glob: {}", error)))?;
-
-        for entry in files.flatten() {
-          match Document::parse_file(&entry) {
-            Ok(external_document) => {
-              all_values.extend(external_document.get_all(&config.path));
-            }
-            Err(_) => continue,
-          }
-        }
-
-        if all_values.len() == 1 && !config.path.contains('[') {
-          variables.insert(config.as_name.clone(), Variable::Single(all_values.remove(0)));
-        } else {
-          variables.insert(config.as_name.clone(), Variable::List(all_values));
-        }
-      } else if config.path.contains('[') {
-        let values = document.get_all(&full_path);
-
-        variables.insert(config.as_name.clone(), Variable::List(values));
-      } else {
-        let value = document
-          .get(&full_path)
-          .ok_or_else(|| YerbaError::PathNotFound(full_path.clone()))?;
-        variables.insert(config.as_name.clone(), Variable::Single(value));
-      }
-
-      Ok(())
-    }
-
     PipelineStep::QuoteStyle(config) => {
       let dot_path = config.path.as_deref();
 
@@ -441,44 +375,39 @@ fn execute_step(
 
     PipelineStep::Set(config) => {
       let full_path = resolve_step_path(base_path, Some(&config.path));
-      let resolved_value = resolve_template(&config.value, document, base_path, variables)?;
 
       if let Some(condition) = &config.condition {
-        let resolved_condition = resolve_template(condition, document, base_path, variables)?;
         let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, &resolved_condition) {
+        if !document.evaluate_condition(parent_path, condition) {
           return Ok(());
         }
       }
 
-      document.set(&full_path, &resolved_value)
+      document.set(&full_path, &config.value)
     }
 
     PipelineStep::Insert(config) => {
       let full_path = resolve_step_path(base_path, Some(&config.path));
-      let resolved_value = resolve_template(&config.value, document, base_path, variables)?;
 
       if let Some(condition) = &config.condition {
-        let resolved_condition = resolve_template(condition, document, base_path, variables)?;
         let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, &resolved_condition) {
+        if !document.evaluate_condition(parent_path, condition) {
           return Ok(());
         }
       }
 
-      document.insert_into(&full_path, &resolved_value, crate::InsertPosition::Last)
+      document.insert_into(&full_path, &config.value, crate::InsertPosition::Last)
     }
 
     PipelineStep::Delete(config) => {
       let full_path = resolve_step_path(base_path, Some(&config.path));
 
       if let Some(condition) = &config.condition {
-        let resolved_condition = resolve_template(condition, document, base_path, variables)?;
         let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, &resolved_condition) {
+        if !document.evaluate_condition(parent_path, condition) {
           return Ok(());
         }
       }
@@ -490,10 +419,9 @@ fn execute_step(
       let full_path = resolve_step_path(base_path, Some(&config.from));
 
       if let Some(condition) = &config.condition {
-        let resolved_condition = resolve_template(condition, document, base_path, variables)?;
         let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, &resolved_condition) {
+        if !document.evaluate_condition(parent_path, condition) {
           return Ok(());
         }
       }
@@ -503,18 +431,16 @@ fn execute_step(
 
     PipelineStep::Remove(config) => {
       let full_path = resolve_step_path(base_path, Some(&config.path));
-      let resolved_value = resolve_template(&config.value, document, base_path, variables)?;
 
       if let Some(condition) = &config.condition {
-        let resolved_condition = resolve_template(condition, document, base_path, variables)?;
         let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, &resolved_condition) {
+        if !document.evaluate_condition(parent_path, condition) {
           return Ok(());
         }
       }
 
-      document.remove(&full_path, &resolved_value)
+      document.remove(&full_path, &config.value)
     }
 
     PipelineStep::BlankLines(config) => {
@@ -534,53 +460,6 @@ fn execute_step(
       document.sort_items(&full_path, &sort_fields, config.case_sensitive)
     }
   }
-}
-
-pub fn resolve_template(
-  template: &str,
-  document: &Document,
-  base_path: Option<&str>,
-  variables: &HashMap<String, Variable>,
-) -> Result<String, YerbaError> {
-  if !template.contains("${") {
-    return Ok(template.to_string());
-  }
-
-  let mut result = String::new();
-  let mut rest = template;
-
-  while let Some(start) = rest.find("${") {
-    result.push_str(&rest[..start]);
-
-    let after_dollar = &rest[start + 2..];
-
-    let end = after_dollar
-      .find('}')
-      .ok_or_else(|| YerbaError::ParseError("unclosed ${ in template".to_string()))?;
-
-    let reference = &after_dollar[..end];
-
-    let resolved = if let Some(variable) = variables.get(reference) {
-      match variable {
-        Variable::Single(value) => value.clone(),
-        Variable::List(values) => values.join(", "),
-        Variable::Value(value) => serde_json::to_string(value).unwrap_or_default(),
-      }
-    } else {
-      let full_path = resolve_step_path(base_path, Some(reference));
-
-      document
-        .get(&full_path)
-        .ok_or_else(|| YerbaError::ReferenceNotFound(reference.to_string()))?
-    };
-
-    result.push_str(&resolved);
-    rest = &after_dollar[end + 1..];
-  }
-
-  result.push_str(rest);
-
-  Ok(result)
 }
 
 fn resolve_step_path(base_path: Option<&str>, step_path: Option<&str>) -> String {

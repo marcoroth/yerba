@@ -373,7 +373,7 @@ pub unsafe extern "C" fn yerba_document_find(
   };
 
   let values = match condition_str {
-    Some(cond) => document.filter_values(path_string, cond),
+    Some(cond) => document.filter(path_string, cond),
     None => document.get_values(path_string),
   };
 
@@ -846,7 +846,7 @@ pub unsafe extern "C" fn yerba_glob_find(
 
       if let Ok(document) = Document::parse_file(file) {
         let values = match condition_string {
-          Some(cond) => document.filter_values(path_string, cond),
+          Some(cond) => document.filter(path_string, cond),
           None => document.get_values(path_string),
         };
 

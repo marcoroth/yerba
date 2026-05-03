@@ -76,7 +76,7 @@ fn test_sort_keys_with_bracket_path() {
 
 #[test]
 fn test_validate_sort_keys_with_bracket_path() {
-  let mut document = parse(indoc! {"
+  let document = parse(indoc! {"
     - name: first
       id: 1
   "});

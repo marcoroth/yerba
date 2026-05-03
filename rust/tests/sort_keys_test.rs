@@ -204,3 +204,52 @@ fn test_sort_keys_preserves_comments_between_sequence_entries() {
     "#}
   );
 }
+
+#[test]
+fn test_sort_keys_does_not_add_blank_lines_between_map_entries() {
+  let mut document = parse(indoc! {r#"
+    - id: "first"
+      speakers:
+        - Alice
+      description: |-
+        Some long text
+        across multiple lines
+      video_provider: "youtube"
+      published_at: "2024-01-01"
+
+    - id: "second"
+      speakers:
+        - Bob
+      description: ""
+      video_provider: "youtube"
+      published_at: "2024-01-02"
+  "#});
+
+  document
+    .sort_keys(
+      "[]",
+      &["id", "published_at", "video_provider", "description", "speakers"],
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - id: "first"
+        published_at: "2024-01-01"
+        video_provider: "youtube"
+        description: |-
+          Some long text
+          across multiple lines
+        speakers:
+          - Alice
+
+      - id: "second"
+        published_at: "2024-01-02"
+        video_provider: "youtube"
+        description: ""
+        speakers:
+          - Bob
+    "#}
+  );
+}

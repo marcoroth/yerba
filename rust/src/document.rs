@@ -1018,7 +1018,7 @@ impl Document {
       .unwrap_or_default();
 
     let sorted_groups: Vec<EntryGroup> = keyed.into_iter().map(|(_, group)| group).collect();
-    let map_text = rebuild_from_groups(&sorted_groups, &indent);
+    let map_text = rebuild_from_groups(&sorted_groups, &indent, false);
 
     self.apply_edit(range, &map_text)
   }
@@ -1094,7 +1094,7 @@ impl Document {
         .unwrap_or_default();
 
       let sorted_groups: Vec<EntryGroup> = keyed.into_iter().map(|(_, group)| group).collect();
-      let map_text = rebuild_from_groups(&sorted_groups, &indent);
+      let map_text = rebuild_from_groups(&sorted_groups, &indent, false);
       edits.push((group_range, map_text));
     }
 
@@ -1244,7 +1244,7 @@ impl Document {
       .unwrap_or_default();
 
     let sorted_groups: Vec<EntryGroup> = sortable.into_iter().map(|(_, group)| group).collect();
-    let sequence_text = rebuild_from_groups(&sorted_groups, &indent);
+    let sequence_text = rebuild_from_groups(&sorted_groups, &indent, true);
 
     self.apply_edit(range, &sequence_text)
   }
@@ -1352,7 +1352,7 @@ impl Document {
           .unwrap_or_default();
 
         let sorted_groups: Vec<EntryGroup> = sortable.into_iter().map(|(_, group)| group).collect();
-        let sequence_text = rebuild_from_groups(&sorted_groups, &indent);
+        let sequence_text = rebuild_from_groups(&sorted_groups, &indent, true);
         edits.push((group_range, sequence_text));
       }
     }
@@ -1862,7 +1862,7 @@ impl Document {
       .map(|entry| preceding_whitespace_indent(entry.syntax()))
       .unwrap_or_default();
 
-    let text = rebuild_from_groups(&reordered, &indent);
+    let text = rebuild_from_groups(&reordered, &indent, true);
 
     self.apply_edit(range, &text)
   }
@@ -2231,12 +2231,16 @@ fn collect_groups_with_range(parent: &SyntaxNode) -> (Vec<EntryGroup>, TextRange
   (groups, range)
 }
 
-fn rebuild_from_groups(groups: &[EntryGroup], indent: &str) -> String {
-  let default_separator = groups
-    .iter()
-    .find(|group| !group.separator.is_empty())
-    .map(|group| group.separator.clone())
-    .unwrap_or_else(|| "\n".to_string());
+fn rebuild_from_groups(groups: &[EntryGroup], indent: &str, preserve_separators: bool) -> String {
+  let default_separator = if preserve_separators {
+    groups
+      .iter()
+      .find(|group| !group.separator.is_empty())
+      .map(|group| group.separator.clone())
+      .unwrap_or_else(|| "\n".to_string())
+  } else {
+    "\n".to_string()
+  };
 
   groups
     .iter()
@@ -2244,10 +2248,18 @@ fn rebuild_from_groups(groups: &[EntryGroup], indent: &str) -> String {
     .map(|(index, group)| {
       if index == 0 {
         group.full_text()
-      } else if group.preceding.is_empty() {
-        format!("{}{}{}", default_separator, indent, group.body)
       } else {
-        format!("{}{}\n{}{}", default_separator, group.preceding, indent, group.body)
+        let separator = if preserve_separators && !group.separator.is_empty() {
+          &group.separator
+        } else {
+          &default_separator
+        };
+
+        if group.preceding.is_empty() {
+          format!("{}{}{}", separator, indent, group.body)
+        } else {
+          format!("{}{}\n{}{}", separator, group.preceding, indent, group.body)
+        }
       }
     })
     .collect()

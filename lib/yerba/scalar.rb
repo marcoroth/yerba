@@ -63,19 +63,9 @@ module Yerba
 
     def to_yaml
       case value
-      when nil
-        "null"
-      when String
-        case quote_style
-        when :double
-          "\"#{value.gsub("\\", "\\\\").gsub('"', '\\"')}\""
-        when :single
-          "'#{value.gsub("'", "''")}'"
-        else
-          value
-        end
-      else
-        value.to_s
+      when nil then "null"
+      when String then Formatting.quote(value, quote_style)
+      else value.to_s
       end
     end
 

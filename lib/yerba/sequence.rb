@@ -156,13 +156,7 @@ module Yerba
     private
 
     def format_for_insert(value)
-      style = detect_quote_style
-
-      case style
-      when :double then "\"#{value.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}\""
-      when :single then "'#{value.gsub("'", "''")}'"
-      else value
-      end
+      Formatting.quote(value, detect_quote_style)
     end
 
     def detect_quote_style

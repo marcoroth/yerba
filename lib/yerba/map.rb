@@ -4,30 +4,31 @@ module Yerba
   class Map
     include Enumerable
 
-    attr_reader :path
+    attr_reader :selector, :location, :key
 
-    # Two construction modes:
-    #   Bound:      Map.new(document, "path")  — from document["key"]
-    #   Standalone: Map.new(host: "localhost", port: 5432)  — for insertion
-    def initialize(document_or_hash = nil, path = nil)
+    def initialize(document_or_hash = nil, selector = nil, location = nil, key = nil)
       if document_or_hash.is_a?(Document)
         @document = document_or_hash
-        @path = path
+        @selector = selector
+        @location = location
+        @key = key
         @data = nil
       elsif document_or_hash.is_a?(Hash)
         @document = nil
-        @path = nil
+        @selector = nil
+        @location = nil
         @data = document_or_hash
       else
         @document = nil
-        @path = nil
+        @selector = nil
+        @location = nil
         @data = {}
       end
     end
 
     def [](key)
       if @document
-        new_path = @path.empty? ? key.to_s : "#{@path}.#{key}"
+        new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
         @document[new_path]
       else
         @data[key]
@@ -36,7 +37,7 @@ module Yerba
 
     def []=(key, value)
       if @document
-        new_path = @path.empty? ? key.to_s : "#{@path}.#{key}"
+        new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
         @document.set(new_path, value)
       else
         @data[key] = value
@@ -45,7 +46,7 @@ module Yerba
 
     def insert(key, value, before: nil, after: nil)
       if @document
-        new_path = @path.empty? ? key.to_s : "#{@path}.#{key}"
+        new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
         @document.insert(new_path, value.to_s, before: before, after: after)
       else
         @data[key] = value
@@ -55,14 +56,14 @@ module Yerba
     end
 
     def sort_keys(order)
-      @document&.sort_keys(@path, order)
+      @document&.sort_keys(@selector, order)
 
       self
     end
 
     def keys
       if @document
-        results = @document.find(@path)
+        results = @document.find(@selector)
         return [] unless results.is_a?(Array) && results.first.is_a?(Hash)
 
         results.first.keys
@@ -92,10 +93,10 @@ module Yerba
 
     def delete(key = nil)
       if key && @document
-        new_path = @path.empty? ? key.to_s : "#{@path}.#{key}"
+        new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
         @document.delete(new_path)
       elsif @document
-        @document.delete(@path)
+        @document.delete(@selector)
       else
         @data.delete(key)
       end
@@ -105,7 +106,7 @@ module Yerba
 
     def key?(key)
       if @document
-        new_path = @path.empty? ? key.to_s : "#{@path}.#{key}"
+        new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
         @document.exists?(new_path)
       else
         @data.key?(key)
@@ -120,7 +121,7 @@ module Yerba
 
     def to_h
       if @document
-        results = @document.find(@path)
+        results = @document.find(@selector)
         results&.first || {}
       else
         @data
@@ -137,15 +138,15 @@ module Yerba
 
     def inspect
       if @document
-        results = @document.find(@path)
+        results = @document.find(@selector)
 
         if results.is_a?(Array) && !results.empty? && results.first.is_a?(Hash)
           map_keys = results.first.keys.first(5)
           preview = map_keys.map { |key| "#{key}: #{results.first[key].inspect}" }.join(", ")
 
-          "#<Yerba::Map path=#{@path.inspect} {#{preview}}>"
+          "#<Yerba::Map selector=#{@selector.inspect} {#{preview}}>"
         else
-          "#<Yerba::Map path=#{@path.inspect}>"
+          "#<Yerba::Map selector=#{@selector.inspect}>"
         end
       else
         "#<Yerba::Map {#{@data.map { |key, value| "#{key}: #{value.inspect}" }.join(", ")}}>"

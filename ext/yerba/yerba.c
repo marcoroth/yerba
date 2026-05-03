@@ -193,6 +193,19 @@ static VALUE document_get(VALUE self, VALUE path) {
   }
 }
 
+static VALUE location_to_ruby(YerbaLocation location) {
+  VALUE klass = rb_path2class("Yerba::Location");
+
+  return rb_funcall(klass, rb_intern("new"), 6,
+    SIZET2NUM(location.start_line),
+    SIZET2NUM(location.start_column),
+    SIZET2NUM(location.end_line),
+    SIZET2NUM(location.end_column),
+    SIZET2NUM(location.start_offset),
+    SIZET2NUM(location.end_offset)
+  );
+}
+
 /* document[](path) → Yerba::Scalar, Yerba::Map, Yerba::Sequence, or nil */
 static VALUE document_bracket(VALUE self, VALUE path) {
   struct Document *document = get_document(self);
@@ -206,6 +219,15 @@ static VALUE document_bracket(VALUE self, VALUE path) {
   }
 
   VALUE instance;
+  VALUE location = location_to_ruby(result.location);
+  VALUE key = Qnil;
+
+  if (result.key_name) {
+    VALUE key_location = location_to_ruby(result.key_location);
+    VALUE key_value = make_utf8_string(result.key_name);
+
+    key = rb_funcall(rb_path2class("Yerba::Scalar"), rb_intern("new"), 4, Qnil, Qnil, key_value, key_location);
+  }
 
   switch (result.node_type) {
     case YERBA_NODE_TYPE_SCALAR: {
@@ -213,7 +235,7 @@ static VALUE document_bracket(VALUE self, VALUE path) {
       VALUE value = typed_value_to_ruby(result.single);
       yerba_get_result_free(result);
 
-      instance = rb_funcall(klass, rb_intern("new"), 3, self, path, value);
+      instance = rb_funcall(klass, rb_intern("new"), 5, self, path, value, location, key);
 
       return instance;
     }
@@ -222,7 +244,7 @@ static VALUE document_bracket(VALUE self, VALUE path) {
       yerba_get_result_free(result);
       VALUE klass = rb_path2class("Yerba::Map");
 
-      instance = rb_funcall(klass, rb_intern("new"), 2, self, path);
+      instance = rb_funcall(klass, rb_intern("new"), 4, self, path, location, key);
 
       return instance;
     }
@@ -231,7 +253,7 @@ static VALUE document_bracket(VALUE self, VALUE path) {
       yerba_get_result_free(result);
       VALUE klass = rb_path2class("Yerba::Sequence");
 
-      instance = rb_funcall(klass, rb_intern("new"), 2, self, path);
+      instance = rb_funcall(klass, rb_intern("new"), 4, self, path, location, key);
 
       return instance;
     }

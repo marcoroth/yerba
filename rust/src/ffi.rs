@@ -68,11 +68,24 @@ pub struct YerbaParseResult {
 }
 
 #[repr(C)]
+pub struct YerbaLocation {
+  pub start_offset: usize,
+  pub end_offset: usize,
+  pub start_line: usize,
+  pub start_column: usize,
+  pub end_line: usize,
+  pub end_column: usize,
+}
+
+#[repr(C)]
 pub struct YerbaGetResult {
   pub is_list: bool,
   pub node_type: YerbaNodeType,
   pub single: YerbaTypedValue,
   pub list: YerbaTypedList,
+  pub location: YerbaLocation,
+  pub key_name: *mut c_char,
+  pub key_location: YerbaLocation,
   pub error: *mut c_char,
 }
 
@@ -144,6 +157,37 @@ pub unsafe extern "C" fn yerba_document_parse(content: *const c_char) -> YerbaPa
   }
 }
 
+fn compute_location(source: &str, start_offset: usize, end_offset: usize) -> YerbaLocation {
+  let start = start_offset.min(source.len());
+  let end = end_offset.min(source.len());
+
+  let before_start = &source[..start];
+  let start_line = before_start.chars().filter(|c| *c == '\n').count() + 1;
+  let start_column = start - before_start.rfind('\n').map(|p| p + 1).unwrap_or(0);
+
+  let before_end = &source[..end];
+  let end_line = before_end.chars().filter(|c| *c == '\n').count() + 1;
+  let end_column = end - before_end.rfind('\n').map(|p| p + 1).unwrap_or(0);
+
+  YerbaLocation {
+    start_offset: start,
+    end_offset: end,
+    start_line,
+    start_column,
+    end_line,
+    end_column,
+  }
+}
+
+const EMPTY_LOCATION: YerbaLocation = YerbaLocation {
+  start_offset: 0,
+  end_offset: 0,
+  start_line: 0,
+  start_column: 0,
+  end_line: 0,
+  end_column: 0,
+};
+
 #[no_mangle]
 pub unsafe extern "C" fn yerba_document_free(document: *mut Document) {
   if !document.is_null() {
@@ -162,17 +206,49 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
     return YerbaGetResult {
       is_list: false,
       node_type: YerbaNodeType::NotFound,
-      single: YerbaTypedValue {
-        text: ptr::null_mut(),
-        value_type: YerbaValueType::Null,
-      },
-      list: YerbaTypedList {
-        json: ptr::null_mut(),
-        length: 0,
-      },
+      single: YerbaTypedValue { text: ptr::null_mut(), value_type: YerbaValueType::Null },
+      list: YerbaTypedList { json: ptr::null_mut(), length: 0 },
+      key_name: ptr::null_mut(),
+      key_location: EMPTY_LOCATION,
+      location: EMPTY_LOCATION,
       error: CString::new(e.to_string()).unwrap_or_default().into_raw(),
     };
   }
+
+  let source = document.to_string();
+
+  let (location, key_text, key_location) = match document.navigate(path_string) {
+    Ok(node) => {
+      let range = node.text_range();
+      let location = compute_location(&source, range.start().into(), range.end().into());
+
+      let (key_text, key_location) = node
+        .parent()
+        .and_then(|parent| {
+          use yaml_parser::ast::BlockMapEntry;
+          use rowan::ast::AstNode;
+
+          BlockMapEntry::cast(parent).and_then(|entry| {
+            entry.key().and_then(|key_node| {
+              let key_text = crate::syntax::extract_scalar_text(key_node.syntax())?;
+              let key_range = key_node.syntax().text_range();
+              let key_location = compute_location(&source, key_range.start().into(), key_range.end().into());
+
+              Some((key_text, key_location))
+            })
+          })
+        })
+        .map(|(name, location)| (Some(name), location))
+        .unwrap_or((None, EMPTY_LOCATION));
+
+      (location, key_text, key_location)
+    }
+    Err(_) => (EMPTY_LOCATION, None, EMPTY_LOCATION),
+  };
+
+  let key_name_pointer = key_text
+    .map(|name| CString::new(name).unwrap_or_default().into_raw())
+    .unwrap_or(ptr::null_mut());
 
   if selector.has_wildcard() {
     let values = document.get_all_typed(path_string);
@@ -193,14 +269,11 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
     YerbaGetResult {
       is_list: true,
       node_type: YerbaNodeType::Sequence,
-      single: YerbaTypedValue {
-        text: ptr::null_mut(),
-        value_type: YerbaValueType::Null,
-      },
-      list: YerbaTypedList {
-        json: CString::new(json).unwrap_or_default().into_raw(),
-        length,
-      },
+      single: YerbaTypedValue { text: ptr::null_mut(), value_type: YerbaValueType::Null },
+      list: YerbaTypedList { json: CString::new(json).unwrap_or_default().into_raw(), length },
+      location,
+      key_name: key_name_pointer,
+      key_location,
       error: ptr::null_mut(),
     }
   } else {
@@ -215,20 +288,20 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
             text: CString::new(scalar.text).unwrap_or_default().into_raw(),
             value_type: vtype,
           },
-          list: YerbaTypedList {
-            json: ptr::null_mut(),
-            length: 0,
-          },
+          list: YerbaTypedList { json: ptr::null_mut(), length: 0 },
+          location,
+          key_name: key_name_pointer,
+          key_location,
           error: ptr::null_mut(),
         }
       }
 
       None => {
+        use rowan::ast::AstNode;
+        use yaml_parser::ast::{BlockMap, BlockSeq};
+
         let node_type = match document.navigate(path_string) {
           Ok(node) => {
-            use rowan::ast::AstNode;
-            use yaml_parser::ast::{BlockMap, BlockSeq};
-
             if node.children().any(|child| BlockSeq::can_cast(child.kind())) {
               YerbaNodeType::Sequence
             } else if node.children().any(|child| BlockMap::can_cast(child.kind())) {
@@ -241,21 +314,17 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
               YerbaNodeType::NotFound
             }
           }
-
           Err(_) => YerbaNodeType::NotFound,
         };
 
         YerbaGetResult {
           is_list: false,
           node_type,
-          single: YerbaTypedValue {
-            text: ptr::null_mut(),
-            value_type: YerbaValueType::Null,
-          },
-          list: YerbaTypedList {
-            json: ptr::null_mut(),
-            length: 0,
-          },
+          single: YerbaTypedValue { text: ptr::null_mut(), value_type: YerbaValueType::Null },
+          list: YerbaTypedList { json: ptr::null_mut(), length: 0 },
+          location,
+          key_name: key_name_pointer,
+          key_location,
           error: ptr::null_mut(),
         }
       }
@@ -750,6 +819,10 @@ pub unsafe extern "C" fn yerba_get_result_free(result: YerbaGetResult) {
 
   if !result.list.json.is_null() {
     drop(CString::from_raw(result.list.json));
+  }
+
+  if !result.key_name.is_null() {
+    drop(CString::from_raw(result.key_name));
   }
 }
 

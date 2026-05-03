@@ -152,7 +152,7 @@ class SequenceTest < Minitest::Spec
         - rust
     YAML
 
-    assert_equal '#<Yerba::Sequence path="tags" ["ruby", "rust"]>', document["tags"].inspect
+    assert_equal '#<Yerba::Sequence selector="tags" ["ruby", "rust"]>', document["tags"].inspect
   end
 
   test "sequence.include? checks membership" do

@@ -53,7 +53,7 @@ class MapTest < Minitest::Spec
         port: 5432
     YAML
 
-    assert_equal '#<Yerba::Map path="database" {host: "localhost", port: 5432}>', document["database"].inspect
+    assert_equal '#<Yerba::Map selector="database" {host: "localhost", port: 5432}>', document["database"].inspect
   end
 
   test "map.dig resolves nested value" do

@@ -63,6 +63,6 @@ class ScalarTest < Minitest::Spec
       name: Alice
     YAML
 
-    assert_equal '#<Yerba::Scalar path="name" value="Alice">', document["name"].inspect
+    assert_equal '#<Yerba::Scalar selector="name" value="Alice">', document["name"].inspect
   end
 end

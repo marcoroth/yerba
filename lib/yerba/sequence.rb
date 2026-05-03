@@ -4,30 +4,31 @@ module Yerba
   class Sequence
     include Enumerable
 
-    attr_reader :path
+    attr_reader :selector, :location, :key
 
-    # Two construction modes:
-    #   Bound:      Sequence.new(document, "path")  — from document["key"]
-    #   Standalone: Sequence.new(["ruby", "rust"])  — for insertion
-    def initialize(document_or_array = nil, path = nil)
+    def initialize(document_or_array = nil, selector = nil, location = nil, key = nil)
       if document_or_array.is_a?(Document)
         @document = document_or_array
-        @path = path
+        @selector = selector
+        @location = location
+        @key = key
         @data = nil
       elsif document_or_array.is_a?(Array)
         @document = nil
-        @path = nil
+        @selector = nil
+        @location = nil
         @data = document_or_array
       else
         @document = nil
-        @path = nil
+        @selector = nil
+        @location = nil
         @data = []
       end
     end
 
     def [](index)
       if @document
-        new_path = "#{@path}[#{index}]"
+        new_path = "#{@selector}[#{index}]"
         @document[new_path]
       else
         @data[index]
@@ -38,14 +39,14 @@ module Yerba
       if @document
         case item
         when Map
-          @document.insert_object(@path, item.to_hash)
+          @document.insert_object(@selector, item.to_hash)
         when Hash
-          @document.insert_object(@path, item)
+          @document.insert_object(@selector, item)
         when Scalar
-          @document.insert(@path, item.to_yaml)
+          @document.insert(@selector, item.to_yaml)
         else
           formatted = format_for_insert(item.to_s)
-          @document.insert(@path, formatted)
+          @document.insert(@selector, formatted)
         end
       else
         @data << item
@@ -62,12 +63,12 @@ module Yerba
 
     def length
       if @document
-        scalar_items = @document.get("#{@path}[]")
+        scalar_items = @document.get("#{@selector}[]")
 
         if scalar_items.is_a?(Array) && !scalar_items.empty?
           scalar_items.length
         else
-          data = @document.get_value(@path)
+          data = @document.get_value(@selector)
           data.is_a?(Array) ? data.length : 0
         end
       else
@@ -85,13 +86,13 @@ module Yerba
     end
 
     def remove(value)
-      @document&.remove(@path, value.to_s)
+      @document&.remove(@selector, value.to_s)
 
       self
     end
 
     def delete_at(index)
-      @document&.remove_at(@path, index)
+      @document&.remove_at(@selector, index)
 
       self
     end
@@ -106,20 +107,20 @@ module Yerba
       end
 
       indices_to_remove.reverse_each do |index|
-        @document&.remove_at(@path, index)
+        @document&.remove_at(@selector, index)
       end
 
       self
     end
 
     def sort(by: nil, case_sensitive: false)
-      @document&.sort(@path, by: by, case_sensitive: case_sensitive)
+      @document&.sort(@selector, by: by, case_sensitive: case_sensitive)
 
       self
     end
 
     def delete
-      @document&.delete(@path)
+      @document&.delete(@selector)
     end
 
     def value
@@ -146,8 +147,8 @@ module Yerba
       preview = list.first(5).map(&:inspect).join(", ")
       suffix = list.length > 5 ? ", ... (#{list.length} items)" : ""
 
-      if @path
-        "#<Yerba::Sequence path=#{@path.inspect} [#{preview}#{suffix}]>"
+      if @selector
+        "#<Yerba::Sequence selector=#{@selector.inspect} [#{preview}#{suffix}]>"
       else
         "#<Yerba::Sequence [#{preview}#{suffix}]>"
       end
@@ -160,17 +161,17 @@ module Yerba
     end
 
     def detect_quote_style
-      @document.get_quote_style("#{@path}[0]")
+      @document.get_quote_style("#{@selector}[0]")
     end
 
     def items
       if @document
-        result = @document.get("#{@path}[]")
+        result = @document.get("#{@selector}[]")
 
         if result.is_a?(Array) && !result.empty?
           result
         else
-          data = @document.get_value(@path)
+          data = @document.get_value(@selector)
           data.is_a?(Array) ? data : []
         end
       else

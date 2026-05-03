@@ -2,41 +2,42 @@
 
 module Yerba
   class Scalar
-    attr_reader :path
+    attr_reader :selector, :location, :key
 
-    # Two construction modes:
-    #   Bound:      Scalar.new(document, "path", value)  — from document["key"]
-    #   Standalone: Scalar.new("hello", quote_style: :double)  — for insertion
-    def initialize(document_or_value, path_or_opts = nil, value = nil, quote_style: nil)
-      if document_or_value.is_a?(Document)
+    def initialize(document_or_value, selector_or_opts = nil, value = nil, location = nil, key = nil, quote_style: nil)
+      if document_or_value.is_a?(Document) || document_or_value.nil?
         @document = document_or_value
-        @path = path_or_opts
+        @selector = selector_or_opts
         @value = value
+        @location = location
+        @key = key
         @quote_style = quote_style
       else
         @document = nil
-        @path = nil
+        @selector = nil
         @value = document_or_value
-        @quote_style = path_or_opts.is_a?(Hash) ? path_or_opts[:quote_style] : quote_style
+        @location = nil
+        @key = nil
+        @quote_style = selector_or_opts.is_a?(Hash) ? selector_or_opts[:quote_style] : quote_style
       end
     end
 
     def value
-      @value ||= @document&.get(@path)
+      @value ||= @document&.get(@selector)
     end
 
     def quote_style
-      @quote_style || @document&.get_quote_style(@path)
+      @quote_style || @document&.get_quote_style(@selector)
     end
 
     def quote_style=(style)
-      @document&.set_quote_style(@path, style)
+      @document&.set_quote_style(@selector, style)
 
       @quote_style = style
     end
 
     def value=(new_value)
-      @document&.set(@path, new_value)
+      @document&.set(@selector, new_value)
       @value = new_value
     end
     alias set value=
@@ -70,12 +71,12 @@ module Yerba
     end
 
     def delete
-      @document&.delete(@path)
+      @document&.delete(@selector)
     end
 
     def inspect
-      if @path
-        "#<Yerba::Scalar path=#{@path.inspect} value=#{value.inspect}>"
+      if @selector
+        "#<Yerba::Scalar selector=#{@selector.inspect} value=#{value.inspect}>"
       else
         "#<Yerba::Scalar value=#{value.inspect} quote_style=#{quote_style.inspect}>"
       end

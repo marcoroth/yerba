@@ -59,7 +59,30 @@ begin
       task platform => "prepare" do
         rb_sys_platform = RB_SYS_PLATFORM_MAP.fetch(platform)
 
+        rust_target = {
+          "aarch64-linux-gnu" => "aarch64-unknown-linux-gnu",
+          "aarch64-linux-musl" => "aarch64-unknown-linux-musl",
+          "arm-linux-gnu" => "armv7-unknown-linux-gnueabihf",
+          "arm-linux-musl" => "armv7-unknown-linux-musleabihf",
+          "arm64-darwin" => "aarch64-apple-darwin",
+          "x86_64-darwin" => "x86_64-apple-darwin",
+          "x86_64-linux-gnu" => "x86_64-unknown-linux-gnu",
+          "x86_64-linux-musl" => "x86_64-unknown-linux-musl",
+        }.fetch(platform)
+
+        linker_env = case rust_target
+                     when /aarch64.*linux.*gnu/ then "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
+                     when /aarch64.*linux.*musl/ then "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-musl-gcc"
+                     when /armv7.*gnueabihf/ then "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc"
+                     else ""
+                     end
+
         RakeCompilerDock.sh(
+          "rustup target add #{rust_target} 2>/dev/null; " \
+          "export #{linker_env}; " \
+          "cd rust && cargo build --release --target #{rust_target} && cd .. && " \
+          "mkdir -p exe/#{platform} && cp rust/target/#{rust_target}/release/yerba exe/#{platform}/yerba && " \
+          "export RCD_PLATFORM=#{platform} && " \
           "bundle --local && rake native:#{platform} gem RUBY_CC_VERSION='#{ENV.fetch("RUBY_CC_VERSION", nil)}'",
           platform: platform,
           image: "rbsys/#{rb_sys_platform}:#{RbSys::VERSION}"

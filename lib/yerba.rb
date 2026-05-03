@@ -12,9 +12,14 @@ require_relative "yerba/document"
 require_relative "yerba/collection"
 
 begin
-  require "yerba/yerba"
+  major, minor, = RUBY_VERSION.split(".")
+  require "yerba/#{major}.#{minor}/yerba"
 rescue LoadError
-  # C extension not available, fall back to CLI mode
+  begin
+    require "yerba/yerba"
+  rescue LoadError
+    # C extension not available, fall back to CLI mode
+  end
 end
 
 module Yerba

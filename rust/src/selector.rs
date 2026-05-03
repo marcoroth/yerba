@@ -72,10 +72,7 @@ impl Selector {
   }
 
   pub fn has_wildcard(&self) -> bool {
-    self
-      .segments()
-      .iter()
-      .any(|s| matches!(s, SelectorSegment::AllItems))
+    self.segments().iter().any(|s| matches!(s, SelectorSegment::AllItems))
   }
 
   /// Split into the container selector (up to and including the last []) and the remaining field selector.

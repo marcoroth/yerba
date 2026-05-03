@@ -1,19 +1,25 @@
+use std::sync::LazyLock;
+
 use indoc::indoc;
 
+use super::colorize_examples;
 use super::{output, parse_file, run_op};
+
+static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
+  colorize_examples(indoc! {r#"
+    yerba set config.yml "database.host" "0.0.0.0"
+    yerba set config.yml "database.host" "0.0.0.0" --if-exists
+    yerba set config.yml "database.host" "0.0.0.0" --condition ".port == 5432"
+    yerba set videos.yml "[0].title" "New Title"
+    yerba set "data/**/event.yml" "website" "" --if-exists
+  "#})
+});
 
 #[derive(clap::Args)]
 #[command(
   about = "Update an existing value at a path (preserves quote style)",
   arg_required_else_help = true,
-  after_help = indoc! {r#"
-    Examples:
-      yerba set config.yml "database.host" "0.0.0.0"
-      yerba set config.yml "database.host" "0.0.0.0" --if-exists
-      yerba set config.yml "database.host" "0.0.0.0" --condition ".port == 5432"
-      yerba set videos.yml "[0].title" "New Title"
-      yerba set "data/**/event.yml" "website" "" --if-exists
-  "#}
+  after_help = EXAMPLES.as_str()
 )]
 pub struct Args {
   file: String,

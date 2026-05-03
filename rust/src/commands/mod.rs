@@ -29,6 +29,115 @@ pub(crate) mod color {
   pub const RESET: &str = "\x1b[0m";
 }
 
+// Compile-time ANSI macros for use in concat!() / clap attributes (used in main.rs)
+#[allow(unused_macros)]
+macro_rules! h {
+  () => {
+    "\x1b[1;32m"
+  };
+} // header (bold green)
+#[allow(unused_macros)]
+macro_rules! b {
+  () => {
+    "\x1b[1m"
+  };
+} // bold
+#[allow(unused_macros)]
+macro_rules! c {
+  () => {
+    "\x1b[36m"
+  };
+} // cyan
+#[allow(unused_macros)]
+macro_rules! d {
+  () => {
+    "\x1b[2m"
+  };
+} // dim
+#[allow(unused_macros)]
+macro_rules! r {
+  () => {
+    "\x1b[0m"
+  };
+} // reset
+#[allow(unused_imports)]
+pub(crate) use {b, c, d, h, r};
+
+pub(crate) fn colorize_examples(input: &str) -> String {
+  colorize_help(&format!("Examples:\n{}", input.trim()))
+}
+
+pub(crate) fn colorize_help(input: &str) -> String {
+  use color::*;
+
+  let mut output = String::new();
+
+  for line in input.lines() {
+    let trimmed = line.trim();
+
+    if trimmed.is_empty() {
+      output.push('\n');
+      continue;
+    }
+
+    if trimmed.ends_with(':') && !trimmed.contains(' ') {
+      output.push_str(&format!("{GREEN}{BOLD}{trimmed}{RESET}\n"));
+      continue;
+    }
+
+    if trimmed.starts_with("yerba ") {
+      let mut parts = trimmed.splitn(3, ' ');
+
+      match (parts.next(), parts.next(), parts.next()) {
+        (Some(cmd), Some(sub), Some(rest)) => {
+          output.push_str(&format!("  {BOLD}{cmd}{RESET} \x1b[36m{sub}{RESET} {rest}\n"));
+        }
+
+        (Some(cmd), Some(sub), None) => {
+          output.push_str(&format!("  {BOLD}{cmd}{RESET} \x1b[36m{sub}{RESET}\n"));
+        }
+
+        _ => {
+          output.push_str(&format!("  {trimmed}\n"));
+        }
+      }
+
+      continue;
+    }
+
+    let mut columns: Vec<&str> = Vec::new();
+    let mut rest = trimmed;
+
+    while !rest.is_empty() {
+      let column_end = rest.find("  ").unwrap_or(rest.len());
+      let column = rest[..column_end].trim();
+
+      if !column.is_empty() {
+        columns.push(column);
+      }
+
+      if column_end >= rest.len() {
+        break;
+      }
+
+      rest = rest[column_end..].trim_start();
+    }
+
+    if columns.len() == 3 {
+      output.push_str(&format!(
+        "  \x1b[36m{:<20}{RESET} {:<21} {DIM}{}{RESET}\n",
+        columns[0], columns[1], columns[2]
+      ));
+    } else if columns.len() == 2 {
+      output.push_str(&format!("  \x1b[36m{:<20}{RESET} {}\n", columns[0], columns[1]));
+    } else {
+      output.push_str(&format!("  {trimmed}\n"));
+    }
+  }
+
+  output.trim_end().to_string()
+}
+
 #[derive(Subcommand)]
 pub enum Command {
   Get(get::Args),

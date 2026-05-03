@@ -1,16 +1,22 @@
+use std::sync::LazyLock;
+
 use indoc::indoc;
 
+use super::colorize_examples;
 use super::{output, parse_file, run_op};
+
+static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
+  colorize_examples(indoc! {r#"
+    yerba remove config.yml "tags" "rust"
+    yerba remove videos.yml "[0].speakers" "Alice"
+  "#})
+});
 
 #[derive(clap::Args)]
 #[command(
   about = "Remove an item from a sequence by its value",
   arg_required_else_help = true,
-  after_help = indoc! {r#"
-    Examples:
-      yerba remove config.yml "tags" "rust"
-      yerba remove videos.yml "[0].speakers" "Alice"
-  "#}
+  after_help = EXAMPLES.as_str()
 )]
 pub struct Args {
   file: String,

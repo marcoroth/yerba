@@ -1,20 +1,25 @@
 use std::process;
+use std::sync::LazyLock;
 
 use indoc::indoc;
 
+use super::colorize_examples;
 use super::{output, parse_file, resolve_files};
+
+static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
+  colorize_examples(indoc! {r#"
+    yerba sort-keys config.yml "database" "host,port,name,pool"
+    yerba sort-keys "data/**/event.yml" "" "id,title,kind,location"
+    yerba sort-keys "data/**/videos.yml" "[]" "id,title,speakers"
+    yerba sort-keys config.yml "database" "host,port" --dry-run
+  "#})
+});
 
 #[derive(clap::Args)]
 #[command(
   about = "Sort keys in a map by a predefined order (aborts on unknown keys)",
   arg_required_else_help = true,
-  after_help = indoc! {r#"
-    Examples:
-      yerba sort-keys config.yml "database" "host,port,name,pool"
-      yerba sort-keys "data/**/event.yml" "" "id,title,kind,location"
-      yerba sort-keys "data/**/videos.yml" "[]" "id,title,speakers"
-      yerba sort-keys config.yml "database" "host,port" --dry-run
-  "#}
+  after_help = EXAMPLES.as_str()
 )]
 pub struct Args {
   file: String,

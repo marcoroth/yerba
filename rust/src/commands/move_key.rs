@@ -1,19 +1,24 @@
 use std::process;
+use std::sync::LazyLock;
 
 use indoc::indoc;
 
+use super::colorize_examples;
 use super::{output, parse_file, resolve_move_indexes, run_op};
+
+static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
+  colorize_examples(indoc! {r#"
+    yerba move-key config.yml "database.name" --to 0
+    yerba move-key config.yml "database.pool" --before "database.host"
+    yerba move-key config.yml "database.pool" --after "database.name"
+  "#})
+});
 
 #[derive(clap::Args)]
 #[command(
   about = "Move a key to a new position within a map",
   arg_required_else_help = true,
-  after_help = indoc! {r#"
-    Examples:
-      yerba move-key config.yml "database.name" --to 0
-      yerba move-key config.yml "database.pool" --before "database.host"
-      yerba move-key config.yml "database.pool" --after "database.name"
-  "#}
+  after_help = EXAMPLES.as_str()
 )]
 pub struct Args {
   file: String,

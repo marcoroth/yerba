@@ -1,24 +1,29 @@
+use std::sync::LazyLock;
+
 use indoc::indoc;
 
+use super::colorize_examples;
 use super::{output, parse_file, run_op};
+
+static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
+  colorize_examples(indoc! {r#"
+    yerba insert config.yml "database.ssl" true
+    yerba insert config.yml "database.ssl" true --after "host"
+    yerba insert config.yml "database.ssl" true --before "port"
+    yerba insert config.yml "tags" "yaml"
+    yerba insert config.yml "tags" "yaml" --at 0
+    yerba insert config.yml "tags" "yaml" --after "ruby"
+    yerba insert speakers.yml "" "name: Bob" --after ".name == Alice"
+    yerba insert videos.yml "[0].speakers" "Diana" --before ".name == Charlie"
+    yerba insert videos.yml "" --from "new_talk.yml" --after ".id == first-talk"
+  "#})
+});
 
 #[derive(clap::Args)]
 #[command(
   about = "Insert a new key into a map or item into a sequence",
   arg_required_else_help = true,
-  after_help = indoc! {r#"
-    Examples:
-      yerba insert config.yml "database.ssl" true
-      yerba insert config.yml "database.ssl" true --after "host"
-      yerba insert config.yml "database.ssl" true --before "port"
-      yerba insert config.yml "tags" "yaml"
-      yerba insert config.yml "tags" "yaml" --at 0
-      yerba insert config.yml "tags" "yaml" --after "ruby"
-      yerba insert speakers.yml "" "name: Bob" --after ".name == Alice"
-      yerba insert videos.yml "[0].speakers" "Diana" --before ".name == Charlie"
-      yerba insert videos.yml "" --from "new_talk.yml" --after ".id == first-talk"
-      cat talk.yml | yerba insert videos.yml "" --from - --after ".id == first-talk"
-  "#}
+  after_help = EXAMPLES.as_str()
 )]
 pub struct Args {
   file: String,

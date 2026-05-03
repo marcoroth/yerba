@@ -1,24 +1,28 @@
 use std::process;
+use std::sync::LazyLock;
 
 use indoc::indoc;
 
-use super::{parse_file, resolve_files};
+use super::{colorize_examples, parse_file, resolve_files};
+
+static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
+  colorize_examples(indoc! {r#"
+    yerba get config.yml "database.host"
+    yerba get videos.yml "[].title"
+    yerba get videos.yml "[0].title"
+    yerba get "data/**/videos.yml" "[].speakers[].name"
+    yerba get videos.yml "[]" --select "title,speakers"
+    yerba get videos.yml "[]" --condition ".kind == keynote"
+    yerba get videos.yml "[]" --select "title" --condition ".kind == keynote"
+    yerba get videos.yml "[]" --condition ".speakers contains Matz" --raw
+  "#})
+});
 
 #[derive(clap::Args)]
 #[command(
   about = "Get values, filter items, and select fields from YAML files",
   arg_required_else_help = true,
-  after_help = indoc! {r#"
-    Examples:
-      yerba get config.yml "database.host"
-      yerba get videos.yml "[].title"
-      yerba get videos.yml "[0].title"
-      yerba get "data/**/videos.yml" "[].speakers[].name"
-      yerba get videos.yml "[]" --select "title,speakers"
-      yerba get videos.yml "[]" --condition ".kind == keynote"
-      yerba get videos.yml "[]" --select "title" --condition ".kind == keynote"
-      yerba get videos.yml "[]" --condition ".speakers contains Matz" --raw
-  "#}
+  after_help = EXAMPLES.as_str()
 )]
 pub struct Args {
   file: String,

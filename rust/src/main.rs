@@ -1,5 +1,7 @@
 mod commands;
 
+use std::sync::LazyLock;
+
 use clap::builder::styling::{AnsiColor, Effects, Styles};
 use clap::Parser;
 use indoc::indoc;
@@ -11,16 +13,21 @@ const STYLES: Styles = Styles::styled()
   .placeholder(AnsiColor::Yellow.on_default())
   .valid(AnsiColor::Green.on_default());
 
-#[derive(Parser)]
-#[command(
-  name = "yerba",
-  version = yerba::version(),
-  styles = STYLES,
-  about = "Yerba 🧉 YAML Editing and Refactoring with Better Accuracy",
-  arg_required_else_help = true,
-  override_usage = "yerba [command] [options]",
-  disable_help_subcommand = true,
-  after_help = indoc! {r#"
+static HELP: LazyLock<String> = LazyLock::new(|| {
+  commands::colorize_help(indoc! {r#"
+    Selectors:
+      key                  A single key          "database.host"
+      key.nested           Nested key path       "database.settings.pool"
+      []                   All items in array    "[].title"
+      [N]                  Item at index         "[0].title"
+      [].key[].nested      Nested array access   "[].speakers[].name"
+
+    Conditions:
+      .key == value        Equality              ".kind == keynote"
+      .key != value        Inequality            ".status != draft"
+      .key contains val    Substring or member   ".title contains Ruby"
+      .key not_contains    Negated contains      ".title not_contains test"
+
     Examples:
       yerba get config.yml "database.host"
       yerba get videos.yml "[0].title"
@@ -35,7 +42,19 @@ const STYLES: Styles = Styles::styled()
       yerba quote-style "data/**/*.yml" "double"
       yerba check
       yerba apply
-  "#}
+  "#})
+});
+
+#[derive(Parser)]
+#[command(
+  name = "yerba",
+  version = yerba::version(),
+  styles = STYLES,
+  about = "Yerba 🧉 YAML Editing and Refactoring with Better Accuracy",
+  arg_required_else_help = true,
+  override_usage = "\x1b[1myerba\x1b[0m <command> <file> <selector> [options]",
+  disable_help_subcommand = true,
+  after_help = HELP.as_str()
 )]
 #[allow(clippy::upper_case_acronyms)]
 struct CLI {

@@ -1,20 +1,26 @@
+use std::sync::LazyLock;
+
 use indoc::indoc;
 
+use super::colorize_examples;
 use super::{output, parse_file, resolve_files};
+
+static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
+  colorize_examples(indoc! {r#"
+    yerba sort config.yml "tags"
+    yerba sort videos.yml "" --by "title"
+    yerba sort videos.yml "" --by "date:desc,title"
+    yerba sort videos.yml "[].speakers"
+    yerba sort videos.yml "[].speakers" --by "name"
+    yerba sort videos.yml "" --by "kind,date:desc,title" --dry-run
+  "#})
+});
 
 #[derive(clap::Args)]
 #[command(
   about = "Sort items in a sequence by field(s)",
   arg_required_else_help = true,
-  after_help = indoc! {r#"
-    Examples:
-      yerba sort config.yml "tags"
-      yerba sort videos.yml "" --by "title"
-      yerba sort videos.yml "" --by "date:desc,title"
-      yerba sort videos.yml "[].speakers"
-      yerba sort videos.yml "[].speakers" --by "name"
-      yerba sort videos.yml "" --by "kind,date:desc,title" --dry-run
-  "#}
+  after_help = EXAMPLES.as_str()
 )]
 pub struct Args {
   file: String,

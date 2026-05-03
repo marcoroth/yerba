@@ -1,19 +1,25 @@
+use std::sync::LazyLock;
+
 use indoc::indoc;
 
+use super::colorize_examples;
 use super::{output, parse_file, resolve_files};
+
+static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
+  colorize_examples(indoc! {r#"
+    yerba quote-style config.yml double
+    yerba quote-style config.yml plain --keys
+    yerba quote-style config.yml double --all
+    yerba quote-style config.yml single --path "database.host"
+    yerba quote-style videos.yml plain --path "[].speakers"
+  "#})
+});
 
 #[derive(clap::Args)]
 #[command(
   about = "Enforce a consistent quote style on values, keys, or both",
   arg_required_else_help = true,
-  after_help = indoc! {r#"
-    Examples:
-      yerba quote-style config.yml double
-      yerba quote-style config.yml plain --keys
-      yerba quote-style config.yml double --all
-      yerba quote-style config.yml single --path "database.host"
-      yerba quote-style videos.yml plain --path "[].speakers"
-  "#}
+  after_help = EXAMPLES.as_str()
 )]
 pub struct Args {
   file: String,

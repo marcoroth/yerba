@@ -27,6 +27,7 @@ Gem::Specification.new do |spec|
     "lib/**/*.rb",
     "sig/**/*.rbs",
     "exe/yerba",
+    "exe/*/yerba",
     "ext/yerba/extconf.rb",
     "ext/yerba/yerba.c",
     "ext/yerba/include/**/*.h",

@@ -76,7 +76,7 @@ fn test_sort_keys_with_bracket_path() {
 
 #[test]
 fn test_validate_sort_keys_with_bracket_path() {
-  let document = parse(indoc! {"
+  let mut document = parse(indoc! {"
     - name: first
       id: 1
   "});
@@ -170,5 +170,37 @@ fn test_sort_keys_preserves_trailing_comments_in_sequence() {
         slides_url: https://example.com
         # https://x.com/status/123
     "}
+  );
+}
+
+#[test]
+fn test_sort_keys_preserves_comments_between_sequence_entries() {
+  let mut document = parse(indoc! {r#"
+    - id: "first"
+      title: "Hello"
+      published_at: "2024-01-01"
+
+    # Section Comment
+
+    - id: "second"
+      title: "World"
+      published_at: "2024-01-02"
+  "#});
+
+  document.sort_keys("[]", &["id", "title", "published_at"]).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - id: "first"
+        title: "Hello"
+        published_at: "2024-01-01"
+
+      # Section Comment
+
+      - id: "second"
+        title: "World"
+        published_at: "2024-01-02"
+    "#}
   );
 }

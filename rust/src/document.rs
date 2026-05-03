@@ -2196,8 +2196,7 @@ fn collect_preceding_sibling_comments(parent: &SyntaxNode) -> (String, Option<ro
       Some(parent)
         if parent.kind() == SyntaxKind::BLOCK
           || parent.kind() == SyntaxKind::DOCUMENT
-          || parent.kind() == SyntaxKind::BLOCK_MAP_VALUE
-          || parent.kind() == SyntaxKind::BLOCK_SEQ_ENTRY =>
+          || parent.kind() == SyntaxKind::BLOCK_MAP_VALUE =>
       {
         node = parent
       }

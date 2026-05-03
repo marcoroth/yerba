@@ -1,6 +1,6 @@
 [package]
 name = "yerba"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 authors = ["Marco Roth <marco.roth@intergga.ch>"]
 description = "YAML Editing and Refactoring with Better Accuracy"

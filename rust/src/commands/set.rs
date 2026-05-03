@@ -12,6 +12,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
     yerba set config.yml "database.host" "0.0.0.0" --condition ".port == 5432"
     yerba set videos.yml "[0].title" "New Title"
     yerba set "data/**/event.yml" "website" "" --if-exists
+    yerba set videos.yml "[].description" "" --all
   "#})
 });
 
@@ -32,6 +33,8 @@ pub struct Args {
   #[arg(long)]
   condition: Option<String>,
   #[arg(long)]
+  all: bool,
+  #[arg(long)]
   dry_run: bool,
 }
 
@@ -51,7 +54,11 @@ impl Args {
     };
 
     if should_set {
-      run_op(|| document.set(&self.selector, &self.value));
+      if self.all {
+        run_op(|| document.set_all(&self.selector, &self.value));
+      } else {
+        run_op(|| document.set(&self.selector, &self.value));
+      }
     }
 
     output(&self.file, &document, self.dry_run);

@@ -198,8 +198,54 @@ fn test_set_bracket_index_multiple_matches_error() {
   "});
 
   let result = document.set("[].title", "test");
+
   assert!(
     result.is_err(),
     "setting on [] (all items) should error — use a specific index"
   );
+}
+
+#[test]
+fn test_set_all_updates_all_matching_nodes() {
+  let mut document = parse(indoc! {"
+    - title: Hello
+      description: some text
+    - title: World
+      description: other text
+  "});
+
+  document.set_all("[].description", "").unwrap();
+
+  let output = document.to_string();
+  assert!(output.contains("description: \n") || output.contains("description:\n"));
+  assert!(!output.contains("some text"));
+  assert!(!output.contains("other text"));
+}
+
+#[test]
+fn test_set_all_preserves_quote_style() {
+  let mut document = parse(indoc! {r#"
+    - name: "Alice"
+    - name: "Bob"
+  "#});
+
+  document.set_all("[].name", "Updated").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - name: "Updated"
+      - name: "Updated"
+    "#}
+  );
+}
+
+#[test]
+fn test_set_all_errors_on_missing_path() {
+  let mut document = parse(indoc! {"
+    - name: Alice
+  "});
+
+  let result = document.set_all("[].missing", "value");
+  assert!(result.is_err());
 }

@@ -501,14 +501,19 @@ pub unsafe extern "C" fn yerba_document_set(
   path: *const c_char,
   value: *const c_char,
   value_type: YerbaValueType,
+  all: bool,
 ) -> YerbaResult {
   let document = &mut *document;
   let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
   let value_string = CStr::from_ptr(value).to_str().unwrap_or("");
 
-  let result = match value_type {
-    YerbaValueType::String => document.set(path_string, value_string),
-    _ => document.set_plain(path_string, value_string),
+  let result = if all {
+    document.set_all(path_string, value_string)
+  } else {
+    match value_type {
+      YerbaValueType::String => document.set(path_string, value_string),
+      _ => document.set_plain(path_string, value_string),
+    }
   };
 
   match result {

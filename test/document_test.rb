@@ -683,4 +683,22 @@ class DocumentTest < Minitest::Spec
 
     assert_nil document["missing"]
   end
+
+  test "set with all: true updates all matching nodes" do
+    document = Yerba::Document.parse(<<~YAML)
+      - title: Hello
+        description: "some text"
+      - title: World
+        description: "other text"
+    YAML
+
+    document.set("[].description", "", all: true)
+
+    assert_equal <<~YAML, document.to_s
+      - title: Hello
+        description: ""
+      - title: World
+        description: ""
+    YAML
+  end
 end

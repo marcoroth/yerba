@@ -399,6 +399,7 @@ static VALUE document_set(int argc, VALUE *argv, VALUE self) {
   const char *c_value;
   YerbaValueType value_type;
   char number_buffer[64];
+  bool all = false;
 
   if (value == Qnil) {
     c_value = "null";
@@ -422,7 +423,13 @@ static VALUE document_set(int argc, VALUE *argv, VALUE self) {
     value_type = YERBA_VALUE_TYPE_STRING;
   }
 
-  YerbaResult result = yerba_document_set(document, StringValueCStr(path), c_value, value_type);
+  if (!NIL_P(opts)) {
+    VALUE v_all = rb_hash_aref(opts, ID2SYM(rb_intern("all")));
+
+    if (RTEST(v_all)) all = true;
+  }
+
+  YerbaResult result = yerba_document_set(document, StringValueCStr(path), c_value, value_type, all);
   check_result(result);
 
   return self;

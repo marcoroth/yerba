@@ -162,6 +162,12 @@ Use `--condition` to only apply the change when a sibling field matches:
 yerba set config.yml "database.host" "0.0.0.0" --condition ".port == 5432"
 ```
 
+Use `--all` to update all nodes matching a wildcard selector:
+
+```bash
+yerba set videos.yml "[].description" "" --all
+```
+
 ### `insert`
 
 Insert a new key into a map or a new item into a sequence. By default, new items are appended at the end.
@@ -426,6 +432,12 @@ Modify values in place. The original formatting is preserved:
 ```ruby
 document["database"]["host"].value = "0.0.0.0"
 document.set("database.port", 3306)
+```
+
+Set all matching nodes at once with `all: true`:
+
+```ruby
+document.set("[].description", "", all: true)
 ```
 
 Insert new keys with positional control:

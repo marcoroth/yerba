@@ -361,6 +361,24 @@ impl Document {
     self.replace_token(&scalar_token, &new_text)
   }
 
+  pub fn set_all(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
+    let nodes = self.navigate_all(dot_path);
+
+    if nodes.is_empty() {
+      return Err(YerbaError::PathNotFound(dot_path.to_string()));
+    }
+
+    for node in nodes.into_iter().rev() {
+      if let Some(scalar_token) = find_scalar_token(&node) {
+        let new_text = format_scalar_value(value, scalar_token.kind());
+
+        self.replace_token(&scalar_token, &new_text)?;
+      }
+    }
+
+    Ok(())
+  }
+
   pub fn set_scalar_style(&mut self, dot_path: &str, style: &QuoteStyle) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
     let scalar_token =

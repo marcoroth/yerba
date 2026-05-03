@@ -503,26 +503,22 @@ pub unsafe extern "C" fn yerba_document_insert_object(
   }
 
   if quote_style == QuoteStyle::Plain {
-    if let Some(value) = document.get_value(path_string) {
-      if let serde_yaml::Value::Sequence(seq) = &value {
-        if let Some(serde_yaml::Value::Mapping(map)) = seq.first() {
-          if let Some((first_key, _)) = map.iter().next() {
-            if let serde_yaml::Value::String(key_name) = first_key {
-              let deep_path = if path_string.is_empty() {
-                format!("[].{}", key_name)
-              } else {
-                format!("{}[].{}", path_string, key_name)
-              };
+    if let Some(serde_yaml::Value::Sequence(seq)) = document.get_value(path_string).as_ref() {
+      if let Some(serde_yaml::Value::Mapping(map)) = seq.first() {
+        if let Some((serde_yaml::Value::String(key_name), _)) = map.iter().next() {
+          let deep_path = if path_string.is_empty() {
+            format!("[].{}", key_name)
+          } else {
+            format!("{}[].{}", path_string, key_name)
+          };
 
-              for scalar in document.get_all_typed(&deep_path) {
-                if scalar.kind == SyntaxKind::DOUBLE_QUOTED_SCALAR {
-                  quote_style = QuoteStyle::Double;
-                  break;
-                } else if scalar.kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
-                  quote_style = QuoteStyle::Single;
-                  break;
-                }
-              }
+          for scalar in document.get_all_typed(&deep_path) {
+            if scalar.kind == SyntaxKind::DOUBLE_QUOTED_SCALAR {
+              quote_style = QuoteStyle::Double;
+              break;
+            } else if scalar.kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
+              quote_style = QuoteStyle::Single;
+              break;
             }
           }
         }

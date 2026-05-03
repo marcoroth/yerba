@@ -372,37 +372,31 @@ pub unsafe extern "C" fn yerba_document_find(
     CStr::from_ptr(select).to_str().ok()
   };
 
-  let matches = match condition_str {
-    Some(cond) => document.find_items(path_string, cond),
-    None => document.find_all(path_string),
+  let values = match condition_str {
+    Some(cond) => document.filter_values(path_string, cond),
+    None => document.get_values(path_string),
   };
 
   let select_fields: Option<Vec<&str>> = _select_string.map(|s| s.split(',').collect());
 
   let mut results: Vec<serde_json::Value> = Vec::new();
 
-  for item in &matches {
-    let yaml_with_dash = format!("- {}", item.text.trim_start_matches("- "));
+  for value in &values {
+    match &select_fields {
+      Some(fields) => {
+        let mut result = serde_json::Map::new();
 
-    if let Ok(parsed) = serde_yaml::from_str::<Vec<serde_yaml::Value>>(&yaml_with_dash) {
-      for value in parsed {
-        match &select_fields {
-          Some(fields) => {
-            let mut result = serde_json::Map::new();
+        for field in fields {
+          let json_value = crate::json::resolve_select_field(value, field);
+          let json_key = crate::json::select_field_key(field);
 
-            for field in fields {
-              let json_value = crate::json::resolve_select_field(&value, field);
-              let json_key = crate::json::select_field_key(field);
-
-              result.insert(json_key, json_value);
-            }
-
-            results.push(serde_json::Value::Object(result));
-          }
-          None => {
-            results.push(crate::json::yaml_to_json(&value));
-          }
+          result.insert(json_key, json_value);
         }
+
+        results.push(serde_json::Value::Object(result));
+      }
+      None => {
+        results.push(crate::json::yaml_to_json(value));
       }
     }
   }
@@ -775,21 +769,30 @@ pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *cons
     }
   };
 
-  let mut results: Vec<serde_json::Value> = Vec::new();
+  use rayon::prelude::*;
 
-  for file in &files {
-    if let Ok(document) = Document::parse_file(file) {
-      if selector.has_wildcard() {
-        for scalar in document.get_all_typed(path_string) {
+  let results: Vec<serde_json::Value> = files
+    .par_iter()
+    .flat_map(|file| {
+      let mut file_results = Vec::new();
+
+      if let Ok(document) = Document::parse_file(file) {
+        if selector.has_wildcard() {
+          for scalar in document.get_all_typed(path_string) {
+            let value_type = detect_yaml_type(&scalar);
+
+            file_results.push(serde_json::json!({"text": scalar.text, "type": value_type as u8}));
+          }
+        } else if let Some(scalar) = document.get_typed(path_string) {
           let value_type = detect_yaml_type(&scalar);
-          results.push(serde_json::json!({"text": scalar.text, "type": value_type as u8}));
+
+          file_results.push(serde_json::json!({"text": scalar.text, "type": value_type as u8}));
         }
-      } else if let Some(scalar) = document.get_typed(path_string) {
-        let value_type = detect_yaml_type(&scalar);
-        results.push(serde_json::json!({"text": scalar.text, "type": value_type as u8}));
       }
-    }
-  }
+
+      file_results
+    })
+    .collect();
 
   let length = results.len();
   let json = serde_json::to_string(&results).unwrap_or_else(|_| "[]".to_string());
@@ -832,41 +835,57 @@ pub unsafe extern "C" fn yerba_glob_find(
     }
   };
 
-  let mut all_results: Vec<serde_json::Value> = Vec::new();
+  use rayon::prelude::*;
 
-  for file in &files {
-    if let Ok(document) = Document::parse_file(file) {
-      let matches = match condition_string {
-        Some(cond) => document.find_items(path_string, cond),
-        None => document.find_all(path_string),
-      };
+  let select_fields: Option<Vec<&str>> = _select_string.map(|s| s.split(',').collect());
 
-      let file_string = file.to_string_lossy().to_string();
+  let all_results: Vec<serde_json::Value> = files
+    .par_iter()
+    .flat_map(|file| {
+      let mut file_results = Vec::new();
 
-      for item in &matches {
-        let yaml_with_dash = format!("- {}", item.text.trim_start_matches("- "));
-        if let Ok(parsed) = serde_yaml::from_str::<Vec<serde_yaml::Value>>(&yaml_with_dash) {
-          for value in parsed {
-            let mut result = serde_json::Map::new();
-            result.insert("__file".to_string(), serde_json::Value::String(file_string.clone()));
-            result.insert("__line".to_string(), serde_json::Value::Number(item.line.into()));
+      if let Ok(document) = Document::parse_file(file) {
+        let values = match condition_string {
+          Some(cond) => document.filter_values(path_string, cond),
+          None => document.get_values(path_string),
+        };
 
-            if let serde_yaml::Value::Mapping(map) = &value {
-              for (key, yaml_value) in map {
-                let json_key = match key {
-                  serde_yaml::Value::String(string) => string.clone(),
-                  _ => format!("{:?}", key),
-                };
-                result.insert(json_key, crate::json::yaml_to_json(yaml_value));
+        let file_string = file.to_string_lossy().to_string();
+
+        for value in &values {
+          let mut result = serde_json::Map::new();
+          result.insert("__file".to_string(), serde_json::Value::String(file_string.clone()));
+
+          match &select_fields {
+            Some(fields) => {
+              for field in fields {
+                let json_value = crate::json::resolve_select_field(value, field);
+                let json_key = crate::json::select_field_key(field);
+                result.insert(json_key, json_value);
               }
             }
 
-            all_results.push(serde_json::Value::Object(result));
+            None => {
+              if let serde_yaml::Value::Mapping(map) = value {
+                for (key, yaml_value) in map {
+                  let json_key = match key {
+                    serde_yaml::Value::String(string) => string.clone(),
+                    _ => format!("{:?}", key),
+                  };
+
+                  result.insert(json_key, crate::json::yaml_to_json(yaml_value));
+                }
+              }
+            }
           }
+
+          file_results.push(serde_json::Value::Object(result));
         }
       }
-    }
-  }
+
+      file_results
+    })
+    .collect();
 
   let length = all_results.len();
   let json = serde_json::to_string_pretty(&all_results).unwrap_or_else(|_| "[]".to_string());

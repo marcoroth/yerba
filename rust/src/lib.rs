@@ -8,7 +8,7 @@ mod syntax;
 mod yaml_writer;
 pub mod yerbafile;
 
-pub use document::{Document, FindResult, InsertPosition, SortField};
+pub use document::{Document, InsertPosition, SortField};
 pub use error::YerbaError;
 pub use quote_style::QuoteStyle;
 pub use selector::Selector;

@@ -628,6 +628,54 @@ class DocumentTest < Minitest::Spec
     assert_equal({ "id" => "def", "title" => "World" }, results[1])
   end
 
+  test "find returns items from nested sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - id: abc
+          title: Hello
+        - id: def
+          title: World
+    YAML
+    results = document.find("items[]")
+
+    assert_equal 2, results.length
+    assert_equal "abc", results[0]["id"]
+    assert_equal "def", results[1]["id"]
+  end
+
+  test "find with condition on nested sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - id: abc
+          kind: talk
+        - id: def
+          kind: keynote
+        - id: ghi
+          kind: talk
+    YAML
+    results = document.find("items[]", condition: '.kind == "keynote"')
+
+    assert_equal 1, results.length
+    assert_equal "def", results[0]["id"]
+  end
+
+  test "find with select on nested sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - id: abc
+          title: Hello
+          year: 2020
+        - id: def
+          title: World
+          year: 2021
+    YAML
+    results = document.find("items[]", select: "id,title")
+
+    assert_equal 2, results.length
+    assert_equal({ "id" => "abc", "title" => "Hello" }, results[0])
+    assert_equal({ "id" => "def", "title" => "World" }, results[1])
+  end
+
   test "[] returns nil for non-existent path" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice

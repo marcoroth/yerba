@@ -37,6 +37,36 @@ class CollectionTest < Minitest::Spec
     assert_equal ["One", "Two"], result
   end
 
+  test "find returns items across files" do
+    collection = Yerba.files(File.join(@dir, "c.yml"))
+    result = collection.find("items[]")
+
+    assert_equal 2, result.length
+    assert_equal "One", result[0]["name"]
+    assert_equal "Two", result[1]["name"]
+  end
+
+  test "find with condition filters across files" do
+    File.write(File.join(@dir, "d.yml"), "- kind: talk\n  id: a\n- kind: keynote\n  id: b\n")
+    collection = Yerba.files(File.join(@dir, "d.yml"))
+    result = collection.find("[]", condition: '.kind == "keynote"')
+
+    assert_equal 1, result.length
+    assert_equal "b", result[0]["id"]
+  end
+
+  test "find with select returns only specified fields plus metadata" do
+    File.write(File.join(@dir, "e.yml"), "- id: x\n  title: Hello\n  year: 2020\n- id: y\n  title: World\n  year: 2021\n")
+    collection = Yerba.files(File.join(@dir, "e.yml"))
+    result = collection.find("[]", select: "id,title")
+
+    assert_equal 2, result.length
+    assert_equal "x", result[0]["id"]
+    assert_equal "Hello", result[0]["title"]
+    refute result[0].key?("year")
+    assert result[0].key?("__file")
+  end
+
   test "apply yields each document and saves" do
     collection = Yerba.files(File.join(@dir, "[ab].yml"))
 

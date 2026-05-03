@@ -16,13 +16,6 @@ use crate::syntax::{
   unescape_single_quoted, ScalarValue,
 };
 
-#[derive(Debug)]
-pub struct FindResult {
-  pub text: String,
-  pub line: usize,
-  pub end_line: usize,
-}
-
 #[derive(Debug, Clone)]
 pub struct SortField {
   pub path: String,
@@ -173,45 +166,6 @@ impl Document {
       .iter()
       .filter(|node| self.evaluate_condition_on_node(node, condition))
       .map(node_to_yaml_value)
-      .collect()
-  }
-
-  pub fn find_items(&self, dot_path: &str, condition: &str) -> Vec<FindResult> {
-    let source = self.root.text().to_string();
-    let nodes = self.navigate_all(dot_path);
-
-    nodes
-      .iter()
-      .filter(|node| self.evaluate_condition_on_node(node, condition))
-      .map(|node| {
-        let start_offset: usize = node.text_range().start().into();
-        let end_offset: usize = node.text_range().end().into();
-
-        FindResult {
-          text: node.text().to_string(),
-          line: byte_offset_to_line(&source, start_offset),
-          end_line: byte_offset_to_line(&source, end_offset),
-        }
-      })
-      .collect()
-  }
-
-  pub fn find_all(&self, dot_path: &str) -> Vec<FindResult> {
-    let source = self.root.text().to_string();
-
-    self
-      .navigate_all(dot_path)
-      .iter()
-      .map(|node| {
-        let start_offset: usize = node.text_range().start().into();
-        let end_offset: usize = node.text_range().end().into();
-
-        FindResult {
-          text: node.text().to_string(),
-          line: byte_offset_to_line(&source, start_offset),
-          end_line: byte_offset_to_line(&source, end_offset),
-        }
-      })
       .collect()
   }
 

@@ -206,8 +206,14 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
     return YerbaGetResult {
       is_list: false,
       node_type: YerbaNodeType::NotFound,
-      single: YerbaTypedValue { text: ptr::null_mut(), value_type: YerbaValueType::Null },
-      list: YerbaTypedList { json: ptr::null_mut(), length: 0 },
+      single: YerbaTypedValue {
+        text: ptr::null_mut(),
+        value_type: YerbaValueType::Null,
+      },
+      list: YerbaTypedList {
+        json: ptr::null_mut(),
+        length: 0,
+      },
       key_name: ptr::null_mut(),
       key_location: EMPTY_LOCATION,
       location: EMPTY_LOCATION,
@@ -225,8 +231,8 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
       let (key_text, key_location) = node
         .parent()
         .and_then(|parent| {
-          use yaml_parser::ast::BlockMapEntry;
           use rowan::ast::AstNode;
+          use yaml_parser::ast::BlockMapEntry;
 
           BlockMapEntry::cast(parent).and_then(|entry| {
             entry.key().and_then(|key_node| {
@@ -269,8 +275,14 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
     YerbaGetResult {
       is_list: true,
       node_type: YerbaNodeType::Sequence,
-      single: YerbaTypedValue { text: ptr::null_mut(), value_type: YerbaValueType::Null },
-      list: YerbaTypedList { json: CString::new(json).unwrap_or_default().into_raw(), length },
+      single: YerbaTypedValue {
+        text: ptr::null_mut(),
+        value_type: YerbaValueType::Null,
+      },
+      list: YerbaTypedList {
+        json: CString::new(json).unwrap_or_default().into_raw(),
+        length,
+      },
       location,
       key_name: key_name_pointer,
       key_location,
@@ -288,7 +300,10 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
             text: CString::new(scalar.text).unwrap_or_default().into_raw(),
             value_type: vtype,
           },
-          list: YerbaTypedList { json: ptr::null_mut(), length: 0 },
+          list: YerbaTypedList {
+            json: ptr::null_mut(),
+            length: 0,
+          },
           location,
           key_name: key_name_pointer,
           key_location,
@@ -320,8 +335,14 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
         YerbaGetResult {
           is_list: false,
           node_type,
-          single: YerbaTypedValue { text: ptr::null_mut(), value_type: YerbaValueType::Null },
-          list: YerbaTypedList { json: ptr::null_mut(), length: 0 },
+          single: YerbaTypedValue {
+            text: ptr::null_mut(),
+            value_type: YerbaValueType::Null,
+          },
+          list: YerbaTypedList {
+            json: ptr::null_mut(),
+            length: 0,
+          },
           location,
           key_name: key_name_pointer,
           key_location,

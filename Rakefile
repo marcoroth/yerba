@@ -14,7 +14,7 @@ begin
     "arm64-darwin",
     "x86_64-darwin",
     "x86_64-linux-gnu",
-    "x86_64-linux-musl",
+    "x86_64-linux-musl"
   ].freeze
 
   RB_SYS_PLATFORM_MAP = {

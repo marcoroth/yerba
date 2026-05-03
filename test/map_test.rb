@@ -4,63 +4,100 @@ require "test_helper"
 
 class MapTest < Minitest::Spec
   test "[] on map path returns Yerba::Map" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
 
     assert_instance_of Yerba::Map, document["database"]
   end
 
   test "map[] navigates to child" do
-    document = Yerba::Document.parse("database:\n  host: localhost")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
 
     assert_instance_of Yerba::Scalar, document["database"]["host"]
     assert_equal "localhost", document["database"]["host"].value
   end
 
   test "map[]= sets value" do
-    document = Yerba::Document.parse("database:\n  host: localhost")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
     document["database"]["host"] = "0.0.0.0"
 
-    assert_equal "database:\n  host: 0.0.0.0", document.to_s
+    assert_equal <<~YAML, document.to_s
+      database:
+        host: 0.0.0.0
+    YAML
   end
 
   test "map.keys returns key names" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
 
     assert_equal ["host", "port"], document["database"].keys
   end
 
   test "map inspect shows keys and values" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
 
     assert_equal '#<Yerba::Map path="database" {host: "localhost", port: 5432}>', document["database"].inspect
   end
 
   test "map.dig resolves nested value" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
 
     assert_equal "localhost", document["database"]["host"]
     assert_equal 5432, document["database"]["port"]
   end
 
   test "each yields key and bound node" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
     pairs = document["database"].each.map { |key, node| [key, node.class.name] }
 
     assert_equal [["host", "Yerba::Scalar"], ["port", "Yerba::Scalar"]], pairs
   end
 
   test "mutating through map each" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
     document["database"].each { |key, node| node.value = "changed" if key == "host" }
 
     assert_equal "changed", document.get("database.host")
   end
 
   test "map.insert adds new key at end" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
     document["database"].insert("ssl", "true")
 
-    expected = <<~YAML.chomp
+    expected = <<~YAML
       database:
         host: localhost
         port: 5432
@@ -71,10 +108,14 @@ class MapTest < Minitest::Spec
   end
 
   test "map.insert adds new key after specified key" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
     document["database"].insert("ssl", "true", after: "host")
 
-    expected = <<~YAML.chomp
+    expected = <<~YAML
       database:
         host: localhost
         ssl: true
@@ -85,10 +126,14 @@ class MapTest < Minitest::Spec
   end
 
   test "map.insert adds new key before specified key" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
     document["database"].insert("ssl", "true", before: "port")
 
-    expected = <<~YAML.chomp
+    expected = <<~YAML
       database:
         host: localhost
         ssl: true
@@ -99,10 +144,14 @@ class MapTest < Minitest::Spec
   end
 
   test "map.sort_keys orders keys" do
-    document = Yerba::Document.parse("database:\n  port: 5432\n  host: localhost")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        port: 5432
+        host: localhost
+    YAML
     document["database"].sort_keys(["host", "port"])
 
-    expected = <<~YAML.chomp
+    expected = <<~YAML
       database:
         host: localhost
         port: 5432
@@ -112,10 +161,15 @@ class MapTest < Minitest::Spec
   end
 
   test "map.delete removes a key" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432\n  pool: 10")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+        pool: 10
+    YAML
     document["database"].delete("pool")
 
-    expected = <<~YAML.chomp
+    expected = <<~YAML
       database:
         host: localhost
         port: 5432
@@ -125,14 +179,21 @@ class MapTest < Minitest::Spec
   end
 
   test "map.key? returns true for existing key" do
-    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
 
     assert document["database"].key?("host")
     assert document["database"].key?("port")
   end
 
   test "map.key? returns false for missing key" do
-    document = Yerba::Document.parse("database:\n  host: localhost")
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
 
     refute document["database"].key?("missing")
   end
@@ -190,7 +251,10 @@ class MapTest < Minitest::Spec
   end
 
   test "inserting map into sequence" do
-    document = Yerba::Document.parse("items:\n  - name: \"Ruby\"")
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: "Ruby"
+    YAML
     map = Yerba::Map.new(name: "Rust", year: 2015)
     document["items"] << map
 

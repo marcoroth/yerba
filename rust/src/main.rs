@@ -44,7 +44,7 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
       yerba delete config.yml "database.pool"
       yerba move videos.yml "" ".id == talk-2" --after ".id == talk-1"
       yerba sort-keys config.yml "database" "id,host,port,name"
-      yerba quote-style "data/**/*.yml" "double"
+      yerba quote-style "data/**/*.yml" --values double
   "#})
 });
 
@@ -52,6 +52,7 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
 #[command(
   name = "yerba",
   version = yerba::version(),
+  disable_version_flag = true,
   styles = STYLES,
   about = "Yerba 🧉 YAML Editing and Refactoring with Better Accuracy",
   arg_required_else_help = true,

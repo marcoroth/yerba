@@ -10,6 +10,7 @@
 ///   "[].title"            → Absolute([AllItems, Key("title")])
 ///   "[0].speakers[]"      → Absolute([Index(0), Key("speakers"), AllItems])
 ///   "[]"                  → Absolute([AllItems])
+///
 #[derive(Debug, Clone, PartialEq)]
 pub enum Selector {
   Relative(Vec<SelectorSegment>),

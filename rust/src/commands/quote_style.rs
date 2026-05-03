@@ -7,51 +7,53 @@ use super::{output, parse_file, resolve_files};
 
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
-    yerba quote-style config.yml double
-    yerba quote-style config.yml plain --keys
-    yerba quote-style config.yml double --all
-    yerba quote-style config.yml single --path "database.host"
-    yerba quote-style videos.yml plain --path "[].speakers"
+    yerba quote-style config.yml --values double
+    yerba quote-style config.yml --keys plain
+    yerba quote-style config.yml --keys plain --values double
+    yerba quote-style config.yml "[].speakers" --values plain
+    yerba quote-style "data/**/*.yml" --keys plain --values double 
   "#})
 });
 
 #[derive(clap::Args)]
 #[command(
-  about = "Enforce a consistent quote style on values, keys, or both",
+  about = "Enforce a consistent quote style on keys and/or values",
   arg_required_else_help = true,
   after_help = EXAMPLES.as_str()
 )]
 pub struct Args {
   file: String,
-  /// Quote style
-  style: yerba::QuoteStyle,
-  /// Scope to a specific path
+  /// Selector to scope the operation (optional — omit for whole file)
+  selector: Option<String>,
+  /// Quote style for values (plain, single, double, literal, folded)
   #[arg(long)]
-  path: Option<String>,
-  /// Apply to keys only
+  values: Option<yerba::QuoteStyle>,
+  /// Quote style for keys (plain, single, double)
   #[arg(long)]
-  keys: bool,
-  /// Apply to both keys and values
-  #[arg(long)]
-  all: bool,
+  keys: Option<yerba::QuoteStyle>,
   #[arg(long)]
   dry_run: bool,
 }
 
 impl Args {
   pub fn run(self) {
-    let dot_path = self.path.as_deref();
+    if self.values.is_none() && self.keys.is_none() {
+      use super::color::*;
+      eprintln!("{RED}Error:{RESET} specify --values, --keys, or both");
+      std::process::exit(1);
+    }
+
+    let selector = self.selector.as_deref().filter(|s| !s.is_empty());
 
     for resolved_file in resolve_files(&self.file) {
       let mut document = parse_file(&resolved_file);
 
-      if self.keys {
-        let _ = document.enforce_key_style(&self.style, dot_path);
-      } else if self.all {
-        let _ = document.enforce_key_style(&self.style, dot_path);
-        let _ = document.enforce_quotes_at(&self.style, dot_path);
-      } else {
-        let _ = document.enforce_quotes_at(&self.style, dot_path);
+      if let Some(style) = &self.keys {
+        let _ = document.enforce_key_style(style, selector);
+      }
+
+      if let Some(style) = &self.values {
+        let _ = document.enforce_quotes_at(style, selector);
       }
 
       output(&resolved_file, &document, self.dry_run);

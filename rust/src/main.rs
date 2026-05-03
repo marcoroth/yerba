@@ -28,6 +28,11 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
       .key contains val    Substring or member   ".title contains Ruby"
       .key not_contains    Negated contains      ".title not_contains test"
 
+    Yerbafile:
+      yerba init           Create a new Yerbafile in the current directory
+      yerba check          Check if all files match the rules (exits 1 if not)
+      yerba apply          Apply all rules and write changes
+
     Examples:
       yerba get config.yml "database.host"
       yerba get videos.yml "[0].title"
@@ -40,8 +45,6 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
       yerba move videos.yml "" ".id == talk-2" --after ".id == talk-1"
       yerba sort-keys config.yml "database" "id,host,port,name"
       yerba quote-style "data/**/*.yml" "double"
-      yerba check
-      yerba apply
   "#})
 });
 

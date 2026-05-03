@@ -3,6 +3,7 @@ pub mod blank_lines;
 pub mod check;
 pub mod delete;
 pub mod get;
+pub mod init;
 pub mod insert;
 pub mod mate;
 pub mod move_item;
@@ -152,6 +153,8 @@ pub enum Command {
   Sort(sort::Args),
   QuoteStyle(quote_style::Args),
   BlankLines(blank_lines::Args),
+  #[command(about = "Create a new Yerbafile in the current directory")]
+  Init,
   #[command(about = "Apply all rules from the Yerbafile and write changes")]
   Apply,
   #[command(about = "Check if all files match Yerbafile rules (exits 1 if not)")]
@@ -177,6 +180,7 @@ impl Command {
       Command::Sort(args) => args.run(),
       Command::QuoteStyle(args) => args.run(),
       Command::BlankLines(args) => args.run(),
+      Command::Init => init::run(),
       Command::Apply => apply::run(),
       Command::Check => check::run(),
       Command::Version => version::run(),
@@ -189,7 +193,7 @@ pub(crate) fn run_yerbafile(write: bool) {
   use color::*;
 
   let yerbafile_path = yerba::Yerbafile::find().unwrap_or_else(|| {
-    eprintln!("{RED}No Yerbafile found.{RESET} Create one in the current directory or a parent.");
+    eprintln!("{RED}No Yerbafile found.{RESET} Run {BOLD}yerba init{RESET} to create one.");
     process::exit(1);
   });
 

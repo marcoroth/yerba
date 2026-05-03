@@ -696,3 +696,62 @@ fn test_insert_multiline_into_nested_sequence() {
     "}
   );
 }
+
+#[test]
+fn test_insert_after_relative_condition() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+      kind: keynote
+    - id: talk-2
+      kind: talk
+    - id: talk-3
+      kind: keynote
+  "});
+
+  document
+    .insert_into(
+      "",
+      "id: talk-4\nkind: talk",
+      InsertPosition::AfterCondition(".id == talk-1".to_string()),
+    )
+    .unwrap();
+
+  let ids: Vec<String> = document.get_all("[].id");
+  assert_eq!(ids, vec!["talk-1", "talk-4", "talk-2", "talk-3"]);
+}
+
+#[test]
+fn test_insert_before_relative_condition() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+    - id: talk-2
+    - id: talk-3
+  "});
+
+  document
+    .insert_into(
+      "",
+      "id: talk-new",
+      InsertPosition::BeforeCondition(".id == talk-3".to_string()),
+    )
+    .unwrap();
+
+  let ids: Vec<String> = document.get_all("[].id");
+  assert_eq!(ids, vec!["talk-1", "talk-2", "talk-new", "talk-3"]);
+}
+
+#[test]
+fn test_insert_condition_requires_dot_prefix() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+    - id: talk-2
+  "});
+
+  let result = document.insert_into(
+    "",
+    "id: talk-3",
+    InsertPosition::AfterCondition("id == talk-1".to_string()),
+  );
+
+  assert!(result.is_err());
+}

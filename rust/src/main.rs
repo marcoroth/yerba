@@ -36,8 +36,8 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
     Examples:
       yerba get config.yml "database.host"
       yerba get videos.yml "[0].title"
-      yerba get videos.yml "[]" --select "title,speakers"
-      yerba get "data/**/videos.yml" "[]" --condition ".kind == keynote" --select "id,title"
+      yerba get videos.yml "[]" --select ".title,.speakers"
+      yerba get "data/**/videos.yml" "[]" --condition ".kind == keynote" --select ".id,.title"
       yerba set config.yml "database.host" "0.0.0.0"
       yerba insert config.yml "tags" "yaml" --after "ruby"
       yerba insert speakers.yml "" --from "speaker.yml" --after ".name == Alice"

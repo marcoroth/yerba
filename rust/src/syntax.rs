@@ -193,6 +193,13 @@ pub fn is_yaml_non_string(value: &str) -> bool {
   detect_yaml_type_from_plain(value) != YerbaValueType::String
 }
 
+pub fn is_yaml_truthy(value: &str) -> bool {
+  matches!(
+    value,
+    "true" | "True" | "TRUE" | "yes" | "Yes" | "YES" | "on" | "On" | "ON" | "y" | "Y"
+  )
+}
+
 pub fn detect_yaml_type_from_plain(value: &str) -> YerbaValueType {
   // Null (YAML 1.1 + 1.2)
   if matches!(value, "null" | "Null" | "NULL" | "~" | "") {

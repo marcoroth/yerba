@@ -64,6 +64,7 @@ pub struct GetConfig {
 pub enum Variable {
   Single(String),
   List(Vec<String>),
+  Value(serde_yaml::Value),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -563,6 +564,7 @@ pub fn resolve_template(
       match variable {
         Variable::Single(value) => value.clone(),
         Variable::List(values) => values.join(", "),
+        Variable::Value(value) => serde_json::to_string(value).unwrap_or_default(),
       }
     } else {
       let full_path = resolve_step_path(base_path, Some(reference));

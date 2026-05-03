@@ -203,3 +203,644 @@ fn test_get_nested_bracket_path() {
   assert_eq!(document.get_all("[0].speakers[]"), vec!["Alice", "Bob"]);
   assert_eq!(document.get_all("[1].speakers[]"), vec!["Charlie"]);
 }
+
+#[test]
+fn test_find_items_filters_by_field() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      kind: keynote
+      title: Opening
+    - id: talk-2
+      kind: talk
+      title: Deep Dive
+    - id: talk-3
+      kind: keynote
+      title: Closing
+  "});
+
+  let matches = document.find_items("[]", ".kind == keynote");
+  assert_eq!(matches.len(), 2);
+  assert!(matches[0].text.contains("Opening"));
+  assert!(matches[1].text.contains("Closing"));
+}
+
+#[test]
+fn test_find_items_condition_on_nested_value() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      video_provider: youtube
+      video_id: abc123
+    - id: talk-2
+      video_provider: vimeo
+      video_id: def456
+    - id: talk-3
+      video_provider: youtube
+      video_id: ghi789
+  "});
+
+  let matches = document.find_items("[]", ".video_provider == youtube");
+  assert_eq!(matches.len(), 2);
+}
+
+#[test]
+fn test_find_items_contains_condition() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: Ruby on Rails
+    - id: talk-2
+      title: Python Basics
+    - id: talk-3
+      title: Advanced Ruby
+  "});
+
+  let matches = document.find_items("[]", ".title contains Ruby");
+  assert_eq!(matches.len(), 2);
+}
+
+#[test]
+fn test_find_items_not_contains_condition() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: Ruby on Rails
+    - id: talk-2
+      title: Python Basics
+  "});
+
+  let matches = document.find_items("[]", ".title not_contains Ruby");
+  assert_eq!(matches.len(), 1);
+  assert!(matches[0].text.contains("Python"));
+}
+
+#[test]
+fn test_find_items_inequality_condition() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      status: draft
+    - id: talk-2
+      status: published
+  "});
+
+  let matches = document.find_items("[]", ".status != draft");
+  assert_eq!(matches.len(), 1);
+  assert!(matches[0].text.contains("published"));
+}
+
+#[test]
+fn test_find_all_returns_all_items() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: First
+    - id: talk-2
+      title: Second
+  "});
+
+  let matches = document.find_all("[]");
+  assert_eq!(matches.len(), 2);
+}
+
+#[test]
+fn test_find_items_no_matches_returns_empty() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      kind: talk
+    - id: talk-2
+      kind: talk
+  "});
+
+  let matches = document.find_items("[]", ".kind == keynote");
+  assert_eq!(matches.len(), 0);
+}
+
+#[test]
+fn test_get_all_bracket_index_returns_scalar_for_field() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: First
+    - id: talk-2
+      title: Second
+  "});
+
+  assert_eq!(document.get_all("[].title"), vec!["First", "Second"]);
+  assert_eq!(document.get_all("[0].title"), vec!["First"]);
+  assert_eq!(document.get_all("[1].title"), vec!["Second"]);
+}
+
+#[test]
+fn test_get_all_bracket_on_scalar_array() {
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+      - yaml
+  "});
+
+  assert_eq!(document.get_all("tags.[]"), vec!["ruby", "rust", "yaml"]);
+}
+
+#[test]
+fn test_find_items_without_dot_prefix_does_not_match() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      kind: keynote
+    - id: talk-2
+      kind: talk
+  "});
+
+  let matches = document.find_items("[]", "kind == keynote");
+  assert_eq!(matches.len(), 0);
+}
+
+#[test]
+fn test_find_items_speakers_contains_array_member() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      speakers:
+        - Alice
+        - Bob
+    - id: talk-2
+      speakers:
+        - Charlie
+  "});
+
+  let matches = document.find_items("[]", ".speakers contains Alice");
+  assert_eq!(matches.len(), 1);
+  assert!(matches[0].text.contains("talk-1"));
+}
+
+#[test]
+fn test_get_sequence_key_returns_first_scalar() {
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+      - go
+  "});
+
+  assert_eq!(document.get("tags"), Some("ruby".to_string()));
+}
+
+#[test]
+fn test_get_all_sequence_key_returns_all_items() {
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+      - go
+  "});
+
+  assert_eq!(document.get_all("tags.[]"), vec!["ruby", "rust", "go"]);
+  assert_eq!(document.get_all("tags[]"), vec!["ruby", "rust", "go"]);
+}
+
+#[test]
+fn test_get_sequence_values_returns_all_items() {
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+      - go
+  "});
+
+  assert_eq!(document.get_sequence_values("tags"), vec!["ruby", "rust", "go"]);
+}
+
+#[test]
+fn test_get_nested_sequence_key_vs_brackets() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      speakers:
+        - Alice
+        - Bob
+    - id: talk-2
+      speakers:
+        - Charlie
+  "});
+
+  assert_eq!(document.get_all("[].speakers"), vec!["Alice", "Charlie"]);
+  assert_eq!(document.get_all("[].speakers[]"), vec!["Alice", "Bob", "Charlie"]);
+}
+
+#[test]
+fn test_get_single_index_vs_all() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: First
+    - id: talk-2
+      title: Second
+    - id: talk-3
+      title: Third
+  "});
+
+  assert_eq!(document.get_all("[].title"), vec!["First", "Second", "Third"]);
+  assert_eq!(document.get_all("[0].title"), vec!["First"]);
+  assert_eq!(document.get_all("[2].title"), vec!["Third"]);
+}
+
+#[test]
+fn test_get_first_item_from_nested_arrays() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      tags:
+        - ruby
+        - rails
+    - id: talk-2
+      tags:
+        - python
+        - django
+    - id: talk-3
+      tags:
+        - rust
+        - wasm
+  "});
+
+  assert_eq!(document.get_all("[].tags[0]"), vec!["ruby", "python", "rust"]);
+  assert_eq!(document.get_all("[].tags[1]"), vec!["rails", "django", "wasm"]);
+
+  assert_eq!(
+    document.get_all("[].tags[]"),
+    vec!["ruby", "rails", "python", "django", "rust", "wasm"]
+  );
+}
+
+#[test]
+fn test_get_value_returns_string_for_scalar() {
+  let document = parse(indoc! {"
+    host: localhost
+    port: 5432
+  "});
+
+  let value = document.get_value("host").unwrap();
+  assert_eq!(value, serde_yaml::Value::String("localhost".to_string()));
+}
+
+#[test]
+fn test_get_value_returns_number_for_integer() {
+  let document = parse(indoc! {"
+    host: localhost
+    port: 5432
+  "});
+
+  let value = document.get_value("port").unwrap();
+  assert_eq!(value, serde_yaml::Value::Number(serde_yaml::Number::from(5432)));
+}
+
+#[test]
+fn test_get_value_returns_mapping_for_object() {
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "});
+
+  let value = document.get_value("database").unwrap();
+
+  if let serde_yaml::Value::Mapping(map) = value {
+    assert_eq!(
+      map.get(&serde_yaml::Value::String("host".to_string())),
+      Some(&serde_yaml::Value::String("localhost".to_string()))
+    );
+    assert_eq!(
+      map.get(&serde_yaml::Value::String("port".to_string())),
+      Some(&serde_yaml::Value::Number(serde_yaml::Number::from(5432)))
+    );
+  } else {
+    panic!("Expected Mapping, got: {:?}", value);
+  }
+}
+
+#[test]
+fn test_get_value_returns_sequence_for_array() {
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+      - yaml
+  "});
+
+  let value = document.get_value("tags").unwrap();
+
+  if let serde_yaml::Value::Sequence(seq) = value {
+    assert_eq!(seq.len(), 3);
+    assert_eq!(seq[0], serde_yaml::Value::String("ruby".to_string()));
+    assert_eq!(seq[1], serde_yaml::Value::String("rust".to_string()));
+    assert_eq!(seq[2], serde_yaml::Value::String("yaml".to_string()));
+  } else {
+    panic!("Expected Sequence, got: {:?}", value);
+  }
+}
+
+#[test]
+fn test_get_value_returns_full_object_at_index() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: First
+    - id: talk-2
+      title: Second
+  "});
+
+  let value = document.get_value("[0]").unwrap();
+
+  if let serde_yaml::Value::Mapping(map) = value {
+    assert_eq!(
+      map.get(&serde_yaml::Value::String("id".to_string())),
+      Some(&serde_yaml::Value::String("talk-1".to_string()))
+    );
+    assert_eq!(
+      map.get(&serde_yaml::Value::String("title".to_string())),
+      Some(&serde_yaml::Value::String("First".to_string()))
+    );
+  } else {
+    panic!("Expected Mapping, got: {:?}", value);
+  }
+}
+
+#[test]
+fn test_get_values_returns_objects_for_speakers() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      speakers:
+        - name: Alice
+          slug: alice
+        - name: Bob
+          slug: bob
+    - id: talk-2
+      speakers:
+        - name: Charlie
+          slug: charlie
+  "});
+
+  let values = document.get_values("[].speakers");
+
+  assert_eq!(values.len(), 2);
+
+  if let serde_yaml::Value::Sequence(speakers) = &values[0] {
+    assert_eq!(speakers.len(), 2);
+
+    if let serde_yaml::Value::Mapping(alice) = &speakers[0] {
+      assert_eq!(
+        alice.get(&serde_yaml::Value::String("name".to_string())),
+        Some(&serde_yaml::Value::String("Alice".to_string()))
+      );
+    } else {
+      panic!("Expected Mapping for speaker");
+    }
+  } else {
+    panic!("Expected Sequence for speakers, got: {:?}", values[0]);
+  }
+}
+
+#[test]
+fn test_get_values_flattened_speakers() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      speakers:
+        - name: Alice
+        - name: Bob
+    - id: talk-2
+      speakers:
+        - name: Charlie
+  "});
+
+  let values = document.get_values("[].speakers[]");
+
+  assert_eq!(values.len(), 3);
+
+  if let serde_yaml::Value::Mapping(alice) = &values[0] {
+    assert_eq!(
+      alice.get(&serde_yaml::Value::String("name".to_string())),
+      Some(&serde_yaml::Value::String("Alice".to_string()))
+    );
+  } else {
+    panic!("Expected Mapping, got: {:?}", values[0]);
+  }
+}
+
+#[test]
+fn test_get_values_returns_scalars_for_field_path() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: First
+    - id: talk-2
+      title: Second
+  "});
+
+  let values = document.get_values("[].title");
+
+  assert_eq!(values.len(), 2);
+  assert_eq!(values[0], serde_yaml::Value::String("First".to_string()));
+  assert_eq!(values[1], serde_yaml::Value::String("Second".to_string()));
+}
+
+#[test]
+fn test_get_value_none_for_missing_path() {
+  let document = parse("host: localhost\n");
+
+  assert!(document.get_value("missing").is_none());
+}
+
+#[test]
+fn test_get_value_boolean() {
+  let document = parse(indoc! {"
+    enabled: true
+    disabled: false
+  "});
+
+  assert_eq!(document.get_value("enabled"), Some(serde_yaml::Value::Bool(true)));
+  assert_eq!(document.get_value("disabled"), Some(serde_yaml::Value::Bool(false)));
+}
+
+#[test]
+fn test_get_value_null() {
+  let document = parse(indoc! {"
+    empty: null
+  "});
+
+  assert_eq!(document.get_value("empty"), Some(serde_yaml::Value::Null));
+}
+
+#[test]
+fn test_path_ref_tags_vs_tags_bracket() {
+  use yerba::Selector;
+
+  let tags = Selector::parse("tags");
+  let tags_bracket = Selector::parse("tags[]");
+
+  assert_ne!(tags, tags_bracket);
+  assert!(!tags.has_brackets());
+  assert!(tags_bracket.has_brackets());
+  assert!(tags_bracket.ends_with_bracket());
+}
+
+#[test]
+fn test_path_ref_relative_vs_absolute() {
+  use yerba::Selector;
+
+  let relative = Selector::parse(".title");
+  let absolute = Selector::parse("title");
+
+  assert!(relative.is_relative());
+  assert!(absolute.is_absolute());
+  assert_ne!(relative, absolute);
+
+  assert_eq!(relative.to_selector_string(), "title");
+  assert_eq!(absolute.to_selector_string(), "title");
+}
+
+#[test]
+fn test_path_ref_condition_split() {
+  use yerba::Selector;
+
+  let selector = Selector::parse("[].speakers[]");
+  let (container, rest) = selector.split_at_last_bracket();
+  assert_eq!(container.to_selector_string(), "[].speakers[]");
+  assert!(rest.is_empty());
+
+  let selector = Selector::parse("[].speakers[].name");
+  let (container, field) = selector.split_at_last_bracket();
+  assert_eq!(container.to_selector_string(), "[].speakers[]");
+  assert_eq!(field.to_selector_string(), "name");
+
+  let selector = Selector::parse("[].speakers[].name");
+  let (container, rest) = selector.split_at_first_bracket();
+  assert_eq!(container.to_selector_string(), "[]");
+  assert_eq!(rest.to_selector_string(), "speakers[].name");
+}
+
+#[test]
+fn test_filter_values_with_contains() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: Ruby on Rails
+      speakers:
+        - Alice
+    - id: talk-2
+      title: Python Basics
+      speakers:
+        - Bob
+    - id: talk-3
+      title: Advanced Ruby
+      speakers:
+        - Charlie
+  "});
+
+  let values = document.filter_values("[]", ".title contains Ruby");
+  assert_eq!(values.len(), 2);
+}
+
+#[test]
+fn test_filter_values_extracts_full_objects() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      video_provider: youtube
+      video_id: abc
+    - id: talk-2
+      video_provider: vimeo
+      video_id: def
+  "});
+
+  let values = document.filter_values("[]", ".video_provider == youtube");
+  assert_eq!(values.len(), 1);
+
+  if let serde_yaml::Value::Mapping(map) = &values[0] {
+    assert_eq!(
+      map.get(&serde_yaml::Value::String("video_id".to_string())),
+      Some(&serde_yaml::Value::String("abc".to_string()))
+    );
+  } else {
+    panic!("Expected Mapping");
+  }
+}
+
+#[test]
+fn test_get_values_with_empty_path_returns_all_items() {
+  let document = parse(indoc! {"
+    - ruby
+    - rust
+    - yaml
+  "});
+
+  let values = document.get_values("[]");
+  assert_eq!(values.len(), 3);
+  assert_eq!(values[0], serde_yaml::Value::String("ruby".to_string()));
+}
+
+#[test]
+fn test_select_field_simple_key() {
+  let yaml: serde_yaml::Value = serde_yaml::from_str("id: talk-1\ntitle: First\n").unwrap();
+
+  assert_eq!(
+    yerba::json::resolve_select_field(&yaml, "title"),
+    serde_json::Value::String("First".to_string())
+  );
+}
+
+#[test]
+fn test_select_field_dot_prefix() {
+  let yaml: serde_yaml::Value = serde_yaml::from_str("id: talk-1\ntitle: First\n").unwrap();
+
+  assert_eq!(
+    yerba::json::resolve_select_field(&yaml, ".title"),
+    serde_json::Value::String("First".to_string())
+  );
+}
+
+#[test]
+fn test_select_field_nested_array() {
+  let yaml: serde_yaml::Value = serde_yaml::from_str("speakers:\n  - name: Alice\n  - name: Bob\n").unwrap();
+
+  let result = yerba::json::resolve_select_field(&yaml, ".speakers[].name");
+
+  assert_eq!(
+    result,
+    serde_json::Value::Array(vec![
+      serde_json::Value::String("Alice".to_string()),
+      serde_json::Value::String("Bob".to_string()),
+    ])
+  );
+}
+
+#[test]
+fn test_select_field_array_index() {
+  let yaml: serde_yaml::Value = serde_yaml::from_str("tags:\n  - ruby\n  - rust\n  - yaml\n").unwrap();
+
+  assert_eq!(
+    yerba::json::resolve_select_field(&yaml, ".tags[0]"),
+    serde_json::Value::String("ruby".to_string())
+  );
+
+  assert_eq!(
+    yerba::json::resolve_select_field(&yaml, ".tags[2]"),
+    serde_json::Value::String("yaml".to_string())
+  );
+}
+
+#[test]
+fn test_select_field_all_items() {
+  let yaml: serde_yaml::Value = serde_yaml::from_str("tags:\n  - ruby\n  - rust\n").unwrap();
+
+  assert_eq!(
+    yerba::json::resolve_select_field(&yaml, ".tags[]"),
+    serde_json::Value::Array(vec![
+      serde_json::Value::String("ruby".to_string()),
+      serde_json::Value::String("rust".to_string()),
+    ])
+  );
+}
+
+#[test]
+fn test_select_field_missing_key() {
+  let yaml: serde_yaml::Value = serde_yaml::from_str("id: talk-1\n").unwrap();
+
+  assert_eq!(
+    yerba::json::resolve_select_field(&yaml, ".missing"),
+    serde_json::Value::Null
+  );
+}
+
+#[test]
+fn test_select_field_key_returns_root_name() {
+  assert_eq!(yerba::json::select_field_key("title"), "title");
+  assert_eq!(yerba::json::select_field_key(".title"), "title");
+  assert_eq!(yerba::json::select_field_key(".speakers[].name"), "speakers");
+  assert_eq!(yerba::json::select_field_key("speakers[0]"), "speakers");
+}

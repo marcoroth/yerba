@@ -1,3 +1,5 @@
+use crate::selector::{Selector, SelectorSegment};
+
 pub fn yaml_to_json(value: &serde_yaml::Value) -> serde_json::Value {
   match value {
     serde_yaml::Value::Null => serde_json::Value::Null,
@@ -37,53 +39,54 @@ pub fn yaml_to_json(value: &serde_yaml::Value) -> serde_json::Value {
 }
 
 pub fn resolve_select_field(value: &serde_yaml::Value, field: &str) -> serde_json::Value {
-  if !field.contains('.') && !field.contains('[') {
-    if let serde_yaml::Value::Mapping(map) = value {
-      for (key, yaml_value) in map {
-        if let serde_yaml::Value::String(key_string) = key {
-          if key_string == field {
-            return yaml_to_json(yaml_value);
+  let parsed = Selector::parse(field);
+  let segments = parsed.segments();
+
+  if segments.len() == 1 {
+    if let SelectorSegment::Key(key) = &segments[0] {
+      if let serde_yaml::Value::Mapping(map) = value {
+        for (map_key, yaml_value) in map {
+          if let serde_yaml::Value::String(key_string) = map_key {
+            if key_string == key {
+              return yaml_to_json(yaml_value);
+            }
           }
         }
       }
-    }
 
-    return serde_json::Value::Null;
+      return serde_json::Value::Null;
+    }
   }
 
   let mut current_values = vec![value.clone()];
 
-  for segment in parse_select_segments(field) {
+  for segment in segments {
     let mut next_values = Vec::new();
 
     for current in &current_values {
-      if segment.starts_with('[') {
-        if let serde_yaml::Value::Sequence(sequence) = current {
-          let index = segment
-            .strip_prefix('[')
-            .and_then(|rest| rest.strip_suffix(']'))
-            .and_then(|inner| {
-              if inner.is_empty() {
-                None
-              } else {
-                inner.parse::<usize>().ok()
-              }
-            });
+      match segment {
+        SelectorSegment::AllItems => {
+          if let serde_yaml::Value::Sequence(sequence) = current {
+            next_values.extend(sequence.iter().cloned());
+          }
+        }
 
-          match index {
-            None => next_values.extend(sequence.iter().cloned()),
-            Some(index) => {
-              if let Some(item) = sequence.get(index) {
-                next_values.push(item.clone());
-              }
+        SelectorSegment::Index(index) => {
+          if let serde_yaml::Value::Sequence(sequence) = current {
+            if let Some(item) = sequence.get(*index) {
+              next_values.push(item.clone());
             }
           }
         }
-      } else if let serde_yaml::Value::Mapping(map) = current {
-        for (map_key, yaml_value) in map {
-          if let serde_yaml::Value::String(key_string) = map_key {
-            if key_string == segment {
-              next_values.push(yaml_value.clone());
+
+        SelectorSegment::Key(key) => {
+          if let serde_yaml::Value::Mapping(map) = current {
+            for (map_key, yaml_value) in map {
+              if let serde_yaml::Value::String(key_string) = map_key {
+                if key_string == key {
+                  next_values.push(yaml_value.clone());
+                }
+              }
             }
           }
         }
@@ -93,15 +96,15 @@ pub fn resolve_select_field(value: &serde_yaml::Value, field: &str) -> serde_jso
     current_values = next_values;
   }
 
-  let used_brackets = field.contains("[]");
+  let used_all_items = parsed.segments().iter().any(|s| matches!(s, SelectorSegment::AllItems));
 
   if current_values.is_empty() {
-    if used_brackets {
+    if used_all_items {
       serde_json::Value::Array(Vec::new())
     } else {
       serde_json::Value::Null
     }
-  } else if current_values.len() == 1 && !used_brackets {
+  } else if current_values.len() == 1 && !used_all_items {
     yaml_to_json(&current_values[0])
   } else {
     serde_json::Value::Array(current_values.iter().map(yaml_to_json).collect())
@@ -109,61 +112,17 @@ pub fn resolve_select_field(value: &serde_yaml::Value, field: &str) -> serde_jso
 }
 
 pub fn select_field_key(field: &str) -> String {
-  let root = field.split(['.', '[']).next().unwrap_or(field);
+  let parsed = Selector::parse(field);
 
-  root.to_string()
-}
-
-fn parse_select_segments(field: &str) -> Vec<&str> {
-  let mut segments = Vec::new();
-  let mut rest = field;
-
-  while !rest.is_empty() {
-    if rest.starts_with('[') {
-      if let Some(close) = rest.find(']') {
-        segments.push(&rest[..close + 1]);
-        rest = &rest[close + 1..];
-
-        if rest.starts_with('.') {
-          rest = &rest[1..];
-        }
+  parsed
+    .segments()
+    .iter()
+    .find_map(|segment| {
+      if let SelectorSegment::Key(key) = segment {
+        Some(key.clone())
       } else {
-        segments.push(rest);
-        break;
+        None
       }
-    } else {
-      let dot_index = rest.find('.');
-      let bracket_index = rest.find('[');
-
-      let split_at = match (dot_index, bracket_index) {
-        (Some(dot), Some(bracket)) => Some(dot.min(bracket)),
-        (Some(dot), None) => Some(dot),
-        (None, Some(bracket)) => Some(bracket),
-        (None, None) => None,
-      };
-
-      match split_at {
-        Some(index) => {
-          let segment = &rest[..index];
-
-          if !segment.is_empty() {
-            segments.push(segment);
-          }
-
-          rest = &rest[index..];
-
-          if rest.starts_with('.') {
-            rest = &rest[1..];
-          }
-        }
-
-        None => {
-          segments.push(rest);
-          break;
-        }
-      }
-    }
-  }
-
-  segments
+    })
+    .unwrap_or_else(|| field.to_string())
 }

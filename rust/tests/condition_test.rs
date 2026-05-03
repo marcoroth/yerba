@@ -253,3 +253,80 @@ fn test_evaluate_condition_contains_substring_nested() {
   assert!(document.evaluate_condition("database", ".name contains myapp"));
   assert!(!document.evaluate_condition("database", ".name contains production"));
 }
+
+#[test]
+fn test_find_items_requires_dot_prefix() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      kind: keynote
+    - id: talk-2
+      kind: talk
+  "});
+
+  let matches = document.find_items("[]", ".kind == keynote");
+  assert_eq!(matches.len(), 1);
+
+  let matches = document.find_items("[]", "kind == keynote");
+  assert_eq!(matches.len(), 0);
+}
+
+#[test]
+fn test_filter_values_returns_structured_values() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      kind: keynote
+      title: Opening
+    - id: talk-2
+      kind: talk
+      title: Deep Dive
+    - id: talk-3
+      kind: keynote
+      title: Closing
+  "});
+
+  let values = document.filter_values("[]", ".kind == keynote");
+  assert_eq!(values.len(), 2);
+
+  if let serde_yaml::Value::Mapping(map) = &values[0] {
+    assert_eq!(
+      map.get(&serde_yaml::Value::String("title".to_string())),
+      Some(&serde_yaml::Value::String("Opening".to_string()))
+    );
+  } else {
+    panic!("Expected Mapping, got: {:?}", values[0]);
+  }
+}
+
+#[test]
+fn test_filter_values_empty_on_no_match() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      kind: talk
+  "});
+
+  let values = document.filter_values("[]", ".kind == keynote");
+  assert!(values.is_empty());
+}
+
+#[test]
+fn test_evaluate_condition_relative_path() {
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "});
+
+  assert!(document.evaluate_condition("database", ".host == localhost"));
+  assert!(!document.evaluate_condition("database", ".host == remotehost"));
+}
+
+#[test]
+fn test_evaluate_condition_absolute_path() {
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      port: 5432
+  "});
+
+  assert!(document.evaluate_condition("", "database.host == localhost"));
+}

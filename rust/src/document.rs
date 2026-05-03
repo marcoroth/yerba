@@ -143,6 +143,39 @@ impl Document {
       .collect()
   }
 
+  pub fn get_value(&self, dot_path: &str) -> Option<serde_yaml::Value> {
+    if dot_path.is_empty() {
+      return Some(node_to_yaml_value(&self.root));
+    }
+
+    let nodes = self.navigate_all(dot_path);
+
+    if nodes.is_empty() {
+      return None;
+    }
+
+    if nodes.len() == 1 {
+      return Some(node_to_yaml_value(&nodes[0]));
+    }
+
+    let values: Vec<serde_yaml::Value> = nodes.iter().map(node_to_yaml_value).collect();
+
+    Some(serde_yaml::Value::Sequence(values))
+  }
+
+  pub fn get_values(&self, dot_path: &str) -> Vec<serde_yaml::Value> {
+    self.navigate_all(dot_path).iter().map(node_to_yaml_value).collect()
+  }
+
+  pub fn filter_values(&self, dot_path: &str, condition: &str) -> Vec<serde_yaml::Value> {
+    self
+      .navigate_all(dot_path)
+      .iter()
+      .filter(|node| self.evaluate_condition_on_node(node, condition))
+      .map(node_to_yaml_value)
+      .collect()
+  }
+
   pub fn find_items(&self, dot_path: &str, condition: &str) -> Vec<FindResult> {
     let source = self.root.text().to_string();
     let nodes = self.navigate_all(dot_path);
@@ -190,9 +223,13 @@ impl Document {
       None => return false,
     };
 
-    let left_path = left.strip_prefix('.').unwrap_or(&left);
-    let target_nodes = navigate_from_node(node, left_path);
+    let path = crate::selector::Selector::parse(&left);
 
+    if !path.is_relative() {
+      return false;
+    }
+
+    let target_nodes = navigate_from_node(node, &path.to_selector_string());
     let values: Vec<String> = target_nodes.iter().filter_map(extract_scalar_text).collect();
 
     match operator {
@@ -252,17 +289,21 @@ impl Document {
       None => return false,
     };
 
-    let full_path = if let Some(relative_key) = left.strip_prefix('.') {
+    let path = crate::selector::Selector::parse(&left);
+
+    let full_path = if path.is_relative() {
+      let path_string = path.to_selector_string();
+
       if parent_path.is_empty() {
-        relative_key.to_string()
+        path_string
       } else {
-        format!("{}.{}", parent_path, relative_key)
+        format!("{}.{}", parent_path, path_string)
       }
     } else {
-      left.to_string()
+      path.to_selector_string()
     };
 
-    let has_brackets = full_path.contains('[');
+    let has_brackets = crate::selector::Selector::parse(&full_path).has_brackets();
 
     match operator {
       "==" => {
@@ -882,7 +923,7 @@ impl Document {
       return Ok(index);
     }
 
-    if reference.starts_with('.') {
+    if crate::selector::Selector::parse(reference).is_relative() {
       return sequence
         .entries()
         .enumerate()
@@ -1729,7 +1770,7 @@ impl Document {
       return Vec::new();
     }
 
-    let segments = parse_path_segments(dot_path);
+    let parsed = crate::selector::Selector::parse(dot_path);
 
     let root = match Root::cast(self.root.clone()) {
       Some(root) => root,
@@ -1743,7 +1784,7 @@ impl Document {
 
     let mut current_nodes = vec![document.syntax().clone()];
 
-    if segments.is_empty() {
+    if parsed.is_empty() {
       if let Some(sequence) = document.syntax().descendants().find_map(BlockSeq::cast) {
         current_nodes = sequence.entries().map(|entry| entry.syntax().clone()).collect();
       }
@@ -1751,7 +1792,7 @@ impl Document {
       return current_nodes;
     }
 
-    for segment in &segments {
+    for segment in parsed.segments() {
       let mut next_nodes = Vec::new();
 
       for node in &current_nodes {
@@ -1876,6 +1917,96 @@ impl std::fmt::Display for Document {
   }
 }
 
+pub fn node_to_yaml_value(node: &SyntaxNode) -> serde_yaml::Value {
+  if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+    let map_position = node
+      .descendants()
+      .find_map(BlockMap::cast)
+      .map(|map| map.syntax().text_range().start());
+
+    let sequence_position = sequence.syntax().text_range().start();
+
+    if map_position.is_none() || sequence_position <= map_position.unwrap() {
+      let values: Vec<serde_yaml::Value> = sequence
+        .entries()
+        .map(|entry| node_to_yaml_value(entry.syntax()))
+        .collect();
+
+      return serde_yaml::Value::Sequence(values);
+    }
+  }
+
+  if let Some(map) = node.descendants().find_map(BlockMap::cast) {
+    let mut mapping = serde_yaml::Mapping::new();
+
+    for entry in map.entries() {
+      let key = entry
+        .key()
+        .and_then(|key_node| extract_scalar_text(key_node.syntax()))
+        .unwrap_or_default();
+
+      let value = entry
+        .value()
+        .map(|value_node| node_to_yaml_value(value_node.syntax()))
+        .unwrap_or(serde_yaml::Value::Null);
+
+      mapping.insert(serde_yaml::Value::String(key), value);
+    }
+
+    return serde_yaml::Value::Mapping(mapping);
+  }
+
+  if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+    let values: Vec<serde_yaml::Value> = sequence
+      .entries()
+      .map(|entry| node_to_yaml_value(entry.syntax()))
+      .collect();
+
+    return serde_yaml::Value::Sequence(values);
+  }
+
+  if let Some(block_scalar) = node
+    .descendants()
+    .find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR)
+  {
+    let text = block_scalar
+      .descendants_with_tokens()
+      .filter_map(|element| element.into_token())
+      .find(|token| token.kind() == SyntaxKind::BLOCK_SCALAR_TEXT)
+      .map(|token| token.text().to_string())
+      .unwrap_or_default();
+
+    return serde_yaml::Value::String(text);
+  }
+
+  if let Some(scalar) = extract_scalar(node) {
+    use crate::syntax::{detect_yaml_type, is_yaml_truthy, YerbaValueType};
+
+    return match detect_yaml_type(&scalar) {
+      YerbaValueType::Null => serde_yaml::Value::Null,
+      YerbaValueType::Boolean => serde_yaml::Value::Bool(is_yaml_truthy(&scalar.text)),
+
+      YerbaValueType::Integer => scalar
+        .text
+        .parse::<i64>()
+        .map(|n| serde_yaml::Value::Number(serde_yaml::Number::from(n)))
+        .unwrap_or(serde_yaml::Value::String(scalar.text)),
+
+      YerbaValueType::Float => scalar
+        .text
+        .parse::<f64>()
+        .map(|n| serde_yaml::Value::Number(serde_yaml::Number::from(n)))
+        .unwrap_or(serde_yaml::Value::String(scalar.text)),
+
+      YerbaValueType::String => serde_yaml::Value::String(scalar.text),
+    };
+  }
+
+  let text = node.text().to_string();
+
+  serde_yaml::from_str(&text).unwrap_or(serde_yaml::Value::String(text))
+}
+
 fn parse_condition(condition: &str) -> Option<(String, &str, String)> {
   let (left, operator, right) = if let Some(index) = condition.find(" not_contains ") {
     (
@@ -1902,108 +2033,49 @@ fn parse_condition(condition: &str) -> Option<(String, &str, String)> {
   Some((left.to_string(), operator, right.to_string()))
 }
 
-fn parse_path_segments(path: &str) -> Vec<&str> {
-  if path.is_empty() {
-    return Vec::new();
-  }
+fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment) -> Vec<SyntaxNode> {
+  use crate::selector::SelectorSegment;
 
-  let mut segments = Vec::new();
-  let mut rest = path;
-
-  while !rest.is_empty() {
-    if rest.starts_with('[') {
-      if let Some(close) = rest.find(']') {
-        segments.push(&rest[..close + 1]);
-        rest = &rest[close + 1..];
-
-        if rest.starts_with('.') {
-          rest = &rest[1..];
-        }
+  match segment {
+    SelectorSegment::AllItems => {
+      if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+        sequence.entries().map(|entry| entry.syntax().clone()).collect()
       } else {
-        segments.push(rest);
-        break;
-      }
-    } else {
-      let dot_index = rest.find('.');
-      let bracket_index = rest.find('[');
-
-      let split_at = match (dot_index, bracket_index) {
-        (Some(dot), Some(bracket)) => Some(dot.min(bracket)),
-        (Some(dot), None) => Some(dot),
-        (None, Some(bracket)) => Some(bracket),
-        (None, None) => None,
-      };
-
-      match split_at {
-        Some(index) => {
-          let segment = &rest[..index];
-
-          if !segment.is_empty() {
-            segments.push(segment);
-          }
-
-          rest = &rest[index..];
-
-          if rest.starts_with('.') {
-            rest = &rest[1..];
-          }
-        }
-
-        None => {
-          segments.push(rest);
-          break;
-        }
+        Vec::new()
       }
     }
-  }
 
-  segments
-}
-
-fn parse_bracket_index(segment: &str) -> Option<usize> {
-  if segment == "[]" {
-    return None;
-  }
-
-  segment
-    .strip_prefix('[')
-    .and_then(|rest| rest.strip_suffix(']'))
-    .and_then(|inner| inner.parse::<usize>().ok())
-}
-
-fn resolve_segment(node: &SyntaxNode, segment: &str) -> Vec<SyntaxNode> {
-  if segment.starts_with('[') {
-    if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
-      match parse_bracket_index(segment) {
-        None => sequence.entries().map(|entry| entry.syntax().clone()).collect(),
-
-        Some(index) => sequence
+    SelectorSegment::Index(index) => {
+      if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+        sequence
           .entries()
-          .nth(index)
+          .nth(*index)
           .map(|entry| vec![entry.syntax().clone()])
-          .unwrap_or_default(),
+          .unwrap_or_default()
+      } else {
+        Vec::new()
       }
-    } else {
+    }
+
+    SelectorSegment::Key(key) => {
+      if let Some(map) = node.descendants().find_map(BlockMap::cast) {
+        if let Some(entry) = find_entry_by_key(&map, key) {
+          if let Some(value) = entry.value() {
+            return vec![value.syntax().clone()];
+          }
+        }
+      }
+
       Vec::new()
     }
-  } else {
-    if let Some(map) = node.descendants().find_map(BlockMap::cast) {
-      if let Some(entry) = find_entry_by_key(&map, segment) {
-        if let Some(value) = entry.value() {
-          return vec![value.syntax().clone()];
-        }
-      }
-    }
-
-    Vec::new()
   }
 }
 
 fn navigate_from_node(node: &SyntaxNode, path: &str) -> Vec<SyntaxNode> {
-  let segments = parse_path_segments(path);
+  let parsed = crate::selector::Selector::parse(path);
   let mut current_nodes = vec![node.clone()];
 
-  for segment in &segments {
+  for segment in parsed.segments() {
     let mut next_nodes = Vec::new();
 
     for current in &current_nodes {

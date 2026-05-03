@@ -93,19 +93,27 @@ if target_platform
              end
 end
 
-lib_path = File.join(lib_dir, lib_name)
+static_lib = File.join(lib_dir, "libyerba.a")
 
-unless File.exist?(lib_path)
-  abort "ERROR: Shared library not found at #{lib_path}"
+if File.exist?(static_lib)
+  puts "yerba: Static library found at #{static_lib}"
+  $LDFLAGS << " #{static_lib}"
+else
+  lib_path = File.join(lib_dir, lib_name)
+
+  unless File.exist?(lib_path)
+    abort "ERROR: Shared library not found at #{lib_path}"
+  end
+
+  puts "yerba: Shared library found at #{lib_path} (dynamic)"
+
+  $LDFLAGS << " -L#{lib_dir} -lyerba"
+
+  if RbConfig::CONFIG["host_os"].match?(/darwin|linux/)
+    $LDFLAGS << " -Wl,-rpath,#{lib_dir}"
+  end
 end
 
-puts "yerba: Shared library found at #{lib_path}"
-
-$LDFLAGS << " -L#{lib_dir} -lyerba"
 $CFLAGS << " -I#{File.join(__dir__, "include")}"
-
-if RbConfig::CONFIG["host_os"].match?(/darwin|linux/)
-  $LDFLAGS << " -Wl,-rpath,#{lib_dir}"
-end
 
 create_makefile("yerba/yerba")

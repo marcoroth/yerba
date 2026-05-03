@@ -14,6 +14,7 @@ use std::ptr;
 
 use yaml_parser::SyntaxKind;
 
+use crate::selector::Selector;
 use crate::syntax::{detect_yaml_type, YerbaValueType};
 use crate::{Document, InsertPosition, QuoteStyle};
 
@@ -155,6 +156,8 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
   let document = &*document;
   let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
 
+  let selector = Selector::parse(path_string);
+
   if let Err(e) = Document::validate_path(path_string) {
     return YerbaGetResult {
       is_list: false,
@@ -171,7 +174,7 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
     };
   }
 
-  if path_string.contains("[]") {
+  if selector.has_wildcard() {
     let values = document.get_all_typed(path_string);
 
     let typed: Vec<serde_json::Value> = values
@@ -258,6 +261,35 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
       }
     }
   }
+}
+
+/// Caller must free with yerba_string_free.
+#[no_mangle]
+pub unsafe extern "C" fn yerba_document_get_value(document: *const Document, path: *const c_char) -> *mut c_char {
+  let document = &*document;
+  let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  match document.get_value(path_string) {
+    Some(value) => {
+      let json = crate::json::yaml_to_json(&value);
+      let json_string = serde_json::to_string(&json).unwrap_or_else(|_| "null".to_string());
+      CString::new(json_string).unwrap_or_default().into_raw()
+    }
+    None => ptr::null_mut(),
+  }
+}
+
+/// Caller must free with yerba_string_free.
+#[no_mangle]
+pub unsafe extern "C" fn yerba_document_get_values(document: *const Document, path: *const c_char) -> *mut c_char {
+  let document = &*document;
+  let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  let values = document.get_values(path_string);
+  let json_values: Vec<serde_json::Value> = values.iter().map(crate::json::yaml_to_json).collect();
+  let json_string = serde_json::to_string(&json_values).unwrap_or_else(|_| "[]".to_string());
+
+  CString::new(json_string).unwrap_or_default().into_raw()
 }
 
 #[no_mangle]
@@ -675,6 +707,7 @@ pub unsafe extern "C" fn yerba_get_result_free(result: YerbaGetResult) {
 pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *const c_char) -> YerbaTypedList {
   let pattern = CStr::from_ptr(glob_pattern).to_str().unwrap_or("");
   let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
+  let selector = Selector::parse(path_string);
 
   let files = match glob::glob(pattern) {
     Ok(paths) => paths.filter_map(|p| p.ok()).collect::<Vec<_>>(),
@@ -690,7 +723,7 @@ pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *cons
 
   for file in &files {
     if let Ok(document) = Document::parse_file(file) {
-      if path_string.contains("[]") {
+      if selector.has_wildcard() {
         for scalar in document.get_all_typed(path_string) {
           let value_type = detect_yaml_type(&scalar);
           results.push(serde_json::json!({"text": scalar.text, "type": value_type as u8}));

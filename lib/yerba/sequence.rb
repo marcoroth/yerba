@@ -66,8 +66,7 @@ module Yerba
         if scalar_items.is_a?(Array) && !scalar_items.empty?
           scalar_items.length
         else
-          parsed = ::YAML.safe_load(@document.to_s)
-          data = @path.empty? ? parsed : parsed.dig(*@path.split("."))
+          data = @document.get_value(@path)
           data.is_a?(Array) ? data.length : 0
         end
       else
@@ -162,8 +161,7 @@ module Yerba
         if result.is_a?(Array) && !result.empty?
           result
         else
-          parsed = ::YAML.safe_load(@document.to_s)
-          data = @path.empty? ? parsed : parsed.dig(*@path.split("."))
+          data = @document.get_value(@path)
           data.is_a?(Array) ? data : []
         end
       else

@@ -15,11 +15,11 @@ module Yerba
     end
 
     def to_h
-      ::YAML.safe_load(to_s)
+      get_value("")
     end
 
     def to_a
-      ::YAML.safe_load(to_s)
+      get_value("")
     end
 
     def to_yaml

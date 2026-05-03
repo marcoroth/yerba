@@ -374,6 +374,55 @@ class DocumentTest < Minitest::Spec
     assert_equal [{ "name" => "Hello" }, { "name" => "World" }], document.to_a
   end
 
+  test "get_value returns hash for map path" do
+    document = Yerba::Document.parse("database:\n  host: localhost\n  port: 5432")
+
+    assert_equal({ "host" => "localhost", "port" => 5432 }, document.get_value("database"))
+  end
+
+  test "get_value returns array for sequence path" do
+    document = Yerba::Document.parse("tags:\n  - ruby\n  - rust")
+
+    assert_equal ["ruby", "rust"], document.get_value("tags")
+  end
+
+  test "get_value returns scalar for scalar path" do
+    document = Yerba::Document.parse("name: Alice\nport: 5432")
+
+    assert_equal "Alice", document.get_value("name")
+    assert_equal 5432, document.get_value("port")
+  end
+
+  test "get_value returns nil for missing path" do
+    document = Yerba::Document.parse("name: Alice")
+
+    assert_nil document.get_value("missing")
+  end
+
+  test "get_value returns full document for empty path" do
+    document = Yerba::Document.parse("name: Alice\nport: 5432")
+
+    assert_equal({ "name" => "Alice", "port" => 5432 }, document.get_value(""))
+  end
+
+  test "get_values returns array of values for wildcard path" do
+    document = Yerba::Document.parse("items:\n  - name: Ruby\n    year: 1995\n  - name: Rust\n    year: 2015")
+
+    assert_equal [{ "name" => "Ruby", "year" => 1995 }, { "name" => "Rust", "year" => 2015 }], document.get_values("items[]")
+  end
+
+  test "get_values returns scalar values for scalar wildcard" do
+    document = Yerba::Document.parse("tags:\n  - ruby\n  - rust")
+
+    assert_equal ["ruby", "rust"], document.get_values("tags[]")
+  end
+
+  test "get_values returns empty array for missing path" do
+    document = Yerba::Document.parse("name: Alice")
+
+    assert_equal [], document.get_values("missing[]")
+  end
+
   test "[] returns nil for non-existent path" do
     document = Yerba::Document.parse("name: Alice")
 

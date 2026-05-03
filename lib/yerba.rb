@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "yaml"
-
 require_relative "yerba/version"
 require_relative "yerba/scalar"
 require_relative "yerba/map"

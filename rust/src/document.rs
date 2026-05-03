@@ -114,7 +114,7 @@ impl Document {
   }
 
   pub fn get_typed(&self, dot_path: &str) -> Option<ScalarValue> {
-    if dot_path.contains("[]") {
+    if crate::selector::Selector::parse(dot_path).has_wildcard() {
       return self.get_all_typed(dot_path).into_iter().next();
     }
 

@@ -250,6 +250,32 @@ static VALUE document_exists_p(VALUE self, VALUE path) {
   return yerba_document_exists(document, StringValueCStr(path)) ? Qtrue : Qfalse;
 }
 
+/* document.get_value(path) → parsed Ruby object (Hash/Array/String/Integer/etc) */
+static VALUE document_get_value(VALUE self, VALUE path) {
+  struct Document *document = get_document(self);
+  char *json = yerba_document_get_value(document, StringValueCStr(path));
+
+  if (!json) return Qnil;
+
+  VALUE json_string = make_utf8_string(json);
+  yerba_string_free(json);
+
+  return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+}
+
+/* document.get_values(path) → Array of parsed Ruby objects */
+static VALUE document_get_values(VALUE self, VALUE path) {
+  struct Document *document = get_document(self);
+  char *json = yerba_document_get_values(document, StringValueCStr(path));
+
+  if (!json) return rb_ary_new();
+
+  VALUE json_string = make_utf8_string(json);
+  yerba_string_free(json);
+
+  return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+}
+
 /* document.get_quote_style(path) → :plain, :single, :double, or nil */
 static VALUE document_get_quote_style(VALUE self, VALUE path) {
   struct Document *document = get_document(self);
@@ -679,6 +705,8 @@ void Init_yerba(void) {
   rb_define_singleton_method(rb_cDocument, "parse", document_s_parse, 1);
   rb_define_method(rb_cDocument, "get", document_get, 1);
   rb_define_method(rb_cDocument, "[]", document_bracket, 1);
+  rb_define_method(rb_cDocument, "get_value", document_get_value, 1);
+  rb_define_method(rb_cDocument, "get_values", document_get_values, 1);
   rb_define_method(rb_cDocument, "get_quote_style", document_get_quote_style, 1);
   rb_define_method(rb_cDocument, "set_quote_style", document_set_quote_style, 2);
   rb_define_method(rb_cDocument, "exists?", document_exists_p, 1);

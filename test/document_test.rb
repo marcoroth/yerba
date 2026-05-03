@@ -423,6 +423,31 @@ class DocumentTest < Minitest::Spec
     assert_equal [], document.get_values("missing[]")
   end
 
+  test "find returns items from root sequence" do
+    document = Yerba::Document.parse("- id: abc\n  title: Hello\n- id: def\n  title: World")
+    results = document.find("[]")
+
+    assert_equal 2, results.length
+    assert_equal "abc", results[0]["id"]
+  end
+
+  test "find with condition filters items" do
+    document = Yerba::Document.parse("- id: abc\n  kind: talk\n- id: def\n  kind: keynote")
+    results = document.find("[]", condition: '.kind == "keynote"')
+
+    assert_equal 1, results.length
+    assert_equal "def", results[0]["id"]
+  end
+
+  test "find with select returns only specified fields" do
+    document = Yerba::Document.parse("- id: abc\n  title: Hello\n  year: 2020\n- id: def\n  title: World\n  year: 2021")
+    results = document.find("[]", select: "id,title")
+
+    assert_equal 2, results.length
+    assert_equal({ "id" => "abc", "title" => "Hello" }, results[0])
+    assert_equal({ "id" => "def", "title" => "World" }, results[1])
+  end
+
   test "[] returns nil for non-existent path" do
     document = Yerba::Document.parse("name: Alice")
 

@@ -377,6 +377,8 @@ pub unsafe extern "C" fn yerba_document_find(
     None => document.find_all(path_string),
   };
 
+  let select_fields: Option<Vec<&str>> = _select_string.map(|s| s.split(',').collect());
+
   let mut results: Vec<serde_json::Value> = Vec::new();
 
   for item in &matches {
@@ -384,14 +386,26 @@ pub unsafe extern "C" fn yerba_document_find(
 
     if let Ok(parsed) = serde_yaml::from_str::<Vec<serde_yaml::Value>>(&yaml_with_dash) {
       for value in parsed {
-        let json_value = crate::json::yaml_to_json(&value);
+        match &select_fields {
+          Some(fields) => {
+            let mut result = serde_json::Map::new();
 
-        results.push(json_value);
+            for field in fields {
+              let json_value = crate::json::resolve_select_field(&value, field);
+              let json_key = crate::json::select_field_key(field);
+
+              result.insert(json_key, json_value);
+            }
+
+            results.push(serde_json::Value::Object(result));
+          }
+          None => {
+            results.push(crate::json::yaml_to_json(&value));
+          }
+        }
       }
     }
   }
-
-  let _ = _select_string; // TODO: implement select field filtering
 
   let json = serde_json::to_string_pretty(&results).unwrap_or_else(|_| "[]".to_string());
   CString::new(json).unwrap_or_default().into_raw()
@@ -468,8 +482,54 @@ pub unsafe extern "C" fn yerba_document_insert_object(
     Err(e) => return YerbaResult::err(&format!("Invalid JSON: {}", e)),
   };
 
-  // TODO: detect quote style from document context
-  let quote_style = QuoteStyle::Double;
+  let try_paths = if path_string.is_empty() {
+    vec!["[]".to_string(), "[0]".to_string()]
+  } else {
+    vec![format!("{}[]", path_string), format!("{}[0]", path_string)]
+  };
+
+  let mut quote_style = QuoteStyle::Plain;
+
+  'outer: for try_path in &try_paths {
+    for scalar in document.get_all_typed(try_path) {
+      if scalar.kind == SyntaxKind::DOUBLE_QUOTED_SCALAR {
+        quote_style = QuoteStyle::Double;
+        break 'outer;
+      } else if scalar.kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
+        quote_style = QuoteStyle::Single;
+        break 'outer;
+      }
+    }
+  }
+
+  if quote_style == QuoteStyle::Plain {
+    if let Some(value) = document.get_value(path_string) {
+      if let serde_yaml::Value::Sequence(seq) = &value {
+        if let Some(serde_yaml::Value::Mapping(map)) = seq.first() {
+          if let Some((first_key, _)) = map.iter().next() {
+            if let serde_yaml::Value::String(key_name) = first_key {
+              let deep_path = if path_string.is_empty() {
+                format!("[].{}", key_name)
+              } else {
+                format!("{}[].{}", path_string, key_name)
+              };
+
+              for scalar in document.get_all_typed(&deep_path) {
+                if scalar.kind == SyntaxKind::DOUBLE_QUOTED_SCALAR {
+                  quote_style = QuoteStyle::Double;
+                  break;
+                } else if scalar.kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
+                  quote_style = QuoteStyle::Single;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   let yaml_text = crate::yaml_writer::json_to_yaml_text(&json_value, &quote_style, 0);
 
   let position = if at >= 0 {

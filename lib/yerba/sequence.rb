@@ -44,7 +44,8 @@ module Yerba
         when Scalar
           @document.insert(@path, item.to_yaml)
         else
-          @document.insert(@path, item.to_s)
+          formatted = format_for_insert(item.to_s)
+          @document.insert(@path, formatted)
         end
       else
         @data << item
@@ -153,6 +154,20 @@ module Yerba
     end
 
     private
+
+    def format_for_insert(value)
+      style = detect_quote_style
+
+      case style
+      when :double then "\"#{value.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}\""
+      when :single then "'#{value.gsub("'", "''")}'"
+      else value
+      end
+    end
+
+    def detect_quote_style
+      @document.get_quote_style("#{@path}[0]")
+    end
 
     def items
       if @document

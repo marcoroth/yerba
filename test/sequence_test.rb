@@ -35,11 +35,60 @@ class SequenceTest < Minitest::Spec
     assert_includes document.to_s, "- rust"
   end
 
-  test "sequence << inserts hash" do
-    document = Yerba::Document.parse("items:\n  - name: \"Ruby\"")
-    document["items"] << { name: "Rust" }
+  test "sequence << inserts hash matching double quote style" do
+    document = Yerba::Document.parse("items:\n  - name: \"Ruby\"\n    year: 1995")
+    document["items"] << { name: "Rust", year: 2015 }
 
-    assert_includes document.to_s, '"Rust"'
+    expected = <<~YAML.chomp
+      items:
+        - name: "Ruby"
+          year: 1995
+        - name: "Rust"
+          year: 2015
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "sequence << inserts hash matching plain style" do
+    document = Yerba::Document.parse("items:\n  - name: Ruby\n    year: 1995")
+    document["items"] << { name: "Rust", year: 2015 }
+
+    expected = <<~YAML.chomp
+      items:
+        - name: Ruby
+          year: 1995
+        - name: Rust
+          year: 2015
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "sequence << inserts scalar matching existing quote style" do
+    document = Yerba::Document.parse("tags:\n  - \"ruby\"")
+    document["tags"] << "rust"
+
+    expected = <<~YAML.chomp
+      tags:
+        - "ruby"
+        - "rust"
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "sequence << inserts scalar as plain when existing items are plain" do
+    document = Yerba::Document.parse("tags:\n  - ruby")
+    document["tags"] << "rust"
+
+    expected = <<~YAML.chomp
+      tags:
+        - ruby
+        - rust
+    YAML
+
+    assert_equal expected, document.to_s
   end
 
   test "sequence << inserts Yerba::Scalar with quote_style" do

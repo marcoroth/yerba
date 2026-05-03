@@ -54,6 +54,7 @@ jobs:
       - name: Build gem
         run: |
           if [ "${{ matrix.target }}" = "default" ]; then
+            rm -rf exe/*/
             bundle exec rake build
           else
             bundle exec rake gem:${{ matrix.target }}

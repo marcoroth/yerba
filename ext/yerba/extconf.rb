@@ -44,16 +44,25 @@ if cross_compiling && target_platform.nil?
   end
 end
 
+workspace_target_dir = File.join(root_dir, "target")
+crate_target_dir = File.join(rust_dir, "target")
+
 if target_platform
   puts "yerba: Cross-compiling Rust for target: #{target_platform}"
   system("rustup target add #{target_platform}") || warn("yerba: Failed to add Rust target #{target_platform}")
 
   cargo_args = "--release --target #{target_platform}"
-  lib_dir = File.join(rust_dir, "target", target_platform, "release")
+  lib_dir = [workspace_target_dir, crate_target_dir]
+            .map { |dir| File.join(dir, target_platform, "release") }
+            .find { |dir| Dir.exist?(dir) } || File.join(crate_target_dir, target_platform, "release")
 else
   puts "yerba: Compiling Rust library for native platform..."
+
   cargo_args = "--release"
-  lib_dir = File.join(rust_dir, "target", "release")
+
+  lib_dir = [workspace_target_dir, crate_target_dir]
+            .map { |dir| File.join(dir, "release") }
+            .find { |dir| Dir.exist?(dir) } || File.join(crate_target_dir, "release")
 end
 
 unless system("cd #{rust_dir} && cargo build #{cargo_args}")

@@ -2,8 +2,10 @@
 
 module Yerba
   class Document
+    ROOT_SELECTOR = "".freeze
+
     def root
-      self[""]
+      self[ROOT_SELECTOR]
     end
 
     def map?
@@ -15,11 +17,11 @@ module Yerba
     end
 
     def to_h
-      get_value("")
+      get_value(ROOT_SELECTOR)
     end
 
     def to_a
-      get_value("")
+      get_value(ROOT_SELECTOR)
     end
 
     def to_yaml

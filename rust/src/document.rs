@@ -1586,6 +1586,47 @@ impl Document {
     Ok(())
   }
 
+  pub fn has_directives_marker(&self) -> bool {
+    self
+      .root
+      .descendants_with_tokens()
+      .any(|element| element.kind() == SyntaxKind::DIRECTIVES_END)
+  }
+
+  pub fn ensure_directives(&mut self) -> Result<(), YerbaError> {
+    if self.has_directives_marker() {
+      return Ok(());
+    }
+
+    let source = self.root.text().to_string();
+    let new_source = format!("---\n{}", source);
+
+    let path = self.path.take();
+    *self = Self::parse(&new_source)?;
+    self.path = path;
+
+    Ok(())
+  }
+
+  pub fn remove_directives(&mut self) -> Result<(), YerbaError> {
+    if !self.has_directives_marker() {
+      return Ok(());
+    }
+
+    let source = self.root.text().to_string();
+    let new_source = source
+      .strip_prefix("---\n")
+      .or_else(|| source.strip_prefix("---"))
+      .unwrap_or(&source)
+      .to_string();
+
+    let path = self.path.take();
+    *self = Self::parse(&new_source)?;
+    self.path = path;
+
+    Ok(())
+  }
+
   pub fn enforce_key_style(&mut self, style: &crate::KeyStyle, dot_path: Option<&str>) -> Result<(), YerbaError> {
     let source = self.root.text().to_string();
 

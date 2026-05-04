@@ -2,6 +2,7 @@ pub mod apply;
 pub mod blank_lines;
 pub mod check;
 pub mod delete;
+pub mod directives;
 pub mod get;
 pub mod init;
 pub mod insert;
@@ -154,6 +155,7 @@ pub enum Command {
   Sort(sort::Args),
   QuoteStyle(quote_style::Args),
   BlankLines(blank_lines::Args),
+  Directives(directives::Args),
   Selectors(selectors::Args),
   #[command(about = "Create a new Yerbafile in the current directory")]
   Init,
@@ -182,6 +184,7 @@ impl Command {
       Command::Sort(args) => args.run(),
       Command::QuoteStyle(args) => args.run(),
       Command::BlankLines(args) => args.run(),
+      Command::Directives(args) => args.run(),
       Command::Selectors(args) => args.run(),
       Command::Init => init::run(),
       Command::Apply => apply::run(),

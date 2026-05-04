@@ -30,6 +30,7 @@ pub enum PipelineStep {
   Remove(RemoveConfig),
   BlankLines(BlankLinesConfig),
   Sort(SortConfig),
+  Directives(DirectivesConfig),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -47,6 +48,14 @@ pub struct BlankLinesConfig {
   #[serde(default)]
   pub path: Option<String>,
   pub count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DirectivesConfig {
+  #[serde(default)]
+  pub ensure: bool,
+  #[serde(default)]
+  pub remove: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -112,13 +121,18 @@ impl<'de> Deserialize<'de> for PipelineStep {
       return Ok(PipelineStep::BlankLines(config));
     }
 
+    if let Some(value) = mapping.get(serde_yaml::Value::String("directives".to_string())) {
+      let config: DirectivesConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      return Ok(PipelineStep::Directives(config));
+    }
+
     if let Some(value) = mapping.get(serde_yaml::Value::String("sort".to_string())) {
       let config: SortConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Sort(config));
     }
 
     Err(serde::de::Error::custom(
-      "unknown pipeline step: expected sort_keys, quote_style, set, insert, delete, rename, remove, blank_lines, or sort",
+      "unknown pipeline step: expected sort_keys, quote_style, set, insert, delete, rename, remove, blank_lines, sort, or directives",
     ))
   }
 }
@@ -465,6 +479,20 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         .unwrap_or_default();
 
       document.sort_items(&full_path, &sort_fields, config.case_sensitive)
+    }
+
+    PipelineStep::Directives(config) => {
+      if config.ensure && config.remove {
+        return Err(YerbaError::ParseError("directives: ensure and remove are mutually exclusive".to_string()));
+      }
+
+      if config.ensure {
+        document.ensure_directives()
+      } else if config.remove {
+        document.remove_directives()
+      } else {
+        Ok(())
+      }
     }
   }
 }

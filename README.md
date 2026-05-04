@@ -341,6 +341,16 @@ yerba blank-lines videos.yml "[]" 1
 yerba blank-lines config.yml "tags" 0
 ```
 
+### `directives`
+
+Add or remove the document start marker (`---`):
+
+```bash
+yerba directives config.yml --ensure
+yerba directives config.yml --remove
+yerba directives "data/**/*.yml" --ensure
+```
+
 ### `selectors`
 
 Show all valid selectors for a YAML file. Useful for discovering the structure of a file and knowing which selectors you can use with other commands:
@@ -455,6 +465,7 @@ Available pipeline steps:
 - `delete` Remove a key (supports conditions)
 - `rename` Rename a key
 - `remove` Remove an item from a sequence
+- `directives` Add or remove the document start marker (`---`)
 - `get` Read a value and store it as a variable for subsequent steps
 
 This makes it easy to enforce project-wide YAML conventions in CI:

@@ -531,6 +531,125 @@ class SequenceTest < Minitest::Spec
     assert_equal "talk-2", result["id"].value
   end
 
+  test "find_by with nested selector returns first of multiple matches" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+          - name: Bob
+      - id: talk-2
+        speakers:
+          - name: Alice
+          - name: Charlie
+      - id: talk-3
+        speakers:
+          - name: Dave
+    YAML
+
+    result = document.root.find_by("speakers[].name", "Alice")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "talk-1", result["id"].value
+  end
+
+  test "find_by with nested hash syntax returns first of multiple matches" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+      - id: talk-2
+        speakers:
+          - name: Alice
+          - name: Bob
+      - id: talk-3
+        speakers:
+          - name: Charlie
+    YAML
+
+    result = document.root.find_by(speakers: { name: "Alice" })
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "talk-1", result["id"].value
+  end
+
+  test "find_by with array value returns first of multiple matches" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        tags:
+          - ruby
+          - rails
+      - id: talk-2
+        tags:
+          - ruby
+          - rust
+      - id: talk-3
+        tags:
+          - python
+    YAML
+
+    result = document.root.find_by(tags: ["ruby"])
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "talk-1", result["id"].value
+  end
+
+  test "find_by with dot-path kwarg returns first of multiple matches" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: server-1
+        database:
+          host: localhost
+      - id: server-2
+        database:
+          host: localhost
+      - id: server-3
+        database:
+          host: example.com
+    YAML
+
+    result = document.root.find_by("database.host": "localhost")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "server-1", result["id"].value
+  end
+
+  test "find_by with dot-path kwarg for nested map" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: server-1
+        database:
+          host: localhost
+          port: 5432
+      - id: server-2
+        database:
+          host: example.com
+          port: 3306
+    YAML
+
+    result = document.root.find_by("database.host": "example.com")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "server-2", result["id"].value
+  end
+
+  test "where with dot-path kwarg for nested map" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: server-1
+        database:
+          host: localhost
+      - id: server-2
+        database:
+          host: example.com
+      - id: server-3
+        database:
+          host: localhost
+    YAML
+
+    results = document.root.where("database.host": "localhost")
+
+    assert_equal 2, results.length
+    assert_equal "server-1", results[0]["id"].value
+    assert_equal "server-3", results[1]["id"].value
+  end
+
   test "find_by with nested hash syntax" do
     document = Yerba::Document.parse(<<~YAML)
       - id: talk-1
@@ -601,6 +720,87 @@ class SequenceTest < Minitest::Spec
     YAML
 
     result = document.root.find_by(speakers: { links: { url: "https://bob.dev" } })
+
+    assert_equal "talk-2", result["id"].value
+  end
+
+  test "find_by with array value on flat sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - Alice
+          - Bob
+      - id: talk-2
+        speakers:
+          - Charlie
+      - id: talk-3
+        speakers:
+          - Alice
+          - Charlie
+    YAML
+
+    result = document.root.find_by(speakers: ["Alice"])
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "talk-1", result["id"].value
+  end
+
+  test "where with array value on flat sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - Alice
+          - Bob
+      - id: talk-2
+        speakers:
+          - Charlie
+      - id: talk-3
+        speakers:
+          - Alice
+          - Charlie
+    YAML
+
+    results = document.root.where(speakers: ["Alice"])
+
+    assert_equal 2, results.length
+    assert_equal "talk-1", results[0]["id"].value
+    assert_equal "talk-3", results[1]["id"].value
+  end
+
+  test "where with array value matching multiple values" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - Alice
+          - Bob
+      - id: talk-2
+        speakers:
+          - Charlie
+      - id: talk-3
+        speakers:
+          - Alice
+          - Charlie
+    YAML
+
+    results = document.root.where(speakers: ["Alice", "Charlie"])
+
+    assert_equal 1, results.length
+    assert_equal "talk-3", results[0]["id"].value
+  end
+
+  test "find_by with array value and additional flat criteria" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        kind: keynote
+        speakers:
+          - Alice
+      - id: talk-2
+        kind: talk
+        speakers:
+          - Alice
+    YAML
+
+    result = document.root.find_by(kind: "talk", speakers: ["Alice"])
 
     assert_equal "talk-2", result["id"].value
   end

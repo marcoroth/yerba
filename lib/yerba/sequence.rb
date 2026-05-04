@@ -96,11 +96,11 @@ module Yerba
       end
 
       criteria[selector] = value if selector && value
-      criteria = expand_nested_criteria(criteria)
+      pairs = expand_nested_criteria(criteria)
 
       indices = nil
 
-      criteria.each do |field, expected|
+      pairs.each do |field, expected|
         field_string = field.to_s
 
         if field_string.include?("[]")
@@ -131,11 +131,11 @@ module Yerba
       end
 
       criteria[selector] = value if selector && value
-      criteria = expand_nested_criteria(criteria)
+      pairs = expand_nested_criteria(criteria)
 
       indices = nil
 
-      criteria.each do |field, expected|
+      pairs.each do |field, expected|
         field_string = field.to_s
 
         if field_string.include?("[]")
@@ -251,15 +251,19 @@ module Yerba
     private
 
     def expand_nested_criteria(criteria)
-      expanded = {}
+      expanded = []
 
       criteria.each do |field, value|
         if value.is_a?(Hash)
           flatten_hash("#{field}[]", value).each do |path, leaf_value|
-            expanded[path] = leaf_value
+            expanded << [path, leaf_value]
+          end
+        elsif value.is_a?(Array)
+          value.each do |item|
+            expanded << ["#{field}[]", item]
           end
         else
-          expanded[field] = value
+          expanded << [field, value]
         end
       end
 

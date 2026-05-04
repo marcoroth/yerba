@@ -122,7 +122,38 @@ pub fn extract_scalar_text(node: &SyntaxNode) -> Option<String> {
 }
 
 pub fn unescape_double_quoted(text: &str) -> String {
-  text.replace("\\\"", "\"").replace("\\\\", "\\")
+  let mut result = String::with_capacity(text.len());
+  let mut chars = text.chars();
+
+  while let Some(character) = chars.next() {
+    if character == '\\' {
+      match chars.next() {
+        Some('n') => result.push('\n'),
+        Some('t') => result.push('\t'),
+        Some('r') => result.push('\r'),
+        Some('\\') => result.push('\\'),
+        Some('"') => result.push('"'),
+        Some('/') => result.push('/'),
+        Some('0') => result.push('\0'),
+        Some('a') => result.push('\u{07}'),
+        Some('b') => result.push('\u{08}'),
+        Some('e') => result.push('\u{1b}'),
+        Some('v') => result.push('\u{0b}'),
+        Some(' ') => result.push(' '),
+        Some('_') => result.push('\u{a0}'),
+        Some('\n') => {} // line continuation: skip newline and leading whitespace
+        Some(other) => {
+          result.push('\\');
+          result.push(other);
+        }
+        None => result.push('\\'),
+      }
+    } else {
+      result.push(character);
+    }
+  }
+
+  result
 }
 
 pub fn unescape_single_quoted(text: &str) -> String {

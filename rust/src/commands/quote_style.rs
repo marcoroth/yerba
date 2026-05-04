@@ -11,7 +11,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
     yerba quote-style config.yml --keys plain
     yerba quote-style config.yml --keys plain --values double
     yerba quote-style config.yml "[].speakers" --values plain
-    yerba quote-style "data/**/*.yml" --keys plain --values double 
+    yerba quote-style "data/**/*.yml" --keys plain --values double
   "#})
 });
 
@@ -25,12 +25,12 @@ pub struct Args {
   file: String,
   /// Selector to scope the operation (optional — omit for whole file)
   selector: Option<String>,
-  /// Quote style for values (plain, single, double, literal, folded)
+  /// Quote style for keys
+  #[arg(long)]
+  keys: Option<yerba::KeyStyle>,
+  /// Quote style for values
   #[arg(long)]
   values: Option<yerba::QuoteStyle>,
-  /// Quote style for keys (plain, single, double)
-  #[arg(long)]
-  keys: Option<yerba::QuoteStyle>,
   #[arg(long)]
   dry_run: bool,
 }
@@ -53,7 +53,13 @@ impl Args {
       }
 
       if let Some(style) = &self.values {
-        let _ = document.enforce_quotes_at(style, selector);
+        if let Ok(warnings) = document.enforce_quotes_at(style, selector) {
+          for warning in warnings {
+            use super::color::*;
+
+            eprintln!("{YELLOW}Warning:{RESET} {} — {}", resolved_file, warning);
+          }
+        }
       }
 
       output(&resolved_file, &document, self.dry_run);

@@ -383,19 +383,20 @@ pub unsafe extern "C" fn yerba_document_get_values(document: *const Document, pa
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_get_quote_style(document: *const Document, path: *const c_char) -> i32 {
+pub unsafe extern "C" fn yerba_document_get_quote_style(document: *const Document, path: *const c_char) -> *mut c_char {
   let document = &*document;
   let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
 
-  match document.get_typed(path_string) {
-    Some(scalar) => match scalar.kind {
-      SyntaxKind::PLAIN_SCALAR => 0,
-      SyntaxKind::SINGLE_QUOTED_SCALAR => 1,
-      SyntaxKind::DOUBLE_QUOTED_SCALAR => 2,
-      _ => -1,
-    },
+  match document.get_quote_style(path_string) {
+    Some(style) => {
+      let ruby_style = style.replace('-', "_");
 
-    None => -1,
+      CString::new(ruby_style)
+        .map(|s| s.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+    }
+
+    None => std::ptr::null_mut(),
   }
 }
 
@@ -403,20 +404,19 @@ pub unsafe extern "C" fn yerba_document_get_quote_style(document: *const Documen
 pub unsafe extern "C" fn yerba_document_set_quote_style(
   document: *mut Document,
   path: *const c_char,
-  style: i32,
+  style: *const c_char,
 ) -> YerbaResult {
   let document = &mut *document;
   let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
+  let style_string = &CStr::from_ptr(style).to_str().unwrap_or("").replace('_', "-");
 
-  let quote_style = match style {
-    0 => QuoteStyle::Plain,
-    1 => QuoteStyle::Single,
-    2 => QuoteStyle::Double,
-    _ => return YerbaResult::err("Invalid quote style (use 0=plain, 1=single, 2=double)"),
+  let quote_style = match style_string.parse::<QuoteStyle>() {
+    Ok(style) => style,
+    Err(e) => return YerbaResult::err(&e),
   };
 
-  match document.set_scalar_style(path_string, &quote_style) {
-    Ok(()) => YerbaResult::ok(),
+  match document.enforce_quotes_at(&quote_style, Some(path_string)) {
+    Ok(_warnings) => YerbaResult::ok(),
     Err(e) => YerbaResult::err(&e.to_string()),
   }
 }
@@ -809,7 +809,7 @@ pub unsafe extern "C" fn yerba_document_quote_style(
     CStr::from_ptr(key_style)
       .to_str()
       .ok()
-      .and_then(|s| s.parse::<QuoteStyle>().ok())
+      .and_then(|s| s.parse::<crate::KeyStyle>().ok())
   };
 
   let value_quote_style = if value_style.is_null() {
@@ -828,8 +828,9 @@ pub unsafe extern "C" fn yerba_document_quote_style(
   }
 
   if let Some(ref value_style) = value_quote_style {
-    if let Err(e) = document.enforce_quotes_at(value_style, path_string) {
-      return YerbaResult::err(&e.to_string());
+    match document.enforce_quotes_at(value_style, path_string) {
+      Ok(_warnings) => {}
+      Err(e) => return YerbaResult::err(&e.to_string()),
     }
   }
 

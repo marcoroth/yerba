@@ -353,7 +353,10 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     PipelineStep::QuoteStyle(config) => {
       let dot_path = config.path.as_deref();
 
-      let key_style = config.key_style.parse::<QuoteStyle>().map_err(YerbaError::ParseError)?;
+      let key_style = config
+        .key_style
+        .parse::<crate::KeyStyle>()
+        .map_err(YerbaError::ParseError)?;
 
       let value_style = config
         .value_style
@@ -361,7 +364,11 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         .map_err(YerbaError::ParseError)?;
 
       document.enforce_key_style(&key_style, dot_path)?;
-      document.enforce_quotes_at(&value_style, dot_path)?;
+      let warnings = document.enforce_quotes_at(&value_style, dot_path)?;
+
+      for warning in &warnings {
+        eprintln!("  warning: {}", warning);
+      }
 
       Ok(())
     }

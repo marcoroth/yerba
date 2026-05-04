@@ -286,7 +286,7 @@ yerba sort-keys "data/**/videos.yml" "[]" "id,title,speakers"
 
 ### `quote-style`
 
-Enforce a consistent quote style across keys and/or values. Available styles are `plain`, `single`, and `double`:
+Enforce a consistent quote style across keys and/or values:
 
 ```bash
 yerba quote-style config.yml --values double
@@ -300,6 +300,36 @@ Scope the operation to a specific selector:
 yerba quote-style config.yml "[].speakers" --values plain
 yerba quote-style "data/**/*.yml" --keys plain --values double
 ```
+
+Use block scalar styles to enforce multiline formatting on specific fields:
+
+```bash
+yerba quote-style videos.yml "[].description" --values literal
+```
+
+**Key styles** (`--keys`):
+
+| Style | Symbol | Example |
+|-------|--------|---------|
+| `plain` | — | `host: value` |
+| `single` | `'` | `'host': value` |
+| `double` | `"` | `"host": value` |
+
+**Value styles** (`--values`):
+
+| Style | Symbol | Example | Behavior |
+|-------|--------|---------|----------|
+| `plain` | — | `host: localhost` | Unquoted |
+| `single` | `'` | `host: 'localhost'` | Single-quoted |
+| `double` | `"` | `host: "localhost"` | Double-quoted, supports `\n` escapes |
+| `literal` | `\|-` | Preserves newlines | Strip trailing newline |
+| `literal-clip` | `\|` | Preserves newlines | Keep one trailing newline |
+| `literal-keep` | `\|+` | Preserves newlines | Keep all trailing newlines |
+| `folded` | `>-` | Folds newlines to spaces | Strip trailing newline |
+| `folded-clip` | `>` | Folds newlines to spaces | Keep one trailing newline |
+| `folded-keep` | `>+` | Folds newlines to spaces | Keep all trailing newlines |
+
+Block scalars are only converted when scoped to a specific selector. An unscoped `--values double` will not touch existing block scalars.
 
 ### `blank-lines`
 

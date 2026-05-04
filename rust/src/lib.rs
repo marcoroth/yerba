@@ -11,7 +11,7 @@ pub mod yerbafile;
 
 pub use document::{collect_selectors, Document, InsertPosition, SortField};
 pub use error::YerbaError;
-pub use quote_style::QuoteStyle;
+pub use quote_style::{KeyStyle, QuoteStyle};
 pub use selector::Selector;
 pub use syntax::{detect_yaml_type, ScalarValue, YerbaValueType};
 pub use yaml_writer::json_to_yaml_text;

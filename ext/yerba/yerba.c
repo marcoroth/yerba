@@ -298,35 +298,35 @@ static VALUE document_get_values(VALUE self, VALUE path) {
   return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
 }
 
-/* document.get_quote_style(path) → :plain, :single, :double, or nil */
+/* document.get_quote_style(path) → :plain, :single, :double, :literal, etc. or nil */
 static VALUE document_get_quote_style(VALUE self, VALUE path) {
   struct Document *document = get_document(self);
-  int style = yerba_document_get_quote_style(document, StringValueCStr(path));
+  char *style = yerba_document_get_quote_style(document, StringValueCStr(path));
 
-  switch (style) {
-    case 0: return ID2SYM(rb_intern("plain"));
-    case 1: return ID2SYM(rb_intern("single"));
-    case 2: return ID2SYM(rb_intern("double"));
-    default: return Qnil;
-  }
+  if (style == NULL) return Qnil;
+
+  VALUE symbol = ID2SYM(rb_intern(style));
+
+  yerba_string_free(style);
+
+  return symbol;
 }
 
 /* document.set_quote_style(path, style) */
 static VALUE document_set_quote_style(VALUE self, VALUE path, VALUE style) {
   struct Document *document = get_document(self);
 
-  int style_int;
+  const char *style_string;
+
   if (RB_TYPE_P(style, T_SYMBOL)) {
-    ID style_id = SYM2ID(style);
-    if (style_id == rb_intern("plain")) style_int = 0;
-    else if (style_id == rb_intern("single")) style_int = 1;
-    else if (style_id == rb_intern("double")) style_int = 2;
-    else rb_raise(rb_eError, "Invalid quote style (use :plain, :single, or :double)");
+    style_string = rb_id2name(SYM2ID(style));
+  } else if (RB_TYPE_P(style, T_STRING)) {
+    style_string = StringValueCStr(style);
   } else {
-    style_int = NUM2INT(style);
+    rb_raise(rb_eError, "Invalid quote style (expected Symbol or String)");
   }
 
-  YerbaResult result = yerba_document_set_quote_style(document, StringValueCStr(path), style_int);
+  YerbaResult result = yerba_document_set_quote_style(document, StringValueCStr(path), style_string);
 
   check_result(result);
 

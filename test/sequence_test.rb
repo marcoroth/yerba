@@ -330,4 +330,204 @@ class SequenceTest < Minitest::Spec
 
     assert_equal '#<Yerba::Sequence ["ruby", "rust"]>', seq.inspect
   end
+
+  test "find_by returns bound node for matching key/value" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        slug: alice
+      - name: Bob
+        slug: bob
+    YAML
+
+    result = document.root.find_by(name: "Bob")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "Bob", result["name"].value
+    assert_equal "[1]", result.selector
+  end
+
+  test "find_by returns nil when no match" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+    YAML
+
+    assert_nil document.root.find_by(name: "Missing")
+  end
+
+  test "find_by result is mutable" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Alice"
+        github: ""
+      - name: "Bob"
+        github: ""
+    YAML
+
+    speaker = document.root.find_by(name: "Alice")
+    speaker["github"] = "alice123"
+
+    assert_equal <<~YAML, document.to_s
+      - name: "Alice"
+        github: "alice123"
+      - name: "Bob"
+        github: ""
+    YAML
+  end
+
+  test "select_by returns all matching bound nodes" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        kind: speaker
+      - name: Bob
+        kind: organizer
+      - name: Charlie
+        kind: speaker
+    YAML
+
+    results = document.root.where(kind: "speaker")
+
+    assert_equal 2, results.length
+    assert_equal "Alice", results[0]["name"].value
+    assert_equal "Charlie", results[1]["name"].value
+  end
+
+  test "find_by with multiple criteria narrows results" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        kind: speaker
+      - name: Bob
+        kind: speaker
+      - name: Alice
+        kind: organizer
+    YAML
+
+    result = document.root.find_by(name: "Alice", kind: "organizer")
+
+    assert_equal "organizer", result["kind"].value
+    assert_equal "[2]", result.selector
+  end
+
+  test "find_by with positional selector" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        kind: speaker
+      - name: Bob
+        kind: organizer
+    YAML
+
+    result = document.root.find_by("name", "Bob")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "Bob", result["name"].value
+  end
+
+  test "where returns all matching bound nodes" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        kind: speaker
+      - name: Bob
+        kind: organizer
+      - name: Charlie
+        kind: speaker
+    YAML
+
+    results = document.root.where(kind: "speaker")
+
+    assert_equal 2, results.length
+    assert_equal "Alice", results[0]["name"].value
+    assert_equal "Charlie", results[1]["name"].value
+  end
+
+  test "index_of with kwargs for map sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+      - name: Bob
+      - name: Charlie
+    YAML
+
+    assert_equal 1, document.root.index_of(name: "Bob")
+    assert_nil document.root.index_of(name: "Missing")
+  end
+
+  test "pluck single field" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        slug: alice
+      - name: Bob
+        slug: bob
+    YAML
+
+    assert_equal ["Alice", "Bob"], document.root.pluck(:name)
+  end
+
+  test "pluck with missing fields returns nil" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        github: aalice
+      - name: Bob
+    YAML
+
+    assert_equal ["aalice", nil], document.root.pluck(:github)
+    assert_equal [["Alice", "aalice"], ["Bob", nil]], document.root.pluck(:name, :github)
+  end
+
+  test "pluck returns typed values" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        age: 30
+        active: true
+      - name: Bob
+        age: 25
+        active: false
+    YAML
+
+    assert_equal [30, 25], document.root.pluck(:age)
+    assert_equal [true, false], document.root.pluck(:active)
+    assert_equal [["Alice", 30, true], ["Bob", 25, false]], document.root.pluck(:name, :age, :active)
+  end
+
+  test "pluck multiple fields" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        slug: alice
+        github: aalice
+      - name: Bob
+        slug: bob
+        github: bbob
+    YAML
+
+    assert_equal [["Alice", "alice"], ["Bob", "bob"]], document.root.pluck(:name, :slug)
+    assert_equal [["Alice", "alice", "aalice"], ["Bob", "bob", "bbob"]], document.root.pluck(:name, :slug, :github)
+  end
+
+  test "index_of with kwargs on scalar sequence returns nil" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+    YAML
+
+    assert_nil document["tags"].index_of(name: "ruby")
+  end
+
+  test "index_of with scalar value on map sequence returns nil" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+      - name: Bob
+    YAML
+
+    assert_nil document.root.index_of("Alice")
+  end
+
+  test "index_of with scalar value for scalar sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+        - go
+    YAML
+
+    assert_equal 0, document["tags"].index_of("ruby")
+    assert_equal 2, document["tags"].index_of("go")
+    assert_nil document["tags"].index_of("python")
+  end
 end

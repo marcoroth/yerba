@@ -58,7 +58,87 @@ module Yerba
     def each
       return enum_for(:each) unless block_given?
 
-      length.times { |i| yield self[i] }
+      length.times { |index| yield self[index] }
+    end
+
+    def find_by(selector = nil, value = nil, **criteria)
+      index = index_of(selector, value, **criteria)
+
+      self[index] if index
+    end
+
+    def where(selector = nil, value = nil, **criteria)
+      indices_of(selector, value, **criteria).map { |index| self[index] }
+    end
+
+    def pluck(*fields)
+      return [] unless @document
+
+      if fields.length == 1
+        all_values = @document.get_value(@selector)
+        return [] unless all_values.is_a?(Array)
+
+        all_values.map { |item| item.is_a?(Hash) ? item[fields.first.to_s] : item }
+      else
+        all_values = @document.get_value(@selector)
+        return [] unless all_values.is_a?(Array)
+
+        all_values.map { |item| fields.map(&:to_s).map { |field| item.is_a?(Hash) ? item[field] : nil } }
+      end
+    end
+
+    def index_of(selector = nil, value = nil, **criteria)
+      if selector && value.nil? && criteria.empty?
+        values = @document&.get("#{@selector}[]")
+
+        return values.index(selector) if values.is_a?(Array)
+
+        return nil
+      end
+
+      criteria[selector] = value if selector && value
+
+      indices = nil
+
+      criteria.each do |field, expected|
+        values = @document&.get("#{@selector}[].#{field}")
+
+        next unless values.is_a?(Array)
+
+        matching = values.each_with_index.filter_map { |actual, index| index if actual == expected }
+
+        indices = indices ? indices & matching : matching
+      end
+
+      indices&.first
+    end
+
+    def indices_of(selector = nil, value = nil, **criteria)
+      if selector && value.nil? && criteria.empty?
+        values = @document&.get("#{@selector}[]")
+
+        if values.is_a?(Array)
+          return values.each_with_index.filter_map { |actual, index| index if actual == selector }
+        end
+
+        return []
+      end
+
+      criteria[selector] = value if selector && value
+
+      indices = nil
+
+      criteria.each do |field, expected|
+        values = @document&.get("#{@selector}[].#{field}")
+
+        next unless values.is_a?(Array)
+
+        matching = values.each_with_index.filter_map { |actual, index| index if actual == expected }
+
+        indices = indices ? indices & matching : matching
+      end
+
+      indices || []
     end
 
     def length
@@ -69,6 +149,7 @@ module Yerba
           scalar_items.length
         else
           data = @document.get_value(@selector)
+
           data.is_a?(Array) ? data.length : 0
         end
       else
@@ -172,6 +253,7 @@ module Yerba
           result
         else
           data = @document.get_value(@selector)
+
           data.is_a?(Array) ? data : []
         end
       else

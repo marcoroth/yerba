@@ -48,7 +48,8 @@ impl Args {
       |document, path, reference| document.resolve_sequence_index(path, reference),
     );
 
-    run_op(|| document.move_item(&self.selector, from_index, to_index));
+    let result = document.move_item(&self.selector, from_index, to_index);
+    run_op(&self.file, &document, result);
     output(&self.file, &document, self.dry_run);
   }
 }

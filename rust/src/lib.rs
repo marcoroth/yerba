@@ -1,3 +1,4 @@
+pub mod didyoumean;
 mod document;
 mod error;
 pub mod ffi;
@@ -8,7 +9,7 @@ mod syntax;
 mod yaml_writer;
 pub mod yerbafile;
 
-pub use document::{Document, InsertPosition, SortField};
+pub use document::{collect_selectors, Document, InsertPosition, SortField};
 pub use error::YerbaError;
 pub use quote_style::QuoteStyle;
 pub use selector::Selector;

@@ -2,7 +2,8 @@
 pub enum YerbaError {
   ParseError(String),
   IoError(std::io::Error),
-  PathNotFound(String),
+  SelectorNotFound(String),
+  AmbiguousSelector(String, usize),
   NotASequence(String),
   IndexOutOfBounds(usize, usize),
   UnknownKeys(Vec<String>),
@@ -13,7 +14,16 @@ impl std::fmt::Display for YerbaError {
     match self {
       YerbaError::ParseError(msg) => write!(f, "parse error: {}", msg),
       YerbaError::IoError(err) => write!(f, "io error: {}", err),
-      YerbaError::PathNotFound(path) => write!(f, "path not found: {}", path),
+      YerbaError::SelectorNotFound(selector) => write!(f, "selector not found: {}", selector),
+
+      YerbaError::AmbiguousSelector(selector, count) => {
+        write!(
+          f,
+          "selector \"{}\" matched {} nodes (expected 1). Use --all to update all matches",
+          selector, count
+        )
+      }
+
       YerbaError::NotASequence(path) => write!(f, "not a sequence: {}", path),
 
       YerbaError::IndexOutOfBounds(index, length) => {

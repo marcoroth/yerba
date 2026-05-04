@@ -330,13 +330,77 @@ pub(crate) fn parse_file(file: &str) -> yerba::Document {
   })
 }
 
-pub(crate) fn run_op(operation: impl FnOnce() -> Result<(), yerba::YerbaError>) {
+pub(crate) fn run_op(file: &str, document: &yerba::Document, result: Result<(), yerba::YerbaError>) {
+  run_op_with_hint(file, document, result, None);
+}
+
+pub(crate) fn run_op_with_hint(
+  file: &str,
+  document: &yerba::Document,
+  result: Result<(), yerba::YerbaError>,
+  hint: Option<&str>,
+) {
   use color::*;
 
-  operation().unwrap_or_else(|error| {
-    eprintln!("{RED}Error:{RESET} {}", error);
+  if let Err(error) = result {
+    if let yerba::YerbaError::SelectorNotFound(selector) = &error {
+      eprintln!("{RED}Error:{RESET} selector \"{selector}\" not found in {file}");
+
+      show_similar_selectors(file, document, selector);
+    } else {
+      eprintln!("{RED}Error:{RESET} {}", error);
+    }
+
+    if let Some(hint) = hint {
+      if matches!(error, yerba::YerbaError::SelectorNotFound(_)) {
+        eprintln!();
+        eprintln!("  {DIM}Hint: {hint}{RESET}");
+      }
+    }
+
     process::exit(1);
-  });
+  }
+}
+
+pub(crate) fn show_similar_selectors(file: &str, document: &yerba::Document, invalid_path: &str) {
+  use color::*;
+  use yerba::didyoumean::didyoumean_ranked;
+
+  let selectors = document.selectors();
+
+  if selectors.is_empty() {
+    return;
+  }
+
+  let query = invalid_path.split_whitespace().next().unwrap_or(invalid_path);
+  let threshold = query.len() / 2 + 3;
+  let close = didyoumean_ranked(query, &selectors, threshold);
+
+  eprintln!();
+
+  if close.is_empty() {
+    eprintln!("  {BOLD}Available selectors in {file}:{RESET}");
+
+    for selector in selectors.iter().take(10) {
+      eprintln!("    {DIM}{selector}{RESET}");
+    }
+
+    if selectors.len() > 10 {
+      eprintln!("    {DIM}... and {} more{RESET}", selectors.len() - 10);
+    }
+  } else if close.len() == 1 {
+    eprintln!("  {BOLD}Did you mean this selector?{RESET} {}", close[0]);
+  } else {
+    eprintln!("  {BOLD}Did you mean one of these selectors?{RESET}");
+
+    for selector in close.iter().take(5) {
+      eprintln!("    {selector}");
+    }
+  }
+
+  eprintln!();
+  eprintln!("  {BOLD}To see all valid selectors, run:{RESET}");
+  eprintln!("    yerba selectors \"{file}\"{RESET}");
 }
 
 pub(crate) fn output(file: &str, document: &yerba::Document, dry_run: bool) {

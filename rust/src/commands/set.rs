@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use indoc::indoc;
 
 use super::colorize_examples;
-use super::{output, parse_file, run_op};
+use super::{output, parse_file, resolve_files, run_op_with_hint};
 
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
@@ -40,27 +40,37 @@ pub struct Args {
 
 impl Args {
   pub fn run(self) {
-    let mut document = parse_file(&self.file);
     let parent_path = self.selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-    let should_set = if self.if_exists {
-      document.exists(&self.selector)
-    } else if self.if_missing {
-      !document.exists(&self.selector)
-    } else if let Some(condition) = &self.condition {
-      document.evaluate_condition(parent_path, condition)
-    } else {
-      true
-    };
+    for resolved_file in resolve_files(&self.file) {
+      let mut document = parse_file(&resolved_file);
 
-    if should_set {
-      if self.all {
-        run_op(|| document.set_all(&self.selector, &self.value));
+      let should_set = if self.if_exists {
+        document.exists(&self.selector)
+      } else if self.if_missing {
+        !document.exists(&self.selector)
+      } else if let Some(condition) = &self.condition {
+        document.evaluate_condition(parent_path, condition)
       } else {
-        run_op(|| document.set(&self.selector, &self.value));
-      }
-    }
+        true
+      };
 
-    output(&self.file, &document, self.dry_run);
+      if should_set {
+        let result = if self.all {
+          document.set_all(&self.selector, &self.value)
+        } else {
+          document.set(&self.selector, &self.value)
+        };
+
+        run_op_with_hint(
+          &resolved_file,
+          &document,
+          result,
+          Some("Use --if-exists to skip files where the selector is missing"),
+        );
+      }
+
+      output(&resolved_file, &document, self.dry_run);
+    }
   }
 }

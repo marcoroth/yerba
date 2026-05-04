@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 
 use indoc::indoc;
 
-use super::{colorize_examples, parse_file, resolve_files};
+use super::{colorize_examples, parse_file, resolve_files, show_similar_selectors};
 
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
@@ -64,25 +64,55 @@ impl Args {
 
     let search_path_string = search_path.to_selector_string();
     let mut all_results: Vec<serde_json::Value> = Vec::new();
+    let files = resolve_files(&self.file);
+    let is_glob = files.len() > 1;
 
-    for resolved_file in resolve_files(&self.file) {
-      let document = parse_file(&resolved_file);
+    for resolved_file in &files {
+      let document = parse_file(resolved_file);
+
+      if normalized_condition.is_none() && !document.exists(&self.selector) {
+        if is_glob {
+          continue;
+        }
+
+        use super::color::*;
+
+        eprintln!(
+          "{RED}Error:{RESET} selector \"{}\" not found in {}",
+          self.selector, resolved_file
+        );
+
+        show_similar_selectors(resolved_file, &document, &self.selector);
+        process::exit(1);
+      }
+
+      if let Some(fields) = &select_fields {
+        for field in fields {
+          let field_trimmed = field.trim().trim_start_matches('.');
+          let full_selector = if search_path_string.is_empty() {
+            field_trimmed.to_string()
+          } else {
+            format!("{}.{}", search_path_string, field_trimmed)
+          };
+
+          if !document.exists(&full_selector) {
+            use super::color::*;
+            eprintln!(
+              "{RED}Error:{RESET} select field \"{}\" not found in {}",
+              field.trim(),
+              resolved_file
+            );
+            show_similar_selectors(resolved_file, &document, &full_selector);
+            process::exit(1);
+          }
+        }
+      }
 
       let values: Vec<serde_yaml::Value> = if let Some(condition) = &normalized_condition {
         document.filter(&search_path_string, condition)
       } else {
         document.get_values(&search_path_string)
       };
-
-      if values.is_empty()
-        && !selector.has_brackets()
-        && normalized_condition.is_none()
-        && !document.exists(&self.selector)
-      {
-        use super::color::*;
-        eprintln!("{RED}Error:{RESET} path not found: {}", self.selector);
-        process::exit(1);
-      }
 
       for value in values {
         if let Some(field) = &extract_field {
@@ -119,6 +149,19 @@ impl Args {
 
         all_results.push(yerba::json::yaml_to_json(&value));
       }
+    }
+
+    if is_glob && all_results.is_empty() && normalized_condition.is_none() {
+      use super::color::*;
+
+      eprintln!(
+        "{RED}Error:{RESET} selector \"{}\" not found in any of the {} files matching \"{}\"",
+        self.selector,
+        files.len(),
+        self.file
+      );
+
+      process::exit(1);
     }
 
     if self.raw {

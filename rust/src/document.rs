@@ -53,7 +53,7 @@ impl SortField {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InsertPosition {
   At(usize),
   Last,
@@ -167,6 +167,18 @@ impl Document {
       .filter(|node| self.evaluate_condition_on_node(node, condition))
       .map(node_to_yaml_value)
       .collect()
+  }
+
+  pub fn selectors(&self) -> Vec<String> {
+    let Some(value) = self.get_value("") else {
+      return Vec::new();
+    };
+
+    let mut selectors = Vec::new();
+    collect_selectors(&value, "", &mut selectors);
+    selectors.sort();
+    selectors.dedup();
+    selectors
   }
 
   fn evaluate_condition_on_node(&self, node: &SyntaxNode, condition: &str) -> bool {
@@ -354,7 +366,7 @@ impl Document {
     }
 
     let scalar_token =
-      find_scalar_token(&current_node).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     let new_text = format_scalar_value(value, scalar_token.kind());
 
@@ -365,7 +377,7 @@ impl Document {
     let nodes = self.navigate_all(dot_path);
 
     if nodes.is_empty() {
-      return Err(YerbaError::PathNotFound(dot_path.to_string()));
+      return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
     }
 
     for node in nodes.into_iter().rev() {
@@ -382,7 +394,7 @@ impl Document {
   pub fn set_scalar_style(&mut self, dot_path: &str, style: &QuoteStyle) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
     let scalar_token =
-      find_scalar_token(&current_node).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     let current_kind = scalar_token.kind();
     let target_kind = style.to_syntax_kind();
@@ -424,7 +436,7 @@ impl Document {
     }
 
     let scalar_token =
-      find_scalar_token(&current_node).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     self.replace_token(&scalar_token, value)
   }
@@ -458,7 +470,7 @@ impl Document {
     let entries: Vec<_> = sequence.entries().collect();
 
     if entries.is_empty() {
-      return Err(YerbaError::PathNotFound(dot_path.to_string()));
+      return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
     }
 
     let indent = entries
@@ -533,7 +545,7 @@ impl Document {
               .map(|text| text == target_value)
               .unwrap_or(false)
           })
-          .ok_or_else(|| YerbaError::PathNotFound(format!("{} item '{}'", dot_path, target_value)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", dot_path, target_value)))?;
 
         let target_range = target_entry.syntax().text_range();
         let replacement = format!("{}\n{}", new_item, indent);
@@ -552,7 +564,7 @@ impl Document {
               .map(|text| text == target_value)
               .unwrap_or(false)
           })
-          .ok_or_else(|| YerbaError::PathNotFound(format!("{} item '{}'", dot_path, target_value)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", dot_path, target_value)))?;
 
         let new_text = format!("\n{}{}", indent, new_item);
 
@@ -563,7 +575,7 @@ impl Document {
         let target_entry = entries
           .iter()
           .find(|entry| self.evaluate_condition_on_node(entry.syntax(), &condition))
-          .ok_or_else(|| YerbaError::PathNotFound(format!("{} condition '{}'", dot_path, condition)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} condition '{}'", dot_path, condition)))?;
 
         let target_range = target_entry.syntax().text_range();
         let replacement = format!("{}\n{}", new_item, indent);
@@ -576,7 +588,7 @@ impl Document {
         let target_entry = entries
           .iter()
           .find(|entry| self.evaluate_condition_on_node(entry.syntax(), &condition))
-          .ok_or_else(|| YerbaError::PathNotFound(format!("{} condition '{}'", dot_path, condition)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} condition '{}'", dot_path, condition)))?;
 
         let new_text = format!("\n{}{}", indent, new_item);
 
@@ -604,7 +616,7 @@ impl Document {
     let map = current_node
       .descendants()
       .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     let entries: Vec<_> = map.entries().collect();
 
@@ -656,7 +668,7 @@ impl Document {
 
       InsertPosition::Before(target_key) => {
         let target_entry = find_entry_by_key(&map, &target_key)
-          .ok_or_else(|| YerbaError::PathNotFound(format!("{}.{}", dot_path, target_key)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", dot_path, target_key)))?;
 
         let target_range = target_entry.syntax().text_range();
         let replacement = format!("{}\n{}", new_entry_text, indent);
@@ -667,7 +679,7 @@ impl Document {
 
       InsertPosition::After(target_key) => {
         let target_entry = find_entry_by_key(&map, &target_key)
-          .ok_or_else(|| YerbaError::PathNotFound(format!("{}.{}", dot_path, target_key)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", dot_path, target_key)))?;
 
         let new_text = format!("\n{}{}", indent, new_entry_text);
 
@@ -729,17 +741,17 @@ impl Document {
       let map = parent_node
         .descendants()
         .find_map(BlockMap::cast)
-        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+        .ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
 
       let entry =
-        find_entry_by_key(&map, source_key).ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+        find_entry_by_key(&map, source_key).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
 
       let key_node = entry
         .key()
-        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+        .ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
 
       let key_token =
-        find_scalar_token(key_node.syntax()).ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+        find_scalar_token(key_node.syntax()).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
 
       let new_text = format_scalar_value(destination_key, key_token.kind());
 
@@ -747,7 +759,7 @@ impl Document {
     } else {
       let value = self
         .get(source_path)
-        .ok_or_else(|| YerbaError::PathNotFound(source_path.to_string()))?;
+        .ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
 
       self.delete(source_path)?;
       self.insert_into(destination_path, &value, InsertPosition::Last)
@@ -763,9 +775,9 @@ impl Document {
     let map = parent_node
       .descendants()
       .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
-    let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+    let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     self.remove_node(entry.syntax())
   }
@@ -787,7 +799,7 @@ impl Document {
           .map(|text| text == value)
           .unwrap_or(false)
       })
-      .ok_or_else(|| YerbaError::PathNotFound(format!("{} item '{}'", dot_path, value)))?;
+      .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", dot_path, value)))?;
 
     self.remove_node(target_entry.syntax())
   }
@@ -838,7 +850,7 @@ impl Document {
     let map = current_node
       .descendants()
       .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     let entries: Vec<_> = map.entries().collect();
 
@@ -851,7 +863,7 @@ impl Document {
     let map = current_node
       .descendants()
       .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     if let Ok(index) = reference.parse::<usize>() {
       let length = map.entries().count();
@@ -874,7 +886,7 @@ impl Document {
           .unwrap_or(false)
       })
       .map(|(index, _entry)| index)
-      .ok_or_else(|| YerbaError::PathNotFound(format!("{} key '{}'", dot_path, reference)))
+      .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} key '{}'", dot_path, reference)))
   }
 
   pub fn resolve_sequence_index(&self, dot_path: &str, reference: &str) -> Result<usize, YerbaError> {
@@ -901,7 +913,7 @@ impl Document {
         .enumerate()
         .find(|(_index, entry)| self.evaluate_condition_on_node(entry.syntax(), reference))
         .map(|(index, _entry)| index)
-        .ok_or_else(|| YerbaError::PathNotFound(format!("{} condition '{}'", dot_path, reference)));
+        .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} condition '{}'", dot_path, reference)));
     }
 
     sequence
@@ -915,7 +927,7 @@ impl Document {
           .unwrap_or(false)
       })
       .map(|(index, _entry)| index)
-      .ok_or_else(|| YerbaError::PathNotFound(format!("{} item '{}'", dot_path, reference)))
+      .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", dot_path, reference)))
   }
 
   pub fn validate_sort_keys(&self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
@@ -934,7 +946,7 @@ impl Document {
     let map = current_node
       .descendants()
       .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     let unknown_keys: Vec<String> = map
       .entries()
@@ -965,7 +977,7 @@ impl Document {
     let map = current_node
       .descendants()
       .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     let entries: Vec<_> = map.entries().collect();
 
@@ -1682,12 +1694,12 @@ impl Document {
     Self::validate_path(dot_path)?;
 
     if dot_path.is_empty() {
-      let root = Root::cast(self.root.clone()).ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+      let root = Root::cast(self.root.clone()).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
       let document = root
         .documents()
         .next()
-        .ok_or_else(|| YerbaError::PathNotFound(dot_path.to_string()))?;
+        .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
       return Ok(document.syntax().clone());
     }
@@ -1695,13 +1707,9 @@ impl Document {
     let nodes = self.navigate_all(dot_path);
 
     match nodes.len() {
-      0 => Err(YerbaError::PathNotFound(dot_path.to_string())),
+      0 => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
       1 => Ok(nodes.into_iter().next().unwrap()),
-      _ => Err(YerbaError::PathNotFound(format!(
-        "{} (matched {} nodes, expected 1)",
-        dot_path,
-        nodes.len()
-      ))),
+      _ => Err(YerbaError::AmbiguousSelector(dot_path.to_string(), nodes.len())),
     }
   }
 
@@ -1886,6 +1894,36 @@ impl Document {
 impl std::fmt::Display for Document {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.root.text())
+  }
+}
+
+pub fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mut Vec<String>) {
+  match value {
+    serde_yaml::Value::Mapping(map) => {
+      for (key, child) in map {
+        if let serde_yaml::Value::String(key_string) = key {
+          let selector = if prefix.is_empty() {
+            key_string.clone()
+          } else {
+            format!("{}.{}", prefix, key_string)
+          };
+
+          selectors.push(selector.clone());
+          collect_selectors(child, &selector, selectors);
+        }
+      }
+    }
+
+    serde_yaml::Value::Sequence(sequence) => {
+      let bracket_prefix = format!("{}[]", prefix);
+      selectors.push(bracket_prefix.clone());
+
+      for item in sequence {
+        collect_selectors(item, &bracket_prefix, selectors);
+      }
+    }
+
+    _ => {}
   }
 }
 

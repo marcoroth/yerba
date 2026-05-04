@@ -3,12 +3,13 @@ use std::sync::LazyLock;
 use indoc::indoc;
 
 use super::colorize_examples;
-use super::{output, parse_file, run_op};
+use super::{output, parse_file, resolve_files, run_op};
 
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
     yerba delete config.yml "database.pool"
     yerba delete videos.yml "[0].description"
+    yerba delete "data/**/event.yml" "date_precision"
     yerba delete config.yml "database.pool" --dry-run
   "#})
 });
@@ -28,8 +29,12 @@ pub struct Args {
 
 impl Args {
   pub fn run(self) {
-    let mut document = parse_file(&self.file);
-    run_op(|| document.delete(&self.selector));
-    output(&self.file, &document, self.dry_run);
+    for resolved_file in resolve_files(&self.file) {
+      let mut document = parse_file(&resolved_file);
+      let result = document.delete(&self.selector);
+
+      run_op(&resolved_file, &document, result);
+      output(&resolved_file, &document, self.dry_run);
+    }
   }
 }

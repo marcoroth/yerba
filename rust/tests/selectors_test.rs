@@ -2,47 +2,8 @@ mod support;
 use indoc::indoc;
 use support::parse;
 
-fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mut Vec<String>) {
-  match value {
-    serde_yaml::Value::Mapping(map) => {
-      for (key, child) in map {
-        if let serde_yaml::Value::String(key_string) = key {
-          let selector = if prefix.is_empty() {
-            key_string.clone()
-          } else {
-            format!("{}.{}", prefix, key_string)
-          };
-
-          selectors.push(selector.clone());
-
-          collect_selectors(child, &selector, selectors);
-        }
-      }
-    }
-
-    serde_yaml::Value::Sequence(sequence) => {
-      let bracket_prefix = format!("{}[]", prefix);
-
-      selectors.push(bracket_prefix.clone());
-
-      for item in sequence {
-        collect_selectors(item, &bracket_prefix, selectors);
-      }
-    }
-    _ => {}
-  }
-}
-
 fn get_selectors(yaml: &str) -> Vec<String> {
-  let document = parse(yaml);
-  let value = document.get_value("").unwrap();
-  let mut selectors = Vec::new();
-
-  collect_selectors(&value, "", &mut selectors);
-
-  selectors.sort();
-  selectors.dedup();
-  selectors
+  parse(yaml).selectors()
 }
 
 #[test]

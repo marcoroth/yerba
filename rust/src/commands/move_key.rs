@@ -81,7 +81,8 @@ impl Args {
       |document, parent_path, reference| document.resolve_key_index(parent_path, reference),
     );
 
-    run_op(|| document.move_key(parent_path, from_index, to_index));
+    let result = document.move_key(parent_path, from_index, to_index);
+    run_op(&self.file, &document, result);
     output(&self.file, &document, self.dry_run);
   }
 }

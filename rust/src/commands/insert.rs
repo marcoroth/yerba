@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use indoc::indoc;
 
 use super::colorize_examples;
-use super::{output, parse_file, run_op};
+use super::{output, parse_file, resolve_files, run_op};
 
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
@@ -99,8 +99,12 @@ impl Args {
         .unwrap_or(yerba::InsertPosition::Last)
     };
 
-    let mut document = parse_file(&self.file);
-    run_op(|| document.insert_into(&self.selector, &resolved_value, position));
-    output(&self.file, &document, self.dry_run);
+    for resolved_file in resolve_files(&self.file) {
+      let mut document = parse_file(&resolved_file);
+      let result = document.insert_into(&self.selector, &resolved_value, position.clone());
+
+      run_op(&resolved_file, &document, result);
+      output(&resolved_file, &document, self.dry_run);
+    }
   }
 }

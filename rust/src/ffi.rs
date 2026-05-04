@@ -478,6 +478,27 @@ pub unsafe extern "C" fn yerba_document_delete(document: *mut Document, path: *c
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_insert_objects(
+  document: *mut Document,
+  path: *const c_char,
+  json: *const c_char,
+) -> YerbaResult {
+  let document = &mut *document;
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+  let json_string = CStr::from_ptr(json).to_str().unwrap_or("");
+
+  let json_values: Vec<serde_json::Value> = match serde_json::from_str(json_string) {
+    Ok(values) => values,
+    Err(e) => return YerbaResult::err(&format!("Invalid JSON: {}", e)),
+  };
+
+  match document.insert_objects(selector_string, &json_values) {
+    Ok(()) => YerbaResult::ok(),
+    Err(e) => YerbaResult::err(&e.to_string()),
+  }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_remove(document: *mut Document, path: *const c_char, value: *const c_char) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");

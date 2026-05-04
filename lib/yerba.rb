@@ -8,6 +8,7 @@ require_relative "yerba/formatting"
 require_relative "yerba/scalar"
 require_relative "yerba/map"
 require_relative "yerba/sequence"
+require_relative "yerba/query_result"
 require_relative "yerba/document"
 require_relative "yerba/collection"
 

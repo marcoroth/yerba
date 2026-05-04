@@ -64,6 +64,10 @@ module Yerba
       root << item
     end
 
+    def concat(items)
+      root.concat(items)
+    end
+
     def inspect
       if path
         "#<Yerba::Document path=#{path.inspect}>"

@@ -488,6 +488,17 @@ static VALUE document_insert_object(int argc, VALUE *argv, VALUE self) {
   return self;
 }
 
+/* document.insert_objects(path, array) */
+static VALUE document_insert_objects(VALUE self, VALUE path, VALUE array) {
+  struct Document *document = get_document(self);
+  VALUE json_string = rb_funcall(rb_path2class("JSON"), rb_intern("generate"), 1, array);
+
+  YerbaResult result = yerba_document_insert_objects(document, StringValueCStr(path), StringValueCStr(json_string));
+  check_result(result);
+
+  return self;
+}
+
 /* document.delete(path, condition: nil) */
 static VALUE document_delete(int argc, VALUE *argv, VALUE self) {
   VALUE path, opts;
@@ -803,6 +814,7 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "set", document_set, -1);
   rb_define_method(rb_cDocument, "insert", document_insert, -1);
   rb_define_method(rb_cDocument, "insert_object", document_insert_object, -1);
+  rb_define_method(rb_cDocument, "insert_objects", document_insert_objects, 2);
   rb_define_method(rb_cDocument, "delete", document_delete, -1);
   rb_define_method(rb_cDocument, "remove", document_remove, 2);
   rb_define_method(rb_cDocument, "remove_at", document_remove_at, 2);

@@ -52,6 +52,80 @@ impl Document {
     self.insert_into(dot_path, &yaml_text, position)
   }
 
+  pub fn insert_objects(
+    &mut self,
+    dot_path: &str,
+    json_values: &[serde_json::Value],
+  ) -> Result<(), YerbaError> {
+    if json_values.is_empty() {
+      return Ok(());
+    }
+
+    let quote_style = self.detect_sequence_quote_style(dot_path);
+    let current_node = self.navigate(dot_path)?;
+
+    let sequence = current_node
+      .descendants()
+      .find_map(BlockSeq::cast)
+      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+
+    let entries: Vec<_> = sequence.entries().collect();
+
+    if entries.is_empty() {
+      return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+    }
+
+    let indent = entries
+      .get(1)
+      .or(entries.first())
+      .map(|entry| preceding_whitespace_indent(entry.syntax()))
+      .unwrap_or_default();
+
+    let mut new_text = String::new();
+
+    for json_value in json_values {
+      let yaml_text = crate::yaml_writer::json_to_yaml_text(json_value, &quote_style, 0);
+
+      let new_item = if yaml_text.contains('\n') {
+        let item_indent = format!("{}  ", indent);
+        let lines: Vec<&str> = yaml_text.split('\n').collect();
+
+        let min_indent = lines
+          .iter()
+          .skip(1)
+          .filter(|line| !line.trim().is_empty())
+          .map(|line| line.len() - line.trim_start().len())
+          .min()
+          .unwrap_or(0);
+
+        let indented: Vec<String> = lines
+          .iter()
+          .enumerate()
+          .map(|(index, line)| {
+            if index == 0 {
+              line.to_string()
+            } else if line.trim().is_empty() {
+              String::new()
+            } else {
+              let relative = &line[min_indent..];
+              format!("{}{}", item_indent, relative)
+            }
+          })
+          .collect();
+
+        format!("- {}", indented.join("\n"))
+      } else {
+        format!("- {}", yaml_text)
+      };
+
+      new_text.push_str(&format!("\n{}{}", indent, new_item));
+    }
+
+    let last_entry = entries.last().unwrap();
+
+    self.insert_after_node(last_entry.syntax(), &new_text)
+  }
+
   pub fn insert_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     Self::validate_path(dot_path)?;
 

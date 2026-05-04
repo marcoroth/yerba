@@ -55,6 +55,24 @@ module Yerba
       self
     end
 
+    def concat(items)
+      if @document
+        hashes = items.map do |item|
+          case item
+          when Map then item.to_hash
+          when Hash then item
+          else { value: item.to_s }
+          end
+        end
+
+        @document.insert_objects(@selector, hashes)
+      else
+        @data.concat(items)
+      end
+
+      self
+    end
+
     def each
       return enum_for(:each) unless block_given?
 
@@ -68,7 +86,7 @@ module Yerba
     end
 
     def where(selector = nil, value = nil, **criteria)
-      indices_of(selector, value, **criteria).map { |index| self[index] }
+      QueryResult.new(self, indices_of(selector, value, **criteria))
     end
 
     def pluck(*fields)

@@ -37,7 +37,7 @@ module Yerba
       each do |document|
         next unless document.sequence?
 
-        results.concat(document.root.where(...))
+        results.concat(document.root.where(...).to_a)
       end
 
       results

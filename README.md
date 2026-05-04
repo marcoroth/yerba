@@ -531,13 +531,36 @@ document.sort("tags", order: ["rust", "ruby", "go"])
 
 The `by:` option accepts symbols, strings, or dot-prefixed strings (`:name`, `"name"`, `".name"`).
 
+### Querying
+
+Find and filter items in sequences with `find_by`, `where`, and `pluck`:
+
+```ruby
+document.find_by(name: "Alice")
+document.where(role: "admin")
+document.pluck(:name)
+
+document.find_by(speakers: { name: "Alice" })
+document.where(tags: ["ruby"])
+document.find_by("database.host": "localhost")
+```
+
+These methods work on `Document` (delegates to root), `Sequence`, and `Collection` (searches across files):
+
+```ruby
+collection = Yerba.files("data/**/*.yml")
+collection.find_by(name: "Alice")
+collection.where(kind: "talk")
+collection.pluck(:name)
+```
+
 ### Quote Style Control
 
 Read and set the quote style on individual scalars:
 
 ```ruby
 scalar = document["database.host"]
-scalar.quote_style          # => :double
+scalar.quote_style # => :double
 scalar.quote_style = :single
 ```
 
@@ -560,6 +583,10 @@ collection = Yerba.files("data/**/videos.yml")
 collection.each do |document|
   puts document.get("[0].title")
 end
+
+collection.find_by(name: "Alice")
+collection.where(kind: "talk")
+collection.pluck(:name)
 
 collection.apply! do |document|
   document.set("status", "published")

@@ -60,6 +60,10 @@ module Yerba
       root.pluck(...)
     end
 
+    def <<(item)
+      root << item
+    end
+
     def inspect
       if path
         "#<Yerba::Document path=#{path.inspect}>"

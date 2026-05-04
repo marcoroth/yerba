@@ -744,4 +744,16 @@ class DocumentTest < Minitest::Spec
 
     assert_equal ["Alice", "Bob", "Charlie"], names
   end
+
+  test "document << appends to root sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+      - name: Bob
+    YAML
+
+    document << { name: "Charlie" }
+
+    assert_equal 3, document.root.length
+    assert_equal "Charlie", document.find_by(name: "Charlie")["name"].value
+  end
 end

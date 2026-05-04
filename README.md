@@ -255,14 +255,24 @@ yerba move-key config.yml "database.pool" --after "database.name"
 
 ### `sort`
 
-Sort items in a sequence. For simple scalar sequences, no options are needed. For sequences of maps, use `--by` to specify sort fields. Append `:desc` for descending order:
+Sort items in a sequence. For simple scalar sequences, no options are needed. For sequences of maps, use `--by` to specify the sort field. Use `--order desc` for descending. Repeat `--by` and `--order` for tie-breakers:
 
 ```bash
 yerba sort config.yml "tags"
-yerba sort videos.yml --by "title"
-yerba sort videos.yml --by "date:desc,title"
-yerba sort videos.yml "[].speakers" --by "name"
+yerba sort videos.yml --by ".title"
+yerba sort videos.yml --by ".date" --order desc --by ".title"
+yerba sort videos.yml "[].speakers" --by ".name"
 ```
+
+Use `--order` with a comma-separated list to specify an explicit custom order. All items must be listed:
+
+```bash
+yerba sort videos.yml "[]" --by ".id" --order "talk-c,talk-a,talk-b"
+yerba sort speakers.yml "[]" --by ".name" --order "Charlie,Alice,Bob"
+yerba sort config.yml "tags" --by "." --order "yaml,ruby,rust"
+```
+
+This is useful for reordering items in a specific sequence (e.g., conference schedule order, priority lists) or when an LLM agent needs to rearrange items programmatically.
 
 ### `sort-keys`
 

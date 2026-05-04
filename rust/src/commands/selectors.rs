@@ -81,7 +81,11 @@ impl Args {
 
     for resolved_file in resolve_files(&self.file) {
       let document = parse_file(&resolved_file);
-      let prefix = if selector.is_empty() { String::new() } else { selector.to_string() };
+      let prefix = if selector.is_empty() {
+        String::new()
+      } else {
+        selector.to_string()
+      };
 
       let values = if selector.is_empty() {
         document.get_value("").into_iter().collect::<Vec<_>>()

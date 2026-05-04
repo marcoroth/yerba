@@ -80,8 +80,8 @@ begin
         RakeCompilerDock.sh(
           "rustup target add #{rust_target} 2>/dev/null; " \
           "export #{linker_env}; " \
-          "cd rust && cargo build --release --target #{rust_target} && cd .. && " \
-          "mkdir -p exe/#{platform} && cp rust/target/#{rust_target}/release/yerba exe/#{platform}/yerba && " \
+          "cargo build --release --target #{rust_target} && " \
+          "mkdir -p exe/#{platform} && cp target/#{rust_target}/release/yerba exe/#{platform}/yerba && " \
           "export RCD_PLATFORM=#{platform} && " \
           "bundle --local && rake native:#{platform} gem RUBY_CC_VERSION='#{ENV.fetch("RUBY_CC_VERSION", nil)}'",
           platform: platform,

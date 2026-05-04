@@ -98,9 +98,7 @@ fn test_sort_by_multiple_fields() {
       title: Alpha
   "});
 
-  document
-    .sort_items("", &[SortField::asc("kind"), SortField::asc("title")], true)
-    .unwrap();
+  document.sort_items("", &[SortField::asc("kind"), SortField::asc("title")], true).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -126,9 +124,7 @@ fn test_sort_by_mixed_directions() {
       title: A
   "});
 
-  document
-    .sort_items("", &[SortField::asc("kind"), SortField::desc("title")], true)
-    .unwrap();
+  document.sort_items("", &[SortField::asc("kind"), SortField::desc("title")], true).unwrap();
 
   assert_eq!(
     document.to_string(),

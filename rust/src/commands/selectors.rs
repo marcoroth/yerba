@@ -81,11 +81,7 @@ impl Args {
 
     for resolved_file in resolve_files(&self.file) {
       let document = parse_file(&resolved_file);
-      let prefix = if selector.is_empty() {
-        String::new()
-      } else {
-        selector.to_string()
-      };
+      let prefix = if selector.is_empty() { String::new() } else { selector.to_string() };
 
       let values = if selector.is_empty() {
         document.get_value("").into_iter().collect::<Vec<_>>()
@@ -112,14 +108,7 @@ impl Args {
       if let Some(label) = info.count_label() {
         let padding = max_selector_len - selector.len() + 2;
 
-        println!(
-          "{}{}{}{}{}",
-          selector,
-          " ".repeat(padding),
-          color::DIM,
-          label,
-          color::RESET
-        );
+        println!("{}{}{}{}{}", selector, " ".repeat(padding), color::DIM, label, color::RESET);
       } else {
         println!("{}", selector);
       }
@@ -127,12 +116,7 @@ impl Args {
   }
 }
 
-fn collect_selectors(
-  value: &serde_yaml::Value,
-  prefix: &str,
-  selectors: &mut BTreeMap<String, SelectorInfo>,
-  counter: &mut usize,
-) {
+fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mut BTreeMap<String, SelectorInfo>, counter: &mut usize) {
   match value {
     serde_yaml::Value::Mapping(map) => {
       for (key, child) in map {

@@ -215,9 +215,7 @@ fn test_enforce_key_style_scoped_to_path() {
       name: myapp
   "});
 
-  document
-    .enforce_key_style(&yerba::KeyStyle::Double, Some("database"))
-    .unwrap();
+  document.enforce_key_style(&yerba::KeyStyle::Double, Some("database")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -315,9 +313,7 @@ fn test_enforce_quotes_scoped_to_single_key() {
     name: myapp
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Single, Some("host"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Single, Some("host")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -339,9 +335,7 @@ fn test_enforce_quotes_scoped_to_nested_key() {
       name: myapp
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Double, Some("database"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Double, Some("database")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -433,9 +427,7 @@ fn test_double_to_literal() {
     description: "Hello World"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -452,9 +444,7 @@ fn test_single_to_literal() {
     description: 'Hello World'
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -471,9 +461,7 @@ fn test_plain_to_literal() {
     description: Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -490,9 +478,7 @@ fn test_double_to_folded() {
     description: "Hello World"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Folded, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Folded, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -510,9 +496,7 @@ fn test_literal_to_double() {
       Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -530,9 +514,7 @@ fn test_literal_multiline_to_double() {
       Second line
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -549,9 +531,7 @@ fn test_literal_single_line_to_single() {
       Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Single, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Single, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -571,9 +551,7 @@ fn test_literal_multiline_to_single_skipped() {
 
   let original = document.to_string();
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Single, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Single, Some("description")).unwrap();
 
   assert_eq!(document.to_string(), original);
 }
@@ -585,9 +563,7 @@ fn test_literal_single_line_to_plain() {
       Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -607,9 +583,7 @@ fn test_literal_multiline_to_plain_skipped() {
 
   let original = document.to_string();
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description")).unwrap();
 
   assert_eq!(document.to_string(), original);
 }
@@ -623,9 +597,7 @@ fn test_literal_with_colon_to_plain_skipped() {
 
   let original = document.to_string();
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description")).unwrap();
 
   assert_eq!(document.to_string(), original);
 }
@@ -637,9 +609,7 @@ fn test_literal_to_folded() {
       Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Folded, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Folded, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -657,9 +627,7 @@ fn test_literal_to_literal_clip() {
       Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::LiteralClip, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::LiteralClip, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -677,9 +645,7 @@ fn test_literal_to_literal_keep() {
       Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::LiteralKeep, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::LiteralKeep, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -697,9 +663,7 @@ fn test_folded_to_literal() {
       Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -717,9 +681,7 @@ fn test_folded_to_folded_keep() {
       Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::FoldedKeep, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::FoldedKeep, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -739,9 +701,7 @@ fn test_literal_noop_when_already_correct() {
 
   let original = document.to_string();
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(document.to_string(), original);
 }
@@ -754,9 +714,7 @@ fn test_literal_preserves_other_fields() {
     name: "test"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -778,9 +736,7 @@ fn test_literal_in_sequence() {
       description: "Second talk"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("[].description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("[].description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -803,9 +759,7 @@ fn test_literal_skips_empty_string() {
 
   let original = document.to_string();
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(document.to_string(), original);
 }
@@ -818,9 +772,7 @@ fn test_literal_multiline_to_single_returns_warning() {
       Second line
   "});
 
-  let warnings = document
-    .enforce_quotes_at(&yerba::QuoteStyle::Single, Some("description"))
-    .unwrap();
+  let warnings = document.enforce_quotes_at(&yerba::QuoteStyle::Single, Some("description")).unwrap();
 
   assert_eq!(warnings.len(), 1);
   assert!(warnings[0].contains("skipped"));
@@ -835,9 +787,7 @@ fn test_literal_multiline_to_plain_returns_warning() {
       Second line
   "});
 
-  let warnings = document
-    .enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description"))
-    .unwrap();
+  let warnings = document.enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description")).unwrap();
 
   assert_eq!(warnings.len(), 1);
   assert!(warnings[0].contains("skipped"));
@@ -851,9 +801,7 @@ fn test_literal_with_colon_to_plain_returns_warning() {
       key: value
   "});
 
-  let warnings = document
-    .enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description"))
-    .unwrap();
+  let warnings = document.enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description")).unwrap();
 
   assert_eq!(warnings.len(), 1);
   assert!(warnings[0].contains("skipped"));
@@ -865,9 +813,7 @@ fn test_successful_conversion_returns_no_warnings() {
     description: "Hello World"
   "#});
 
-  let warnings = document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  let warnings = document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert!(warnings.is_empty());
 }
@@ -887,9 +833,7 @@ fn test_mixed_document_to_literal_scoped() {
         - "Bob"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("[].description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("[].description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -927,9 +871,7 @@ fn test_mixed_document_literal_to_double_scoped() {
         - "Bob"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Double, Some("[].description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Double, Some("[].description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -990,9 +932,7 @@ fn test_mixed_document_multiline_block_skipped_to_single() {
 
   let original = document.to_string();
 
-  let warnings = document
-    .enforce_quotes_at(&yerba::QuoteStyle::Single, Some("[].description"))
-    .unwrap();
+  let warnings = document.enforce_quotes_at(&yerba::QuoteStyle::Single, Some("[].description")).unwrap();
 
   assert_eq!(document.to_string(), original);
   assert!(warnings.is_empty());
@@ -1011,9 +951,7 @@ fn test_mixed_document_multiline_block_skipped_in_sequence() {
       description: "Short"
   "#});
 
-  let warnings = document
-    .enforce_quotes_at(&yerba::QuoteStyle::Single, Some("[].description"))
-    .unwrap();
+  let warnings = document.enforce_quotes_at(&yerba::QuoteStyle::Single, Some("[].description")).unwrap();
 
   assert_eq!(warnings.len(), 1);
   assert!(warnings[0].contains("skipped"));
@@ -1040,9 +978,7 @@ fn test_literal_strip_to_clip_to_keep_roundtrip() {
       Hello World
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::LiteralClip, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::LiteralClip, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1052,9 +988,7 @@ fn test_literal_strip_to_clip_to_keep_roundtrip() {
     "}
   );
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::LiteralKeep, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::LiteralKeep, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1064,9 +998,7 @@ fn test_literal_strip_to_clip_to_keep_roundtrip() {
     "}
   );
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1083,9 +1015,7 @@ fn test_double_to_literal_and_back() {
     description: "Hello World"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1095,9 +1025,7 @@ fn test_double_to_literal_and_back() {
     "}
   );
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1227,9 +1155,7 @@ fn test_double_with_escaped_newlines_to_literal() {
     description: "First line.\nSecond line.\nThird line."
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1248,9 +1174,7 @@ fn test_double_with_escaped_tab_to_literal() {
     description: "Hello\tWorld"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(document.to_string(), "description: |-\n  Hello\tWorld\n");
 }
@@ -1264,9 +1188,7 @@ fn test_literal_with_newlines_to_double() {
       Third line.
   "});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1282,9 +1204,7 @@ fn test_double_with_newlines_to_literal_and_back() {
     description: "First.\nSecond."
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1295,9 +1215,7 @@ fn test_double_with_newlines_to_literal_and_back() {
     "}
   );
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Double, Some("description")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1313,9 +1231,7 @@ fn test_double_with_escaped_backslash_preserved() {
     path: "C:\\Users\\test"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("path"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("path")).unwrap();
 
   assert_eq!(document.to_string(), "path: |-\n  C:\\Users\\test\n");
 }
@@ -1324,9 +1240,7 @@ fn test_double_with_escaped_backslash_preserved() {
 fn test_literal_with_backslash_to_double() {
   let mut document = parse("path: |-\n  C:\\Users\\test\n");
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Double, Some("path"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Double, Some("path")).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -1343,9 +1257,7 @@ fn test_double_to_literal_nested() {
       description: "A database config"
   "#});
 
-  document
-    .enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("database.description"))
-    .unwrap();
+  document.enforce_quotes_at(&yerba::QuoteStyle::Literal, Some("database.description")).unwrap();
 
   assert_eq!(
     document.to_string(),

@@ -199,10 +199,7 @@ fn test_set_bracket_index_multiple_matches_error() {
 
   let result = document.set("[].title", "test");
 
-  assert!(
-    result.is_err(),
-    "setting on [] (all items) should error — use a specific index"
-  );
+  assert!(result.is_err(), "setting on [] (all items) should error — use a specific index");
 }
 
 #[test]

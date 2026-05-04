@@ -62,14 +62,7 @@ fn test_selectors_nested_sequence() {
 
   assert_eq!(
     selectors,
-    vec![
-      "[]",
-      "[].id",
-      "[].speakers",
-      "[].speakers[]",
-      "[].speakers[].name",
-      "[].speakers[].slug",
-    ]
+    vec!["[]", "[].id", "[].speakers", "[].speakers[]", "[].speakers[].name", "[].speakers[].slug",]
   );
 }
 
@@ -84,10 +77,7 @@ fn test_selectors_mixed_structure() {
       - rust
   "});
 
-  assert_eq!(
-    selectors,
-    vec!["database", "database.host", "database.port", "tags", "tags[]"]
-  );
+  assert_eq!(selectors, vec!["database", "database.host", "database.port", "tags", "tags[]"]);
 }
 
 #[test]

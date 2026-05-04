@@ -6,16 +6,8 @@ impl Document {
     Self::validate_path(destination_path)?;
 
     let source_parent = source_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
-
-    let destination_parent = destination_path
-      .rsplit_once('.')
-      .map(|(parent, _)| parent)
-      .unwrap_or("");
-
-    let destination_key = destination_path
-      .rsplit_once('.')
-      .map(|(_, key)| key)
-      .unwrap_or(destination_path);
+    let destination_parent = destination_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+    let destination_key = destination_path.rsplit_once('.').map(|(_, key)| key).unwrap_or(destination_path);
 
     if source_parent == destination_parent {
       let (parent_path, source_key) = source_path.rsplit_once('.').unwrap_or(("", source_path));
@@ -26,23 +18,14 @@ impl Document {
         .find_map(BlockMap::cast)
         .ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
 
-      let entry =
-        find_entry_by_key(&map, source_key).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
-
-      let key_node = entry
-        .key()
-        .ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
-
-      let key_token =
-        find_scalar_token(key_node.syntax()).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
-
+      let entry = find_entry_by_key(&map, source_key).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
+      let key_node = entry.key().ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
+      let key_token = find_scalar_token(key_node.syntax()).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
       let new_text = format_scalar_value(destination_key, key_token.kind());
 
       self.replace_token(&key_token, &new_text)
     } else {
-      let value = self
-        .get(source_path)
-        .ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
+      let value = self.get(source_path).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
 
       self.delete(source_path)?;
       self.insert_into(destination_path, &value, InsertPosition::Last)

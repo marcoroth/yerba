@@ -45,12 +45,7 @@ impl Document {
     QuoteStyle::Plain
   }
 
-  pub fn insert_object(
-    &mut self,
-    dot_path: &str,
-    json_value: &serde_json::Value,
-    position: InsertPosition,
-  ) -> Result<(), YerbaError> {
+  pub fn insert_object(&mut self, dot_path: &str, json_value: &serde_json::Value, position: InsertPosition) -> Result<(), YerbaError> {
     let quote_style = self.detect_sequence_quote_style(dot_path);
     let yaml_text = crate::yaml_writer::json_to_yaml_text(json_value, &quote_style, 0);
 
@@ -216,13 +211,7 @@ impl Document {
     }
   }
 
-  fn insert_map_key(
-    &mut self,
-    dot_path: &str,
-    key: &str,
-    value: &str,
-    position: InsertPosition,
-  ) -> Result<(), YerbaError> {
+  fn insert_map_key(&mut self, dot_path: &str, key: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
     let map = current_node
@@ -240,10 +229,7 @@ impl Document {
     }
 
     if find_entry_by_key(&map, key).is_some() {
-      return Err(YerbaError::ParseError(format!(
-        "key '{}' already exists at '{}'",
-        key, dot_path
-      )));
+      return Err(YerbaError::ParseError(format!("key '{}' already exists at '{}'", key, dot_path)));
     }
 
     let indent = entries
@@ -279,8 +265,7 @@ impl Document {
       }
 
       InsertPosition::Before(target_key) => {
-        let target_entry = find_entry_by_key(&map, &target_key)
-          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", dot_path, target_key)))?;
+        let target_entry = find_entry_by_key(&map, &target_key).ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", dot_path, target_key)))?;
 
         let target_range = target_entry.syntax().text_range();
         let replacement = format!("{}\n{}", new_entry_text, indent);
@@ -290,17 +275,14 @@ impl Document {
       }
 
       InsertPosition::After(target_key) => {
-        let target_entry = find_entry_by_key(&map, &target_key)
-          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", dot_path, target_key)))?;
+        let target_entry = find_entry_by_key(&map, &target_key).ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", dot_path, target_key)))?;
 
         let new_text = format!("\n{}{}", indent, new_entry_text);
 
         self.insert_after_node(target_entry.syntax(), &new_text)
       }
 
-      InsertPosition::BeforeCondition(_) | InsertPosition::AfterCondition(_) => {
-        self.insert_map_key(dot_path, key, value, InsertPosition::Last)
-      }
+      InsertPosition::BeforeCondition(_) | InsertPosition::AfterCondition(_) => self.insert_map_key(dot_path, key, value, InsertPosition::Last),
 
       InsertPosition::FromSortOrder(order) => {
         let new_key_position = order.iter().position(|ordered_key| ordered_key == key);

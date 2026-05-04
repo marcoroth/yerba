@@ -39,10 +39,7 @@ impl Args {
     } else {
       use super::color::*;
 
-      eprintln!(
-        "{RED}Error:{RESET} expected a number for blank line count, got '{}'",
-        self.first
-      );
+      eprintln!("{RED}Error:{RESET} expected a number for blank line count, got '{}'", self.first);
 
       std::process::exit(1);
     };

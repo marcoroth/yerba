@@ -158,9 +158,7 @@ pub unsafe extern "C" fn yerba_document_parse_file(path: *const c_char) -> Yerba
     Err(e) => {
       return YerbaParseResult {
         document: ptr::null_mut(),
-        error: CString::new(format!("Invalid UTF-8 in path: {}", e))
-          .unwrap_or_default()
-          .into_raw(),
+        error: CString::new(format!("Invalid UTF-8 in path: {}", e)).unwrap_or_default().into_raw(),
       }
     }
   };
@@ -192,9 +190,7 @@ pub unsafe extern "C" fn yerba_document_parse(content: *const c_char) -> YerbaPa
     Err(e) => {
       return YerbaParseResult {
         document: ptr::null_mut(),
-        error: CString::new(format!("Invalid UTF-8: {}", e))
-          .unwrap_or_default()
-          .into_raw(),
+        error: CString::new(format!("Invalid UTF-8: {}", e)).unwrap_or_default().into_raw(),
       }
     }
   };
@@ -322,9 +318,7 @@ pub unsafe extern "C" fn yerba_document_get_quote_style(document: *const Documen
     Some(style) => {
       let ruby_style = style.replace('-', "_");
 
-      CString::new(ruby_style)
-        .map(|s| s.into_raw())
-        .unwrap_or(std::ptr::null_mut())
+      CString::new(ruby_style).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
     }
 
     None => std::ptr::null_mut(),
@@ -332,11 +326,7 @@ pub unsafe extern "C" fn yerba_document_get_quote_style(document: *const Documen
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_set_quote_style(
-  document: *mut Document,
-  path: *const c_char,
-  style: *const c_char,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_set_quote_style(document: *mut Document, path: *const c_char, style: *const c_char) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
   let style_string = &CStr::from_ptr(style).to_str().unwrap_or("").replace('_', "-");
@@ -353,11 +343,7 @@ pub unsafe extern "C" fn yerba_document_set_quote_style(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_evaluate_condition(
-  document: *const Document,
-  parent_path: *const c_char,
-  condition: *const c_char,
-) -> bool {
+pub unsafe extern "C" fn yerba_document_evaluate_condition(document: *const Document, parent_path: *const c_char, condition: *const c_char) -> bool {
   let document = &*document;
   let parent = CStr::from_ptr(parent_path).to_str().unwrap_or("");
   let cond = CStr::from_ptr(condition).to_str().unwrap_or("");
@@ -372,26 +358,13 @@ pub unsafe extern "C" fn yerba_document_exists(document: *const Document, path: 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_find(
-  document: *const Document,
-  path: *const c_char,
-  condition: *const c_char,
-  select: *const c_char,
-) -> *mut c_char {
+pub unsafe extern "C" fn yerba_document_find(document: *const Document, path: *const c_char, condition: *const c_char, select: *const c_char) -> *mut c_char {
   let document = &*document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
 
-  let condition_string = if condition.is_null() {
-    None
-  } else {
-    CStr::from_ptr(condition).to_str().ok()
-  };
+  let condition_string = if condition.is_null() { None } else { CStr::from_ptr(condition).to_str().ok() };
 
-  let select_string = if select.is_null() {
-    None
-  } else {
-    CStr::from_ptr(select).to_str().ok()
-  };
+  let select_string = if select.is_null() { None } else { CStr::from_ptr(select).to_str().ok() };
 
   let results = document.find_items(selector_string, condition_string, select_string);
   let json = serde_json::to_string_pretty(&results).unwrap_or_else(|_| "[]".to_string());
@@ -505,11 +478,7 @@ pub unsafe extern "C" fn yerba_document_delete(document: *mut Document, path: *c
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_remove(
-  document: *mut Document,
-  path: *const c_char,
-  value: *const c_char,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_remove(document: *mut Document, path: *const c_char, value: *const c_char) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
   let value_string = CStr::from_ptr(value).to_str().unwrap_or("");
@@ -521,11 +490,7 @@ pub unsafe extern "C" fn yerba_document_remove(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_remove_at(
-  document: *mut Document,
-  path: *const c_char,
-  index: usize,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_remove_at(document: *mut Document, path: *const c_char, index: usize) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
 
@@ -536,12 +501,7 @@ pub unsafe extern "C" fn yerba_document_remove_at(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_move_item(
-  document: *mut Document,
-  path: *const c_char,
-  from: usize,
-  to: usize,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_move_item(document: *mut Document, path: *const c_char, from: usize, to: usize) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
 
@@ -552,11 +512,7 @@ pub unsafe extern "C" fn yerba_document_move_item(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_rename(
-  document: *mut Document,
-  source: *const c_char,
-  dest: *const c_char,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_rename(document: *mut Document, source: *const c_char, dest: *const c_char) -> YerbaResult {
   let document = &mut *document;
   let source_string = CStr::from_ptr(source).to_str().unwrap_or("");
   let dest_string = CStr::from_ptr(dest).to_str().unwrap_or("");
@@ -568,20 +524,11 @@ pub unsafe extern "C" fn yerba_document_rename(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_sort(
-  document: *mut Document,
-  path: *const c_char,
-  by: *const c_char,
-  case_sensitive: bool,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_sort(document: *mut Document, path: *const c_char, by: *const c_char, case_sensitive: bool) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
 
-  let by_string = if by.is_null() {
-    None
-  } else {
-    CStr::from_ptr(by).to_str().ok()
-  };
+  let by_string = if by.is_null() { None } else { CStr::from_ptr(by).to_str().ok() };
 
   let sort_fields: Vec<crate::SortField> = match by_string {
     Some(fields) => crate::SortField::parse_list(fields),
@@ -595,12 +542,7 @@ pub unsafe extern "C" fn yerba_document_sort(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_reorder(
-  document: *mut Document,
-  path: *const c_char,
-  by: *const c_char,
-  order_csv: *const c_char,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_reorder(document: *mut Document, path: *const c_char, by: *const c_char, order_csv: *const c_char) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
   let by_string = CStr::from_ptr(by).to_str().unwrap_or("");
@@ -615,11 +557,7 @@ pub unsafe extern "C" fn yerba_document_reorder(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_sort_keys(
-  document: *mut Document,
-  path: *const c_char,
-  order: *const c_char,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_sort_keys(document: *mut Document, path: *const c_char, order: *const c_char) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
   let order_string = CStr::from_ptr(order).to_str().unwrap_or("");
@@ -640,28 +578,18 @@ pub unsafe extern "C" fn yerba_document_quote_style(
 ) -> YerbaResult {
   let document = &mut *document;
 
-  let selector = if path.is_null() {
-    None
-  } else {
-    CStr::from_ptr(path).to_str().ok()
-  };
+  let selector = if path.is_null() { None } else { CStr::from_ptr(path).to_str().ok() };
 
   let key = if key_style.is_null() {
     None
   } else {
-    CStr::from_ptr(key_style)
-      .to_str()
-      .ok()
-      .and_then(|s| s.parse::<crate::KeyStyle>().ok())
+    CStr::from_ptr(key_style).to_str().ok().and_then(|s| s.parse::<crate::KeyStyle>().ok())
   };
 
   let value = if value_style.is_null() {
     None
   } else {
-    CStr::from_ptr(value_style)
-      .to_str()
-      .ok()
-      .and_then(|s| s.parse::<QuoteStyle>().ok())
+    CStr::from_ptr(value_style).to_str().ok().and_then(|s| s.parse::<QuoteStyle>().ok())
   };
 
   match document.enforce_quote_style(key.as_ref(), value.as_ref(), selector) {
@@ -671,11 +599,7 @@ pub unsafe extern "C" fn yerba_document_quote_style(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_blank_lines(
-  document: *mut Document,
-  path: *const c_char,
-  count: usize,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_blank_lines(document: *mut Document, path: *const c_char, count: usize) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
 
@@ -743,26 +667,11 @@ pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *cons
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_glob_find(
-  glob_pattern: *const c_char,
-  path: *const c_char,
-  condition: *const c_char,
-  select: *const c_char,
-) -> YerbaTypedList {
+pub unsafe extern "C" fn yerba_glob_find(glob_pattern: *const c_char, path: *const c_char, condition: *const c_char, select: *const c_char) -> YerbaTypedList {
   let pattern = CStr::from_ptr(glob_pattern).to_str().unwrap_or("");
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
-
-  let condition_string = if condition.is_null() {
-    None
-  } else {
-    CStr::from_ptr(condition).to_str().ok()
-  };
-
-  let select_string = if select.is_null() {
-    None
-  } else {
-    CStr::from_ptr(select).to_str().ok()
-  };
+  let condition_string = if condition.is_null() { None } else { CStr::from_ptr(condition).to_str().ok() };
+  let select_string = if select.is_null() { None } else { CStr::from_ptr(select).to_str().ok() };
 
   let all_results = crate::glob_find(pattern, selector_string, condition_string, select_string);
   let length = all_results.len();

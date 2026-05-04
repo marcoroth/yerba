@@ -11,9 +11,7 @@ fn test_insert_key_at_end() {
       port: 5432
   "});
 
-  document
-    .insert_into("database.ssl", "true", InsertPosition::Last)
-    .unwrap();
+  document.insert_into("database.ssl", "true", InsertPosition::Last).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -34,9 +32,7 @@ fn test_insert_key_at_index() {
       port: 5432
   "});
 
-  document
-    .insert_into("database.ssl", "true", InsertPosition::At(0))
-    .unwrap();
+  document.insert_into("database.ssl", "true", InsertPosition::At(0)).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -58,9 +54,7 @@ fn test_insert_key_after() {
       name: myapp
   "});
 
-  document
-    .insert_into("database.ssl", "true", InsertPosition::After("host".to_string()))
-    .unwrap();
+  document.insert_into("database.ssl", "true", InsertPosition::After("host".to_string())).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -109,9 +103,7 @@ fn test_insert_key_preserves_comments() {
     # End
   "});
 
-  document
-    .insert_into("database.ssl", "true", InsertPosition::Last)
-    .unwrap();
+  document.insert_into("database.ssl", "true", InsertPosition::Last).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -134,9 +126,7 @@ fn test_insert_duplicate_key_errors() {
       port: 5432
   "});
 
-  assert!(document
-    .insert_into("database.host", "newvalue", InsertPosition::Last)
-    .is_err());
+  assert!(document.insert_into("database.host", "newvalue", InsertPosition::Last).is_err());
 }
 
 #[test]
@@ -180,9 +170,7 @@ fn test_insert_from_sort_order_middle() {
 
   let order = vec!["host".to_string(), "port".to_string(), "name".to_string()];
 
-  document
-    .insert_into("database.port", "5432", InsertPosition::FromSortOrder(order))
-    .unwrap();
+  document.insert_into("database.port", "5432", InsertPosition::FromSortOrder(order)).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -230,9 +218,7 @@ fn test_insert_from_sort_order_key_not_in_order() {
 
   let order = vec!["host".to_string(), "port".to_string()];
 
-  document
-    .insert_into("database.ssl", "true", InsertPosition::FromSortOrder(order))
-    .unwrap();
+  document.insert_into("database.ssl", "true", InsertPosition::FromSortOrder(order)).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -252,9 +238,7 @@ fn test_insert_into_nested_map() {
       debug: true
   "});
 
-  document
-    .insert_into("settings.db_host", "localhost", InsertPosition::Last)
-    .unwrap();
+  document.insert_into("settings.db_host", "localhost", InsertPosition::Last).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -337,9 +321,7 @@ fn test_insert_into_sequence_before() {
       - rust
   "});
 
-  document
-    .insert_into("tags", "yaml", InsertPosition::Before("rust".to_string()))
-    .unwrap();
+  document.insert_into("tags", "yaml", InsertPosition::Before("rust".to_string())).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -360,9 +342,7 @@ fn test_insert_into_sequence_after() {
       - rust
   "});
 
-  document
-    .insert_into("tags", "yaml", InsertPosition::After("ruby".to_string()))
-    .unwrap();
+  document.insert_into("tags", "yaml", InsertPosition::After("ruby".to_string())).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -386,9 +366,7 @@ fn test_insert_with_bracket_index_path() {
         - Bob
   "});
 
-  document
-    .insert_into("[1].speakers", "Charlie", InsertPosition::Last)
-    .unwrap();
+  document.insert_into("[1].speakers", "Charlie", InsertPosition::Last).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -413,9 +391,7 @@ fn test_insert_with_bracket_index_after() {
         - Charlie
   "});
 
-  document
-    .insert_into("[0].speakers", "Bob", InsertPosition::After("Alice".to_string()))
-    .unwrap();
+  document.insert_into("[0].speakers", "Bob", InsertPosition::After("Alice".to_string())).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -464,11 +440,7 @@ fn test_insert_after_condition_on_object_sequence() {
   "});
 
   document
-    .insert_into(
-      "",
-      "name: Bob\n  slug: bob",
-      InsertPosition::AfterCondition(".name == Alice".to_string()),
-    )
+    .insert_into("", "name: Bob\n  slug: bob", InsertPosition::AfterCondition(".name == Alice".to_string()))
     .unwrap();
 
   assert_eq!(
@@ -494,11 +466,7 @@ fn test_insert_before_condition_on_object_sequence() {
   "});
 
   document
-    .insert_into(
-      "",
-      "name: Bob\n  slug: bob",
-      InsertPosition::BeforeCondition(".name == Charlie".to_string()),
-    )
+    .insert_into("", "name: Bob\n  slug: bob", InsertPosition::BeforeCondition(".name == Charlie".to_string()))
     .unwrap();
 
   assert_eq!(
@@ -524,11 +492,7 @@ fn test_insert_after_condition_with_bracket_path() {
   "});
 
   document
-    .insert_into(
-      "[0].speakers",
-      "name: Bob",
-      InsertPosition::AfterCondition(".name == Alice".to_string()),
-    )
+    .insert_into("[0].speakers", "name: Bob", InsertPosition::AfterCondition(".name == Alice".to_string()))
     .unwrap();
 
   assert_eq!(
@@ -550,11 +514,7 @@ fn test_insert_condition_no_match_errors() {
     - name: Bob
   "});
 
-  let result = document.insert_into(
-    "",
-    "name: Charlie",
-    InsertPosition::AfterCondition(".name == Missing".to_string()),
-  );
+  let result = document.insert_into("", "name: Charlie", InsertPosition::AfterCondition(".name == Missing".to_string()));
 
   assert!(result.is_err());
 }
@@ -566,9 +526,7 @@ fn test_insert_multiline_map_into_sequence() {
       slug: alice
   "});
 
-  document
-    .insert_into("", "name: Bob\nslug: bob\ngithub: bob", InsertPosition::Last)
-    .unwrap();
+  document.insert_into("", "name: Bob\nslug: bob\ngithub: bob", InsertPosition::Last).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -590,11 +548,7 @@ fn test_insert_multiline_map_with_nested_array() {
   "});
 
   document
-    .insert_into(
-      "",
-      "id: talk-2\ntitle: Second\nspeakers:\n  - Alice\n  - Bob",
-      InsertPosition::Last,
-    )
+    .insert_into("", "id: talk-2\ntitle: Second\nspeakers:\n  - Alice\n  - Bob", InsertPosition::Last)
     .unwrap();
 
   assert_eq!(
@@ -620,9 +574,7 @@ fn test_insert_multiline_at_position() {
       slug: charlie
   "});
 
-  document
-    .insert_into("", "name: Bob\nslug: bob", InsertPosition::At(1))
-    .unwrap();
+  document.insert_into("", "name: Bob\nslug: bob", InsertPosition::At(1)).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -647,11 +599,7 @@ fn test_insert_multiline_after_condition() {
   "});
 
   document
-    .insert_into(
-      "",
-      "name: Bob\nslug: bob",
-      InsertPosition::AfterCondition(".name == Alice".to_string()),
-    )
+    .insert_into("", "name: Bob\nslug: bob", InsertPosition::AfterCondition(".name == Alice".to_string()))
     .unwrap();
 
   assert_eq!(
@@ -676,11 +624,7 @@ fn test_insert_multiline_into_nested_sequence() {
   "});
 
   document
-    .insert_into(
-      "talks",
-      "id: talk-2\ntitle: Second\nspeakers:\n  - Alice",
-      InsertPosition::Last,
-    )
+    .insert_into("talks", "id: talk-2\ntitle: Second\nspeakers:\n  - Alice", InsertPosition::Last)
     .unwrap();
 
   assert_eq!(
@@ -709,11 +653,7 @@ fn test_insert_after_relative_condition() {
   "});
 
   document
-    .insert_into(
-      "",
-      "id: talk-4\nkind: talk",
-      InsertPosition::AfterCondition(".id == talk-1".to_string()),
-    )
+    .insert_into("", "id: talk-4\nkind: talk", InsertPosition::AfterCondition(".id == talk-1".to_string()))
     .unwrap();
 
   let ids: Vec<String> = document.get_all("[].id");
@@ -729,11 +669,7 @@ fn test_insert_before_relative_condition() {
   "});
 
   document
-    .insert_into(
-      "",
-      "id: talk-new",
-      InsertPosition::BeforeCondition(".id == talk-3".to_string()),
-    )
+    .insert_into("", "id: talk-new", InsertPosition::BeforeCondition(".id == talk-3".to_string()))
     .unwrap();
 
   let ids: Vec<String> = document.get_all("[].id");
@@ -747,11 +683,7 @@ fn test_insert_condition_requires_dot_prefix() {
     - id: talk-2
   "});
 
-  let result = document.insert_into(
-    "",
-    "id: talk-3",
-    InsertPosition::AfterCondition("id == talk-1".to_string()),
-  );
+  let result = document.insert_into("", "id: talk-3", InsertPosition::AfterCondition("id == talk-1".to_string()));
 
   assert!(result.is_err());
 }

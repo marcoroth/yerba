@@ -53,11 +53,7 @@ impl std::fmt::Display for YerbaError {
       }
 
       YerbaError::UnknownKeys(keys) => {
-        let suggestion = keys
-          .iter()
-          .map(|key| format!("\"{}\"", key))
-          .collect::<Vec<_>>()
-          .join(", ");
+        let suggestion = keys.iter().map(|key| format!("\"{}\"", key)).collect::<Vec<_>>().join(", ");
 
         write!(
           f,

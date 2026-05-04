@@ -47,16 +47,11 @@ pub fn extract_scalar(node: &SyntaxNode) -> Option<ScalarValue> {
     _ => return None,
   };
 
-  Some(ScalarValue {
-    text,
-    kind: token.kind(),
-  })
+  Some(ScalarValue { text, kind: token.kind() })
 }
 
 pub fn is_map_key(token: &SyntaxToken) -> bool {
-  token
-    .parent_ancestors()
-    .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_KEY)
+  token.parent_ancestors().any(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_KEY)
 }
 
 pub fn find_entry_by_key(map: &BlockMap, key: &str) -> Option<BlockMapEntry> {
@@ -70,15 +65,12 @@ pub fn find_entry_by_key(map: &BlockMap, key: &str) -> Option<BlockMapEntry> {
 }
 
 pub fn find_scalar_token(node: &SyntaxNode) -> Option<SyntaxToken> {
-  node
-    .descendants_with_tokens()
-    .filter_map(|element| element.into_token())
-    .find(|token| {
-      matches!(
-        token.kind(),
-        SyntaxKind::PLAIN_SCALAR | SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR
-      )
-    })
+  node.descendants_with_tokens().filter_map(|element| element.into_token()).find(|token| {
+    matches!(
+      token.kind(),
+      SyntaxKind::PLAIN_SCALAR | SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR
+    )
+  })
 }
 
 pub fn format_scalar_value(value: &str, kind: SyntaxKind) -> String {
@@ -225,10 +217,7 @@ pub fn is_yaml_non_string(value: &str) -> bool {
 }
 
 pub fn is_yaml_truthy(value: &str) -> bool {
-  matches!(
-    value,
-    "true" | "True" | "TRUE" | "yes" | "Yes" | "YES" | "on" | "On" | "ON" | "y" | "Y"
-  )
+  matches!(value, "true" | "True" | "TRUE" | "yes" | "Yes" | "YES" | "on" | "On" | "ON" | "y" | "Y")
 }
 
 pub fn detect_yaml_type_from_plain(value: &str) -> YerbaValueType {

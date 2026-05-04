@@ -22,10 +22,7 @@ fn test_parse_nested_key() {
 
   assert_eq!(
     path,
-    Selector::Absolute(vec![
-      SelectorSegment::Key("database".to_string()),
-      SelectorSegment::Key("host".to_string()),
-    ])
+    Selector::Absolute(vec![SelectorSegment::Key("database".to_string()), SelectorSegment::Key("host".to_string()),])
   );
 }
 
@@ -33,10 +30,7 @@ fn test_parse_nested_key() {
 fn test_parse_relative_key() {
   let path = Selector::parse(".title");
 
-  assert_eq!(
-    path,
-    Selector::Relative(vec![SelectorSegment::Key("title".to_string())])
-  );
+  assert_eq!(path, Selector::Relative(vec![SelectorSegment::Key("title".to_string())]));
   assert!(path.is_relative());
 }
 
@@ -76,10 +70,7 @@ fn test_parse_bracket_with_field() {
 
   assert_eq!(
     path,
-    Selector::Absolute(vec![
-      SelectorSegment::AllItems,
-      SelectorSegment::Key("title".to_string())
-    ])
+    Selector::Absolute(vec![SelectorSegment::AllItems, SelectorSegment::Key("title".to_string())])
   );
 
   assert!(!path.ends_with_bracket());
@@ -91,10 +82,7 @@ fn test_parse_index_with_field() {
 
   assert_eq!(
     path,
-    Selector::Absolute(vec![
-      SelectorSegment::Index(0),
-      SelectorSegment::Key("title".to_string())
-    ])
+    Selector::Absolute(vec![SelectorSegment::Index(0), SelectorSegment::Key("title".to_string())])
   );
 }
 
@@ -152,10 +140,7 @@ fn test_parse_key_then_bracket() {
 
   assert_eq!(
     path,
-    Selector::Absolute(vec![
-      SelectorSegment::Key("tags".to_string()),
-      SelectorSegment::AllItems
-    ])
+    Selector::Absolute(vec![SelectorSegment::Key("tags".to_string()), SelectorSegment::AllItems])
   );
 }
 

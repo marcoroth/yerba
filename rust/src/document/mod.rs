@@ -19,9 +19,8 @@ use crate::error::YerbaError;
 use crate::QuoteStyle;
 
 use crate::syntax::{
-  extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
-  is_yaml_non_string, preceding_whitespace_indent, removal_range, unescape_double_quoted, unescape_single_quoted,
-  ScalarValue,
+  extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key, is_yaml_non_string, preceding_whitespace_indent,
+  removal_range, unescape_double_quoted, unescape_single_quoted, ScalarValue,
 };
 
 #[derive(Debug, Clone)]
@@ -129,12 +128,10 @@ impl Document {
   }
 
   pub fn save(&self) -> Result<(), YerbaError> {
-    let path = self.path.as_ref().ok_or_else(|| {
-      YerbaError::IoError(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "no file path associated with this document",
-      ))
-    })?;
+    let path = self
+      .path
+      .as_ref()
+      .ok_or_else(|| YerbaError::IoError(std::io::Error::new(std::io::ErrorKind::NotFound, "no file path associated with this document")))?;
 
     fs::write(path, self.to_string())?;
 
@@ -153,10 +150,7 @@ impl Document {
     if dot_path.is_empty() {
       let root = Root::cast(self.root.clone()).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
-      let document = root
-        .documents()
-        .next()
-        .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+      let document = root.documents().next().ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
       return Ok(document.syntax().clone());
     }
@@ -216,31 +210,19 @@ impl Document {
 
   pub fn validate_path(dot_path: &str) -> Result<(), YerbaError> {
     if dot_path.ends_with('.') {
-      return Err(YerbaError::ParseError(format!(
-        "invalid path: trailing dot in '{}'",
-        dot_path
-      )));
+      return Err(YerbaError::ParseError(format!("invalid path: trailing dot in '{}'", dot_path)));
     }
 
     if dot_path.contains("..") {
-      return Err(YerbaError::ParseError(format!(
-        "invalid path: double dot in '{}'",
-        dot_path
-      )));
+      return Err(YerbaError::ParseError(format!("invalid path: double dot in '{}'", dot_path)));
     }
 
     if dot_path.starts_with('.') {
-      return Err(YerbaError::ParseError(format!(
-        "invalid path: leading dot in '{}'",
-        dot_path
-      )));
+      return Err(YerbaError::ParseError(format!("invalid path: leading dot in '{}'", dot_path)));
     }
 
     if dot_path.contains('[') && !dot_path.contains(']') {
-      return Err(YerbaError::ParseError(format!(
-        "invalid path: unclosed bracket in '{}'",
-        dot_path
-      )));
+      return Err(YerbaError::ParseError(format!("invalid path: unclosed bracket in '{}'", dot_path)));
     }
 
     Ok(())
@@ -322,10 +304,7 @@ impl Document {
     let item = reordered.remove(from);
     reordered.insert(to, item);
 
-    let indent = entries
-      .get(1)
-      .map(|entry| preceding_whitespace_indent(entry.syntax()))
-      .unwrap_or_default();
+    let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
 
     let text = rebuild_from_groups(&reordered, &indent, true);
 
@@ -442,18 +421,12 @@ pub fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mu
 
 pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> serde_yaml::Value {
   if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
-    let map_position = node
-      .descendants()
-      .find_map(BlockMap::cast)
-      .map(|map| map.syntax().text_range().start());
+    let map_position = node.descendants().find_map(BlockMap::cast).map(|map| map.syntax().text_range().start());
 
     let sequence_position = sequence.syntax().text_range().start();
 
     if map_position.is_none() || sequence_position <= map_position.unwrap() {
-      let values: Vec<serde_yaml::Value> = sequence
-        .entries()
-        .map(|entry| node_to_yaml_value(entry.syntax()))
-        .collect();
+      let values: Vec<serde_yaml::Value> = sequence.entries().map(|entry| node_to_yaml_value(entry.syntax())).collect();
 
       return serde_yaml::Value::Sequence(values);
     }
@@ -463,10 +436,7 @@ pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> serde_yaml::Value {
     let mut mapping = serde_yaml::Mapping::new();
 
     for entry in map.entries() {
-      let key = entry
-        .key()
-        .and_then(|key_node| extract_scalar_text(key_node.syntax()))
-        .unwrap_or_default();
+      let key = entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())).unwrap_or_default();
 
       let value = entry
         .value()
@@ -480,18 +450,12 @@ pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> serde_yaml::Value {
   }
 
   if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
-    let values: Vec<serde_yaml::Value> = sequence
-      .entries()
-      .map(|entry| node_to_yaml_value(entry.syntax()))
-      .collect();
+    let values: Vec<serde_yaml::Value> = sequence.entries().map(|entry| node_to_yaml_value(entry.syntax())).collect();
 
     return serde_yaml::Value::Sequence(values);
   }
 
-  if let Some(block_scalar) = node
-    .descendants()
-    .find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR)
-  {
+  if let Some(block_scalar) = node.descendants().find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR) {
     let text = block_scalar
       .descendants_with_tokens()
       .filter_map(|element| element.into_token())
@@ -532,11 +496,7 @@ pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> serde_yaml::Value {
 
 pub(crate) fn parse_condition(condition: &str) -> Option<(String, &str, String)> {
   let (left, operator, right) = if let Some(index) = condition.find(" not_contains ") {
-    (
-      condition[..index].trim(),
-      "not_contains",
-      condition[index + 14..].trim(),
-    )
+    (condition[..index].trim(), "not_contains", condition[index + 14..].trim())
   } else if let Some(index) = condition.find(" contains ") {
     (condition[..index].trim(), "contains", condition[index + 10..].trim())
   } else if let Some(index) = condition.find("!=") {
@@ -570,11 +530,7 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
 
     SelectorSegment::Index(index) => {
       if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
-        sequence
-          .entries()
-          .nth(*index)
-          .map(|entry| vec![entry.syntax().clone()])
-          .unwrap_or_default()
+        sequence.entries().nth(*index).map(|entry| vec![entry.syntax().clone()]).unwrap_or_default()
       } else {
         Vec::new()
       }
@@ -639,10 +595,7 @@ pub(crate) fn collect_blank_line_edits(node: &SyntaxNode, blank_lines: usize, ed
     let whitespace_text = whitespace_token.text();
     let newline_count = whitespace_text.chars().filter(|character| *character == '\n').count();
 
-    let indent = whitespace_text
-      .rfind('\n')
-      .map(|position| &whitespace_text[position + 1..])
-      .unwrap_or("");
+    let indent = whitespace_text.rfind('\n').map(|position| &whitespace_text[position + 1..]).unwrap_or("");
 
     let desired_newlines = blank_lines + 1;
 
@@ -659,11 +612,7 @@ fn collect_entry_groups(parent: &SyntaxNode) -> Vec<EntryGroup> {
   let mut buffer = String::new();
 
   for child in parent.children_with_tokens() {
-    let is_entry = child.as_node().is_some()
-      && matches!(
-        child.as_node().unwrap().kind(),
-        SyntaxKind::BLOCK_MAP_ENTRY | SyntaxKind::BLOCK_SEQ_ENTRY
-      );
+    let is_entry = child.as_node().is_some() && matches!(child.as_node().unwrap().kind(), SyntaxKind::BLOCK_MAP_ENTRY | SyntaxKind::BLOCK_SEQ_ENTRY);
 
     if is_entry {
       let entry_text = child.as_node().unwrap().text().to_string();
@@ -766,11 +715,7 @@ pub(crate) fn collect_preceding_sibling_comments(parent: &SyntaxNode) -> (String
     }
 
     match node.parent() {
-      Some(parent)
-        if parent.kind() == SyntaxKind::BLOCK
-          || parent.kind() == SyntaxKind::DOCUMENT
-          || parent.kind() == SyntaxKind::BLOCK_MAP_VALUE =>
-      {
+      Some(parent) if parent.kind() == SyntaxKind::BLOCK || parent.kind() == SyntaxKind::DOCUMENT || parent.kind() == SyntaxKind::BLOCK_MAP_VALUE => {
         node = parent
       }
       _ => break,

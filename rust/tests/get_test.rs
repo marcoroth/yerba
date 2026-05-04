@@ -456,10 +456,7 @@ fn test_get_first_item_from_nested_arrays() {
   assert_eq!(document.get_all("[].tags[0]"), vec!["ruby", "python", "rust"]);
   assert_eq!(document.get_all("[].tags[1]"), vec!["rails", "django", "wasm"]);
 
-  assert_eq!(
-    document.get_all("[].tags[]"),
-    vec!["ruby", "rails", "python", "django", "rust", "wasm"]
-  );
+  assert_eq!(document.get_all("[].tags[]"), vec!["ruby", "rails", "python", "django", "rust", "wasm"]);
 }
 
 #[test]
@@ -831,10 +828,7 @@ fn test_select_field_all_items() {
 fn test_select_field_missing_key() {
   let yaml: serde_yaml::Value = serde_yaml::from_str("id: talk-1\n").unwrap();
 
-  assert_eq!(
-    yerba::json::resolve_select_field(&yaml, ".missing"),
-    serde_json::Value::Null
-  );
+  assert_eq!(yerba::json::resolve_select_field(&yaml, ".missing"), serde_json::Value::Null);
 }
 
 #[test]

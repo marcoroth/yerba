@@ -10,8 +10,7 @@ pub fn didyoumean(input: &str, list: &[String]) -> Option<String> {
     .map(|item| (item.clone(), levenshtein(&input_lower, &item.to_lowercase())))
     .collect();
 
-  scored
-    .sort_by(|(a_item, a_distance), (b_item, b_distance)| a_distance.cmp(b_distance).then_with(|| a_item.cmp(b_item)));
+  scored.sort_by(|(a_item, a_distance), (b_item, b_distance)| a_distance.cmp(b_distance).then_with(|| a_item.cmp(b_item)));
 
   scored.into_iter().next().map(|(item, _)| item)
 }
@@ -29,8 +28,7 @@ pub fn didyoumean_ranked(input: &str, list: &[String], threshold: usize) -> Vec<
     .filter(|(_, distance)| *distance <= threshold)
     .collect();
 
-  scored
-    .sort_by(|(a_item, a_distance), (b_item, b_distance)| a_distance.cmp(b_distance).then_with(|| a_item.cmp(b_item)));
+  scored.sort_by(|(a_item, a_distance), (b_item, b_distance)| a_distance.cmp(b_distance).then_with(|| a_item.cmp(b_item)));
 
   scored.into_iter().map(|(item, _)| item).collect()
 }

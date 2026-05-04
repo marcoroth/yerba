@@ -190,8 +190,7 @@ pub struct RuleResult {
 impl Yerbafile {
   pub fn load(path: impl AsRef<Path>) -> Result<Self, YerbaError> {
     let content = fs::read_to_string(path.as_ref())?;
-    let yerbafile: Yerbafile =
-      serde_yaml::from_str(&content).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
+    let yerbafile: Yerbafile = serde_yaml::from_str(&content).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
     Ok(yerbafile)
   }
 
@@ -305,10 +304,7 @@ impl Yerbafile {
         continue;
       }
 
-      let file_results: Vec<RuleResult> = file_strings
-        .par_iter()
-        .map(|file| self.apply_pipeline_to_file(rule, file, write))
-        .collect();
+      let file_results: Vec<RuleResult> = file_strings.par_iter().map(|file| self.apply_pipeline_to_file(rule, file, write)).collect();
 
       results.extend(file_results);
     }
@@ -367,15 +363,9 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     PipelineStep::QuoteStyle(config) => {
       let dot_path = config.path.as_deref();
 
-      let key_style = config
-        .key_style
-        .parse::<crate::KeyStyle>()
-        .map_err(YerbaError::ParseError)?;
+      let key_style = config.key_style.parse::<crate::KeyStyle>().map_err(YerbaError::ParseError)?;
 
-      let value_style = config
-        .value_style
-        .parse::<QuoteStyle>()
-        .map_err(YerbaError::ParseError)?;
+      let value_style = config.value_style.parse::<QuoteStyle>().map_err(YerbaError::ParseError)?;
 
       document.enforce_key_style(&key_style, dot_path)?;
       let warnings = document.enforce_quotes_at(&value_style, dot_path)?;
@@ -472,20 +462,14 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
 
     PipelineStep::Sort(config) => {
       let full_path = resolve_step_path(base_path, config.path.as_deref());
-      let sort_fields = config
-        .by
-        .as_deref()
-        .map(crate::SortField::parse_list)
-        .unwrap_or_default();
+      let sort_fields = config.by.as_deref().map(crate::SortField::parse_list).unwrap_or_default();
 
       document.sort_items(&full_path, &sort_fields, config.case_sensitive)
     }
 
     PipelineStep::Directives(config) => {
       if config.ensure && config.remove {
-        return Err(YerbaError::ParseError(
-          "directives: ensure and remove are mutually exclusive".to_string(),
-        ));
+        return Err(YerbaError::ParseError("directives: ensure and remove are mutually exclusive".to_string()));
       }
 
       if config.ensure {

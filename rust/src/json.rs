@@ -117,12 +117,6 @@ pub fn select_field_key(field: &str) -> String {
   parsed
     .segments()
     .iter()
-    .find_map(|segment| {
-      if let SelectorSegment::Key(key) = segment {
-        Some(key.clone())
-      } else {
-        None
-      }
-    })
+    .find_map(|segment| if let SelectorSegment::Key(key) = segment { Some(key.clone()) } else { None })
     .unwrap_or_else(|| field.to_string())
 }

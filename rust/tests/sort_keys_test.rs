@@ -12,9 +12,7 @@ fn test_sort_keys() {
       pool: 10
   "});
 
-  document
-    .sort_keys("database", &["name", "host", "port", "pool"])
-    .unwrap();
+  document.sort_keys("database", &["name", "host", "port", "pool"]).unwrap();
 
   assert_eq!(
     document.to_string(),
@@ -226,10 +224,7 @@ fn test_sort_keys_does_not_add_blank_lines_between_map_entries() {
   "#});
 
   document
-    .sort_keys(
-      "[]",
-      &["id", "published_at", "video_provider", "description", "speakers"],
-    )
+    .sort_keys("[]", &["id", "published_at", "video_provider", "description", "speakers"])
     .unwrap();
 
   assert_eq!(

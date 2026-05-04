@@ -127,10 +127,7 @@ pub(crate) fn colorize_help(input: &str) -> String {
     }
 
     if columns.len() == 3 {
-      output.push_str(&format!(
-        "  \x1b[36m{:<20}{RESET} {:<21} {DIM}{}{RESET}\n",
-        columns[0], columns[1], columns[2]
-      ));
+      output.push_str(&format!("  \x1b[36m{:<20}{RESET} {:<21} {DIM}{}{RESET}\n", columns[0], columns[1], columns[2]));
     } else if columns.len() == 2 {
       output.push_str(&format!("  \x1b[36m{:<20}{RESET} {}\n", columns[0], columns[1]));
     } else {
@@ -337,12 +334,7 @@ pub(crate) fn run_op(file: &str, document: &yerba::Document, result: Result<(), 
   run_op_with_hint(file, document, result, None);
 }
 
-pub(crate) fn run_op_with_hint(
-  file: &str,
-  document: &yerba::Document,
-  result: Result<(), yerba::YerbaError>,
-  hint: Option<&str>,
-) {
+pub(crate) fn run_op_with_hint(file: &str, document: &yerba::Document, result: Result<(), yerba::YerbaError>, hint: Option<&str>) {
   use color::*;
 
   if let Err(error) = result {

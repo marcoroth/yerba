@@ -12,11 +12,7 @@ impl Document {
   }
 
   pub fn get_all(&self, dot_path: &str) -> Vec<String> {
-    self
-      .navigate_all(dot_path)
-      .iter()
-      .filter_map(extract_scalar_text)
-      .collect()
+    self.navigate_all(dot_path).iter().filter_map(extract_scalar_text).collect()
   }
 
   pub fn get_typed(&self, dot_path: &str) -> Option<ScalarValue> {

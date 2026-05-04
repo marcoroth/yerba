@@ -58,10 +58,7 @@ impl Selector {
   }
 
   pub fn ends_with_bracket(&self) -> bool {
-    matches!(
-      self.segments().last(),
-      Some(SelectorSegment::AllItems | SelectorSegment::Index(_))
-    )
+    matches!(self.segments().last(), Some(SelectorSegment::AllItems | SelectorSegment::Index(_)))
   }
 
   pub fn has_brackets(&self) -> bool {
@@ -109,9 +106,7 @@ impl Selector {
   pub fn split_at_first_bracket(&self) -> (Selector, Selector) {
     let segments = self.segments();
 
-    let first_bracket = segments
-      .iter()
-      .position(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::Index(_)));
+    let first_bracket = segments.iter().position(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::Index(_)));
 
     match first_bracket {
       Some(position) => {

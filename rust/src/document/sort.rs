@@ -110,13 +110,9 @@ impl Document {
 
   pub fn validate_sort_keys(&self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
     if dot_path == "[]" || dot_path.ends_with(".[]") {
-      let seq_path = if dot_path == "[]" {
-        ""
-      } else {
-        &dot_path[..dot_path.len() - 3]
-      };
+      let sequence_path = if dot_path == "[]" { "" } else { &dot_path[..dot_path.len() - 3] };
 
-      return self.validate_each_sort_keys(seq_path, key_order);
+      return self.validate_each_sort_keys(sequence_path, key_order);
     }
 
     let current_node = self.navigate(dot_path)?;
@@ -141,13 +137,9 @@ impl Document {
 
   pub fn sort_keys(&mut self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
     if dot_path == "[]" || dot_path.ends_with(".[]") {
-      let seq_path = if dot_path == "[]" {
-        ""
-      } else {
-        &dot_path[..dot_path.len() - 3]
-      };
+      let sequence_path = if dot_path == "[]" { "" } else { &dot_path[..dot_path.len() - 3] };
 
-      return self.sort_each_keys(seq_path, key_order);
+      return self.sort_each_keys(sequence_path, key_order);
     }
 
     let current_node = self.navigate(dot_path)?;
@@ -169,10 +161,7 @@ impl Document {
       .iter()
       .zip(groups)
       .map(|(entry, group)| {
-        let key_name = entry
-          .key()
-          .and_then(|key_node| extract_scalar_text(key_node.syntax()))
-          .unwrap_or_default();
+        let key_name = entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())).unwrap_or_default();
         (key_name, group)
       })
       .collect();
@@ -202,10 +191,7 @@ impl Document {
       return Ok(());
     }
 
-    let indent = entries
-      .get(1)
-      .map(|entry| preceding_whitespace_indent(entry.syntax()))
-      .unwrap_or_default();
+    let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
 
     let sorted_groups: Vec<EntryGroup> = keyed.into_iter().map(|(_, group)| group).collect();
     let map_text = rebuild_from_groups(&sorted_groups, &indent, false);
@@ -243,10 +229,7 @@ impl Document {
         .iter()
         .zip(groups)
         .map(|(entry, group)| {
-          let key_name = entry
-            .key()
-            .and_then(|key_node| extract_scalar_text(key_node.syntax()))
-            .unwrap_or_default();
+          let key_name = entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())).unwrap_or_default();
           (key_name, group)
         })
         .collect();
@@ -278,10 +261,7 @@ impl Document {
         continue;
       }
 
-      let indent = entries
-        .get(1)
-        .map(|entry| preceding_whitespace_indent(entry.syntax()))
-        .unwrap_or_default();
+      let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
 
       let sorted_groups: Vec<EntryGroup> = keyed.into_iter().map(|(_, group)| group).collect();
       let map_text = rebuild_from_groups(&sorted_groups, &indent, false);
@@ -324,10 +304,7 @@ impl Document {
     for entry in sequence.entries() {
       if let Some(map) = entry.syntax().descendants().find_map(BlockMap::cast) {
         for map_entry in map.entries() {
-          if let Some(key_name) = map_entry
-            .key()
-            .and_then(|key_node| extract_scalar_text(key_node.syntax()))
-          {
+          if let Some(key_name) = map_entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())) {
             if !key_order.contains(&key_name.as_str()) && !all_unknown.contains(&key_name) {
               all_unknown.push(key_name);
             }
@@ -343,12 +320,7 @@ impl Document {
     }
   }
 
-  pub fn sort_items(
-    &mut self,
-    dot_path: &str,
-    sort_fields: &[SortField],
-    case_sensitive: bool,
-  ) -> Result<(), YerbaError> {
+  pub fn sort_items(&mut self, dot_path: &str, sort_fields: &[SortField], case_sensitive: bool) -> Result<(), YerbaError> {
     if dot_path.contains("[].") {
       return self.sort_each_items(dot_path, sort_fields, case_sensitive);
     }
@@ -373,19 +345,13 @@ impl Document {
       .zip(groups)
       .map(|(entry, group)| {
         let sort_values = if sort_fields.is_empty() {
-          vec![entry
-            .flow()
-            .and_then(|flow| extract_scalar_text(flow.syntax()))
-            .unwrap_or_default()]
+          vec![entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default()]
         } else {
           sort_fields
             .iter()
             .map(|field| {
               if field.path.is_empty() {
-                entry
-                  .flow()
-                  .and_then(|flow| extract_scalar_text(flow.syntax()))
-                  .unwrap_or_default()
+                entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default()
               } else {
                 let nodes = navigate_from_node(entry.syntax(), &field.path);
                 nodes.first().and_then(extract_scalar_text).unwrap_or_default()
@@ -435,10 +401,7 @@ impl Document {
       return Ok(());
     }
 
-    let indent = entries
-      .get(1)
-      .map(|entry| preceding_whitespace_indent(entry.syntax()))
-      .unwrap_or_default();
+    let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
 
     let sorted_groups: Vec<EntryGroup> = sortable.into_iter().map(|(_, group)| group).collect();
     let sequence_text = rebuild_from_groups(&sorted_groups, &indent, true);
@@ -446,12 +409,7 @@ impl Document {
     self.apply_edit(range, &sequence_text)
   }
 
-  fn sort_each_items(
-    &mut self,
-    dot_path: &str,
-    sort_fields: &[SortField],
-    case_sensitive: bool,
-  ) -> Result<(), YerbaError> {
+  fn sort_each_items(&mut self, dot_path: &str, sort_fields: &[SortField], case_sensitive: bool) -> Result<(), YerbaError> {
     let (parent_path, child_path) = if let Some(last_bracket) = dot_path.rfind("[].") {
       (&dot_path[..last_bracket + 2], &dot_path[last_bracket + 3..])
     } else {
@@ -488,19 +446,13 @@ impl Document {
           .zip(groups)
           .map(|(entry, group)| {
             let sort_values = if sort_fields.is_empty() {
-              vec![entry
-                .flow()
-                .and_then(|flow| extract_scalar_text(flow.syntax()))
-                .unwrap_or_default()]
+              vec![entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default()]
             } else {
               sort_fields
                 .iter()
                 .map(|field| {
                   if field.path.is_empty() {
-                    entry
-                      .flow()
-                      .and_then(|flow| extract_scalar_text(flow.syntax()))
-                      .unwrap_or_default()
+                    entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default()
                   } else {
                     let nodes = navigate_from_node(entry.syntax(), &field.path);
                     nodes.first().and_then(extract_scalar_text).unwrap_or_default()
@@ -550,13 +502,10 @@ impl Document {
           continue;
         }
 
-        let indent = entries
-          .get(1)
-          .map(|entry| preceding_whitespace_indent(entry.syntax()))
-          .unwrap_or_default();
-
+        let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
         let sorted_groups: Vec<EntryGroup> = sortable.into_iter().map(|(_, group)| group).collect();
         let sequence_text = rebuild_from_groups(&sorted_groups, &indent, true);
+
         edits.push((group_range, sequence_text));
       }
     }
@@ -614,31 +563,21 @@ impl Document {
     let mut moves: Vec<usize> = Vec::new();
 
     for desired in desired_order {
-      let found = labels
-        .iter()
-        .enumerate()
-        .find(|(index, label)| label.as_str() == *desired && !used[*index]);
+      let found = labels.iter().enumerate().find(|(index, label)| label.as_str() == *desired && !used[*index]);
 
       if let Some((index, _)) = found {
         moves.push(index);
         used[index] = true;
       } else {
-        return Err(YerbaError::SelectorNotFound(format!(
-          "no item found with {} == \"{}\"",
-          by, desired
-        )));
+        return Err(YerbaError::SelectorNotFound(format!("no item found with {} == \"{}\"", by, desired)));
       }
     }
 
-    let missing: Vec<&String> = labels
-      .iter()
-      .enumerate()
-      .filter(|(index, _)| !used[*index])
-      .map(|(_, label)| label)
-      .collect();
+    let missing: Vec<&String> = labels.iter().enumerate().filter(|(index, _)| !used[*index]).map(|(_, label)| label).collect();
 
     if !missing.is_empty() {
       let missing_list = missing.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+
       return Err(YerbaError::SelectorNotFound(format!(
         "order must specify all {} items, but {} missing: {}",
         labels.len(),

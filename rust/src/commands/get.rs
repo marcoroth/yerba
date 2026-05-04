@@ -77,10 +77,7 @@ impl Args {
 
         use super::color::*;
 
-        eprintln!(
-          "{RED}Error:{RESET} selector \"{}\" not found in {}",
-          self.selector, resolved_file
-        );
+        eprintln!("{RED}Error:{RESET} selector \"{}\" not found in {}", self.selector, resolved_file);
 
         show_similar_selectors(resolved_file, &document, &self.selector);
         process::exit(1);
@@ -97,11 +94,7 @@ impl Args {
 
           if !document.exists(&full_selector) {
             use super::color::*;
-            eprintln!(
-              "{RED}Error:{RESET} select field \"{}\" not found in {}",
-              field.trim(),
-              resolved_file
-            );
+            eprintln!("{RED}Error:{RESET} select field \"{}\" not found in {}", field.trim(), resolved_file);
             show_similar_selectors(resolved_file, &document, &full_selector);
             process::exit(1);
           }
@@ -175,23 +168,13 @@ impl Args {
         }
       }
     } else if all_results.len() == 1 {
-      println!(
-        "{}",
-        serde_json::to_string_pretty(&all_results[0]).unwrap_or_else(|_| "null".to_string())
-      );
+      println!("{}", serde_json::to_string_pretty(&all_results[0]).unwrap_or_else(|_| "null".to_string()));
     } else {
-      println!(
-        "{}",
-        serde_json::to_string_pretty(&all_results).unwrap_or_else(|_| "[]".to_string())
-      );
+      println!("{}", serde_json::to_string_pretty(&all_results).unwrap_or_else(|_| "[]".to_string()));
     }
   }
 
-  fn resolve_search_scope(
-    &self,
-    selector: &yerba::Selector,
-    condition_path: Option<&yerba::Selector>,
-  ) -> (yerba::Selector, Option<yerba::Selector>) {
+  fn resolve_search_scope(&self, selector: &yerba::Selector, condition_path: Option<&yerba::Selector>) -> (yerba::Selector, Option<yerba::Selector>) {
     if let Some(condition) = condition_path {
       if condition.is_relative() {
         let (container, field) = selector.split_at_last_bracket();

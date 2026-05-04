@@ -89,13 +89,7 @@ impl Args {
 
     let by = &self.by[0];
     let selector = self.selector.as_deref().unwrap_or("");
-
-    let items_selector = if selector.is_empty() {
-      "[]".to_string()
-    } else {
-      format!("{}[]", selector)
-    };
-
+    let items_selector = if selector.is_empty() { "[]".to_string() } else { format!("{}[]", selector) };
     let document = parse_file(&self.file);
     let (labels, context_values, selector_display) = self.resolve_labels(&document, by, selector, &items_selector);
 
@@ -111,6 +105,7 @@ impl Args {
 
     for (index, label) in labels.iter().enumerate() {
       let context = context_values.get(index).map(|c| c.as_slice()).unwrap_or(&[]);
+
       eprintln!("    {}", self.format_label_line(index, label, context));
     }
 
@@ -119,26 +114,14 @@ impl Args {
     eprintln!("{context_hint}");
     eprintln!();
     eprintln!("  {BOLD}To sort alphabetically:{RESET}");
-    eprintln!(
-      "    yerba sort \"{}\"{selector_display} --by \"{by}\" --order asc",
-      self.file
-    );
-    eprintln!(
-      "    yerba sort \"{}\"{selector_display} --by \"{by}\" --order desc",
-      self.file
-    );
+    eprintln!("    yerba sort \"{}\"{selector_display} --by \"{by}\" --order asc", self.file);
+    eprintln!("    yerba sort \"{}\"{selector_display} --by \"{by}\" --order desc", self.file);
     eprintln!();
     eprintln!("  {BOLD}To reorder explicitly:{RESET}");
-    eprintln!(
-      "    yerba sort \"{}\"{selector_display} --by \"{by}\" --order \"{csv}\"",
-      self.file
-    );
+    eprintln!("    yerba sort \"{}\"{selector_display} --by \"{by}\" --order \"{csv}\"", self.file);
     eprintln!();
     eprintln!("  {BOLD}To move individual items:{RESET}");
-    eprintln!(
-      "    yerba move \"{}\"{selector_display} <item> --before/--after <target>",
-      self.file
-    );
+    eprintln!("    yerba move \"{}\"{selector_display} <item> --before/--after <target>", self.file);
 
     process::exit(1);
   }
@@ -174,11 +157,7 @@ impl Args {
       let mut document = parse_file(&resolved_file);
 
       if sort_fields.is_empty() {
-        let first_item_selector = if selector.is_empty() {
-          "[0]".to_string()
-        } else {
-          format!("{}[0]", selector)
-        };
+        let first_item_selector = if selector.is_empty() { "[0]".to_string() } else { format!("{}[0]", selector) };
 
         match document.get_value(&first_item_selector) {
           Some(first) if first.is_mapping() => {
@@ -190,11 +169,7 @@ impl Args {
             let fields: Vec<&String> = selectors
               .iter()
               .filter(|s| {
-                let check = if prefix.is_empty() {
-                  format!("{}[].", selector)
-                } else {
-                  prefix.to_string()
-                };
+                let check = if prefix.is_empty() { format!("{}[].", selector) } else { prefix.to_string() };
                 s.starts_with(&check) && !s[check.len()..].contains('.') && !s[check.len()..].contains('[')
               })
               .collect();
@@ -212,10 +187,7 @@ impl Args {
           }
 
           None if selector.is_empty() => {
-            eprintln!(
-              "{RED}Error:{RESET} no sequence found at root level in {}",
-              resolved_file
-            );
+            eprintln!("{RED}Error:{RESET} no sequence found at root level in {}", resolved_file);
             eprintln!();
             eprintln!("  {DIM}Specify a selector for the sequence to sort:{RESET}");
             eprintln!("    yerba sort \"{}\" \"<selector>\"", self.file);
@@ -255,11 +227,7 @@ impl Args {
     let order = &self.order[0];
     let selector = self.selector.as_deref().unwrap_or("");
 
-    let items_selector = if selector.is_empty() {
-      "[]".to_string()
-    } else {
-      format!("{}[]", selector)
-    };
+    let items_selector = if selector.is_empty() { "[]".to_string() } else { format!("{}[]", selector) };
 
     let mut document = parse_file(&self.file);
     let mut seen = std::collections::HashSet::new();
@@ -286,11 +254,7 @@ impl Args {
     let values_with_commas: Vec<&String> = labels.iter().filter(|l| l.contains(',')).collect();
 
     if !values_with_commas.is_empty() {
-      let selector_display = if selector.is_empty() {
-        String::new()
-      } else {
-        format!(" \"{selector}\"")
-      };
+      let selector_display = if selector.is_empty() { String::new() } else { format!(" \"{selector}\"") };
 
       eprintln!("{RED}Error:{RESET} some values for {by} contain commas, which conflicts with --order parsing");
       eprintln!();
@@ -302,10 +266,7 @@ impl Args {
 
       eprintln!();
       eprintln!("  {BOLD}Use yerba move to reorder individual items instead:{RESET}");
-      eprintln!(
-        "    yerba move \"{}\"{selector_display} <item> --before/--after <target>",
-        self.file
-      );
+      eprintln!("    yerba move \"{}\"{selector_display} <item> --before/--after <target>", self.file);
 
       process::exit(1);
     }
@@ -322,13 +283,7 @@ impl Args {
     }
   }
 
-  fn resolve_labels(
-    &self,
-    document: &yerba::Document,
-    by: &str,
-    selector: &str,
-    items_selector: &str,
-  ) -> (Vec<String>, Vec<Vec<String>>, String) {
+  fn resolve_labels(&self, document: &yerba::Document, by: &str, selector: &str, items_selector: &str) -> (Vec<String>, Vec<Vec<String>>, String) {
     use super::color::*;
 
     let items = document.get_values(items_selector);
@@ -338,10 +293,7 @@ impl Args {
         eprintln!("{RED}Error:{RESET} no sequence found at root level");
         eprintln!();
         eprintln!("  {DIM}If the file is a map, specify which sequence to sort:{RESET}");
-        eprintln!(
-          "    yerba sort \"{}\" \"<selector>\" --by \"{by}\" --order asc",
-          self.file
-        );
+        eprintln!("    yerba sort \"{}\" \"<selector>\" --by \"{by}\" --order asc", self.file);
         eprintln!();
 
         super::show_similar_selectors(&self.file, document, "[]");
@@ -383,10 +335,7 @@ impl Args {
         } else {
           let field = by.strip_prefix('.').unwrap_or(by);
 
-          yerba::json::resolve_select_field(item, field)
-            .as_str()
-            .unwrap_or("")
-            .to_string()
+          yerba::json::resolve_select_field(item, field).as_str().unwrap_or("").to_string()
         }
       })
       .collect();
@@ -412,11 +361,7 @@ impl Args {
       })
       .collect();
 
-    let selector_display = if selector.is_empty() {
-      String::new()
-    } else {
-      format!(" \"{selector}\"")
-    };
+    let selector_display = if selector.is_empty() { String::new() } else { format!(" \"{selector}\"") };
 
     (labels, context_values, selector_display)
   }
@@ -427,12 +372,7 @@ impl Args {
     if context.is_empty() {
       format!("{DIM}[{index}]{RESET} {label}")
     } else {
-      let context = context
-        .iter()
-        .filter(|c| !c.is_empty())
-        .cloned()
-        .collect::<Vec<_>>()
-        .join(", ");
+      let context = context.iter().filter(|c| !c.is_empty()).cloned().collect::<Vec<_>>().join(", ");
 
       if context.is_empty() {
         format!("{DIM}[{index}]{RESET} {label}")

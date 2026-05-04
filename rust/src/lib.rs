@@ -57,12 +57,7 @@ pub fn glob_get(pattern: &str, selector: &str) -> Vec<ScalarValue> {
     .collect()
 }
 
-pub fn glob_find(
-  pattern: &str,
-  selector: &str,
-  condition: Option<&str>,
-  select: Option<&str>,
-) -> Vec<serde_json::Value> {
+pub fn glob_find(pattern: &str, selector: &str, condition: Option<&str>, select: Option<&str>) -> Vec<serde_json::Value> {
   use rayon::prelude::*;
 
   let files = match glob::glob(pattern) {

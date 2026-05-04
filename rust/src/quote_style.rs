@@ -19,10 +19,7 @@ impl std::str::FromStr for KeyStyle {
       "plain" => Ok(KeyStyle::Plain),
       "single" | "single-quoted" => Ok(KeyStyle::Single),
       "double" | "double-quoted" => Ok(KeyStyle::Double),
-      _ => Err(format!(
-        "unknown key style: '{}'. Valid options: plain, single, double",
-        string
-      )),
+      _ => Err(format!("unknown key style: '{}'. Valid options: plain, single, double", string)),
     }
   }
 }
@@ -94,24 +91,16 @@ impl QuoteStyle {
       QuoteStyle::Plain => SyntaxKind::PLAIN_SCALAR,
       QuoteStyle::Single => SyntaxKind::SINGLE_QUOTED_SCALAR,
       QuoteStyle::Double => SyntaxKind::DOUBLE_QUOTED_SCALAR,
-      QuoteStyle::Literal
-      | QuoteStyle::LiteralClip
-      | QuoteStyle::LiteralKeep
-      | QuoteStyle::Folded
-      | QuoteStyle::FoldedClip
-      | QuoteStyle::FoldedKeep => SyntaxKind::BLOCK_SCALAR_TEXT,
+      QuoteStyle::Literal | QuoteStyle::LiteralClip | QuoteStyle::LiteralKeep | QuoteStyle::Folded | QuoteStyle::FoldedClip | QuoteStyle::FoldedKeep => {
+        SyntaxKind::BLOCK_SCALAR_TEXT
+      }
     }
   }
 
   pub(crate) fn is_block_scalar(&self) -> bool {
     matches!(
       self,
-      QuoteStyle::Literal
-        | QuoteStyle::LiteralClip
-        | QuoteStyle::LiteralKeep
-        | QuoteStyle::Folded
-        | QuoteStyle::FoldedClip
-        | QuoteStyle::FoldedKeep
+      QuoteStyle::Literal | QuoteStyle::LiteralClip | QuoteStyle::LiteralKeep | QuoteStyle::Folded | QuoteStyle::FoldedClip | QuoteStyle::FoldedKeep
     )
   }
 

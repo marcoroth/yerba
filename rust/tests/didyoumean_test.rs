@@ -31,11 +31,7 @@ fn test_didyoumean_sorts_alphabetically_on_tie() {
 
 #[test]
 fn test_didyoumean_ranked_with_threshold() {
-  let list = vec![
-    "database.host".to_string(),
-    "database.port".to_string(),
-    "tags".to_string(),
-  ];
+  let list = vec!["database.host".to_string(), "database.port".to_string(), "tags".to_string()];
 
   let results = didyoumean_ranked("databse.host", &list, 3);
   assert_eq!(results, vec!["database.host", "database.port"]);

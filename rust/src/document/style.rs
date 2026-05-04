@@ -64,10 +64,7 @@ impl Document {
   }
 
   pub fn has_directives_marker(&self) -> bool {
-    self
-      .root
-      .descendants_with_tokens()
-      .any(|element| element.kind() == SyntaxKind::DIRECTIVES_END)
+    self.root.descendants_with_tokens().any(|element| element.kind() == SyntaxKind::DIRECTIVES_END)
   }
 
   pub fn ensure_directives(&mut self) -> Result<(), YerbaError> {
@@ -116,10 +113,7 @@ impl Document {
 
     for element in self.root.descendants_with_tokens() {
       if let Some(token) = element.into_token() {
-        if !scope_ranges
-          .iter()
-          .any(|range| range.contains_range(token.text_range()))
-        {
+        if !scope_ranges.iter().any(|range| range.contains_range(token.text_range())) {
           continue;
         }
 
@@ -234,10 +228,7 @@ impl Document {
 
     for element in self.root.descendants_with_tokens() {
       if let Some(token) = element.into_token() {
-        if !scope_ranges
-          .iter()
-          .any(|range| range.contains_range(token.text_range()))
-        {
+        if !scope_ranges.iter().any(|range| range.contains_range(token.text_range())) {
           continue;
         }
 
@@ -297,13 +288,7 @@ impl Document {
 
               let dedented: String = lines
                 .iter()
-                .map(|line| {
-                  if line.len() >= min_indent {
-                    &line[min_indent..]
-                  } else {
-                    line.trim()
-                  }
-                })
+                .map(|line| if line.len() >= min_indent { &line[min_indent..] } else { line.trim() })
                 .collect::<Vec<_>>()
                 .join("\n");
 
@@ -336,25 +321,12 @@ impl Document {
                 }
 
                 QuoteStyle::Plain => {
-                  if is_multiline
-                    || trimmed.contains(':')
-                    || trimmed.contains('#')
-                    || trimmed.contains('"')
-                    || trimmed.contains('\'')
-                  {
+                  if is_multiline || trimmed.contains(':') || trimmed.contains('#') || trimmed.contains('"') || trimmed.contains('\'') {
                     let offset: usize = token.text_range().start().into();
                     let line = source[..offset].matches('\n').count() + 1;
+                    let reason = if is_multiline { "multiline content" } else { "special characters" };
 
-                    let reason = if is_multiline {
-                      "multiline content"
-                    } else {
-                      "special characters"
-                    };
-
-                    warnings.push(format!(
-                      "line {}: skipped block scalar → plain ({} can't be plain)",
-                      line, reason
-                    ));
+                    warnings.push(format!("line {}: skipped block scalar → plain ({} can't be plain)", line, reason));
 
                     continue;
                   }
@@ -376,11 +348,13 @@ impl Document {
           let raw_value = match current_kind {
             SyntaxKind::DOUBLE_QUOTED_SCALAR => {
               let text = token.text();
+
               unescape_double_quoted(&text[1..text.len() - 1])
             }
 
             SyntaxKind::SINGLE_QUOTED_SCALAR => {
               let text = token.text();
+
               unescape_single_quoted(&text[1..text.len() - 1])
             }
 
@@ -398,17 +372,11 @@ impl Document {
           let line_prefix = &source[line_start..offset];
           let indent = line_prefix.len() - line_prefix.trim_start().len() + 2;
           let indent_str = " ".repeat(indent);
-
           let header = style.block_header();
+
           let indented = raw_value
             .lines()
-            .map(|line| {
-              if line.is_empty() {
-                String::new()
-              } else {
-                format!("{}{}", indent_str, line)
-              }
-            })
+            .map(|line| if line.is_empty() { String::new() } else { format!("{}{}", indent_str, line) })
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -465,8 +433,7 @@ impl Document {
           }
 
           QuoteStyle::Plain => {
-            if raw_value.contains('"') || raw_value.contains('\'') || raw_value.contains(':') || raw_value.contains('#')
-            {
+            if raw_value.contains('"') || raw_value.contains('\'') || raw_value.contains(':') || raw_value.contains('#') {
               continue;
             }
 

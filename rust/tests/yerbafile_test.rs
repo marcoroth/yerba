@@ -77,7 +77,9 @@ fn test_find_from_returns_none_when_not_found() {
 #[test]
 fn test_load_parses_yerbafile() {
   let dir = TempDir::new().unwrap();
-  fs::write(dir.path().join("Yerbafile"), indoc! {r#"
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
     rules:
       - files: "**/*.yml"
         pipeline:
@@ -86,7 +88,9 @@ fn test_load_parses_yerbafile() {
               order:
                 - name
                 - slug
-  "#}).unwrap();
+  "#},
+  )
+  .unwrap();
 
   let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
 
@@ -97,7 +101,9 @@ fn test_load_parses_yerbafile() {
 #[test]
 fn test_apply_to_document_reorders_keys() {
   let dir = TempDir::new().unwrap();
-  fs::write(dir.path().join("Yerbafile"), indoc! {r#"
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
     rules:
       - files: "**/*.yml"
         pipeline:
@@ -107,7 +113,9 @@ fn test_apply_to_document_reorders_keys() {
                 - name
                 - slug
                 - github
-  "#}).unwrap();
+  "#},
+  )
+  .unwrap();
 
   let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
 
@@ -115,22 +123,28 @@ fn test_apply_to_document_reorders_keys() {
     - github: aalice
       name: Alice
       slug: alice
-  "}).unwrap();
+  "})
+  .unwrap();
 
   let changed = yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap();
 
   assert!(changed);
-  assert_eq!(document.to_string(), indoc! {"
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
     - name: Alice
       slug: alice
       github: aalice
-  "});
+  "}
+  );
 }
 
 #[test]
 fn test_apply_to_document_skips_non_matching_rules() {
   let dir = TempDir::new().unwrap();
-  fs::write(dir.path().join("Yerbafile"), indoc! {r#"
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
     rules:
       - files: "data/videos/**/*.yml"
         pipeline:
@@ -139,28 +153,36 @@ fn test_apply_to_document_skips_non_matching_rules() {
               order:
                 - title
                 - id
-  "#}).unwrap();
+  "#},
+  )
+  .unwrap();
 
   let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
 
   let mut document = yerba::Document::parse(indoc! {"
     - id: talk-1
       title: Hello
-  "}).unwrap();
+  "})
+  .unwrap();
 
   let changed = yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap();
 
   assert!(!changed);
-  assert_eq!(document.to_string(), indoc! {"
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
     - id: talk-1
       title: Hello
-  "});
+  "}
+  );
 }
 
 #[test]
 fn test_apply_to_document_applies_all_matching_rules() {
   let dir = TempDir::new().unwrap();
-  fs::write(dir.path().join("Yerbafile"), indoc! {r#"
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
     rules:
       - files: "**/*.yml"
         pipeline:
@@ -172,20 +194,26 @@ fn test_apply_to_document_applies_all_matching_rules() {
               order:
                 - name
                 - slug
-  "#}).unwrap();
+  "#},
+  )
+  .unwrap();
 
   let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
 
   let mut document = yerba::Document::parse(indoc! {"
     - slug: alice
       name: Alice
-  "}).unwrap();
+  "})
+  .unwrap();
 
   let changed = yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap();
 
   assert!(changed);
-  assert_eq!(document.to_string(), indoc! {r#"
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
     - name: "Alice"
       slug: "alice"
-  "#});
+  "#}
+  );
 }

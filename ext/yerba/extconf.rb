@@ -65,9 +65,19 @@ else
             .find { |dir| Dir.exist?(dir) } || File.join(crate_target_dir, "release")
 end
 
-unless system("cd #{rust_dir} && cargo build #{cargo_args}")
+unless system("cd #{root_dir} && cargo build #{cargo_args}")
   abort "ERROR: Failed to compile yerba from Rust source."
 end
+
+lib_dir = if target_platform
+            [workspace_target_dir, crate_target_dir]
+              .map { |dir| File.join(dir, target_platform, "release") }
+              .find { |dir| Dir.exist?(dir) } || lib_dir
+          else
+            [workspace_target_dir, crate_target_dir]
+              .map { |dir| File.join(dir, "release") }
+              .find { |dir| Dir.exist?(dir) } || lib_dir
+          end
 
 if target_platform
   platform_key = ENV.fetch("RCD_PLATFORM", "")

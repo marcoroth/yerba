@@ -12,8 +12,8 @@ use crate::QuoteStyle;
 
 use crate::syntax::{
   extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
-  is_yaml_non_string, preceding_whitespace_indent, preceding_whitespace_token, removal_range, unescape_double_quoted,
-  unescape_single_quoted, ScalarValue,
+  is_yaml_non_string, preceding_whitespace_indent, removal_range, unescape_double_quoted, unescape_single_quoted,
+  ScalarValue,
 };
 
 #[derive(Debug, Clone)]
@@ -1531,33 +1531,30 @@ impl Document {
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
     for current_node in &nodes {
-      let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
-        Some(sequence) => sequence,
-        None => continue,
+      let sequence = current_node.descendants().find_map(BlockSeq::cast);
+      let map = current_node.descendants().find_map(BlockMap::cast);
+
+      let use_sequence = match (&sequence, &map) {
+        (Some(sequence), Some(map)) => sequence.syntax().text_range().start() <= map.syntax().text_range().start(),
+        (Some(_), None) => true,
+        (None, Some(_)) => false,
+        (None, None) => continue,
       };
 
-      let entries: Vec<_> = sequence.entries().collect();
+      if use_sequence {
+        let entries: Vec<_> = sequence.unwrap().entries().collect();
 
-      if entries.len() <= 1 {
-        continue;
-      }
+        if entries.len() > 1 {
+          for entry in entries.iter().skip(1) {
+            collect_blank_line_edits(entry.syntax(), blank_lines, &mut edits);
+          }
+        }
+      } else {
+        let entries: Vec<_> = map.unwrap().entries().collect();
 
-      for entry in entries.iter().skip(1) {
-        if let Some(whitespace_token) = preceding_whitespace_token(entry.syntax()) {
-          let whitespace_text = whitespace_token.text();
-          let newline_count = whitespace_text.chars().filter(|character| *character == '\n').count();
-
-          let indent = whitespace_text
-            .rfind('\n')
-            .map(|position| &whitespace_text[position + 1..])
-            .unwrap_or("");
-
-          let desired_newlines = blank_lines + 1;
-
-          if newline_count != desired_newlines {
-            let new_whitespace = format!("{}{}", "\n".repeat(desired_newlines), indent);
-
-            edits.push((whitespace_token.text_range(), new_whitespace));
+        if entries.len() > 1 {
+          for entry in entries.iter().skip(1) {
+            collect_blank_line_edits(entry.syntax(), blank_lines, &mut edits);
           }
         }
       }
@@ -2488,6 +2485,28 @@ impl EntryGroup {
       self.body.clone()
     } else {
       format!("{}\n{}", self.preceding, self.body)
+    }
+  }
+}
+
+fn collect_blank_line_edits(node: &SyntaxNode, blank_lines: usize, edits: &mut Vec<(TextRange, String)>) {
+  use crate::syntax::preceding_whitespace_token;
+
+  if let Some(whitespace_token) = preceding_whitespace_token(node) {
+    let whitespace_text = whitespace_token.text();
+    let newline_count = whitespace_text.chars().filter(|character| *character == '\n').count();
+
+    let indent = whitespace_text
+      .rfind('\n')
+      .map(|position| &whitespace_text[position + 1..])
+      .unwrap_or("");
+
+    let desired_newlines = blank_lines + 1;
+
+    if newline_count != desired_newlines {
+      let new_whitespace = format!("{}{}", "\n".repeat(desired_newlines), indent);
+
+      edits.push((whitespace_token.text_range(), new_whitespace));
     }
   }
 }

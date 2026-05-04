@@ -259,3 +259,133 @@ fn test_blank_lines_nested_only() {
     "}
   );
 }
+
+#[test]
+fn test_blank_lines_remove_from_map() {
+  let mut document = parse(indoc! {"
+    host: localhost
+
+    port: 5432
+
+    name: myapp
+  "});
+
+  document.enforce_blank_lines("", 0).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      host: localhost
+      port: 5432
+      name: myapp
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_add_to_map() {
+  let mut document = parse(indoc! {"
+    host: localhost
+    port: 5432
+    name: myapp
+  "});
+
+  document.enforce_blank_lines("", 1).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      host: localhost
+
+      port: 5432
+
+      name: myapp
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_map_noop_when_correct() {
+  let mut document = parse(indoc! {"
+    host: localhost
+    port: 5432
+  "});
+
+  let original = document.to_string();
+
+  document.enforce_blank_lines("", 0).unwrap();
+
+  assert_eq!(document.to_string(), original);
+}
+
+#[test]
+fn test_blank_lines_nested_map() {
+  let mut document = parse(indoc! {"
+    database:
+      host: localhost
+
+      port: 5432
+
+      name: myapp
+  "});
+
+  document.enforce_blank_lines("database", 0).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      database:
+        host: localhost
+        port: 5432
+        name: myapp
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_map_with_comments() {
+  let mut document = parse(indoc! {"
+    # Database config
+    host: localhost
+
+    port: 5432
+
+    # App name
+    name: myapp
+  "});
+
+  document.enforce_blank_lines("", 0).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      # Database config
+      host: localhost
+      port: 5432
+
+      # App name
+      name: myapp
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_map_normalizes_multiple() {
+  let mut document = parse(indoc! {"
+    host: localhost
+
+
+
+    port: 5432
+  "});
+
+  document.enforce_blank_lines("", 0).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      host: localhost
+      port: 5432
+    "}
+  );
+}

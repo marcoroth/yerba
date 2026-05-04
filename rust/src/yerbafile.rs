@@ -483,7 +483,9 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
 
     PipelineStep::Directives(config) => {
       if config.ensure && config.remove {
-        return Err(YerbaError::ParseError("directives: ensure and remove are mutually exclusive".to_string()));
+        return Err(YerbaError::ParseError(
+          "directives: ensure and remove are mutually exclusive".to_string(),
+        ));
       }
 
       if config.ensure {

@@ -230,7 +230,7 @@ static VALUE document_bracket(VALUE self, VALUE path) {
   }
 
   switch (result.node_type) {
-    case YERBA_NODE_TYPE_SCALAR: {
+    case NODE_TYPE_SCALAR: {
       VALUE klass = rb_path2class("Yerba::Scalar");
       VALUE value = typed_value_to_ruby(result.single);
       yerba_get_result_free(result);
@@ -240,7 +240,7 @@ static VALUE document_bracket(VALUE self, VALUE path) {
       return instance;
     }
 
-    case YERBA_NODE_TYPE_MAP: {
+    case NODE_TYPE_MAP: {
       yerba_get_result_free(result);
       VALUE klass = rb_path2class("Yerba::Map");
 
@@ -249,7 +249,7 @@ static VALUE document_bracket(VALUE self, VALUE path) {
       return instance;
     }
 
-    case YERBA_NODE_TYPE_SEQUENCE: {
+    case NODE_TYPE_SEQUENCE: {
       yerba_get_result_free(result);
       VALUE klass = rb_path2class("Yerba::Sequence");
 

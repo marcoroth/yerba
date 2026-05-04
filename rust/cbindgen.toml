@@ -9,6 +9,7 @@ no_includes = true
 
 [export]
 include = [
+  "NodeType",
   "YerbaValueType",
   "YerbaResult",
   "YerbaTypedValue",

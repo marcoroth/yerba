@@ -9,7 +9,7 @@ mod syntax;
 mod yaml_writer;
 pub mod yerbafile;
 
-pub use document::{collect_selectors, Document, InsertPosition, SortField};
+pub use document::{collect_selectors, Document, InsertPosition, Location, NodeInfo, NodeType, SortField};
 pub use error::YerbaError;
 pub use quote_style::{KeyStyle, QuoteStyle};
 pub use selector::Selector;
@@ -27,4 +27,95 @@ pub fn parse(source: &str) -> Result<Document, YerbaError> {
 
 pub fn parse_file(path: impl AsRef<std::path::Path>) -> Result<Document, YerbaError> {
   Document::parse_file(path)
+}
+
+pub fn glob_get(pattern: &str, selector: &str) -> Vec<ScalarValue> {
+  use rayon::prelude::*;
+
+  let parsed_selector = Selector::parse(selector);
+
+  let files = match glob::glob(pattern) {
+    Ok(paths) => paths.filter_map(|p| p.ok()).collect::<Vec<_>>(),
+    Err(_) => return vec![],
+  };
+
+  files
+    .par_iter()
+    .flat_map(|file| {
+      let mut results = Vec::new();
+
+      if let Ok(document) = Document::parse_file(file) {
+        if parsed_selector.has_wildcard() {
+          results.extend(document.get_all_typed(selector));
+        } else if let Some(scalar) = document.get_typed(selector) {
+          results.push(scalar);
+        }
+      }
+
+      results
+    })
+    .collect()
+}
+
+pub fn glob_find(
+  pattern: &str,
+  selector: &str,
+  condition: Option<&str>,
+  select: Option<&str>,
+) -> Vec<serde_json::Value> {
+  use rayon::prelude::*;
+
+  let files = match glob::glob(pattern) {
+    Ok(paths) => paths.filter_map(|p| p.ok()).collect::<Vec<_>>(),
+    Err(_) => return vec![],
+  };
+
+  let select_fields: Option<Vec<&str>> = select.map(|s| s.split(',').collect());
+
+  files
+    .par_iter()
+    .flat_map(|file| {
+      let mut file_results = Vec::new();
+
+      if let Ok(document) = Document::parse_file(file) {
+        let values = match condition {
+          Some(cond) => document.filter(selector, cond),
+          None => document.get_values(selector),
+        };
+
+        let file_string = file.to_string_lossy().to_string();
+
+        for value in &values {
+          let mut result = serde_json::Map::new();
+          result.insert("__file".to_string(), serde_json::Value::String(file_string.clone()));
+
+          match &select_fields {
+            Some(fields) => {
+              for field in fields {
+                let json_value = json::resolve_select_field(value, field);
+                let json_key = json::select_field_key(field);
+                result.insert(json_key, json_value);
+              }
+            }
+            None => {
+              if let serde_yaml::Value::Mapping(map) = value {
+                for (key, yaml_value) in map {
+                  let json_key = match key {
+                    serde_yaml::Value::String(string) => string.clone(),
+                    _ => format!("{:?}", key),
+                  };
+
+                  result.insert(json_key, json::yaml_to_json(yaml_value));
+                }
+              }
+            }
+          }
+
+          file_results.push(serde_json::Value::Object(result));
+        }
+      }
+
+      file_results
+    })
+    .collect()
 }

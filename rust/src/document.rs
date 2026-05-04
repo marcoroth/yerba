@@ -53,6 +53,36 @@ impl SortField {
   }
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum NodeType {
+  Scalar = 0,
+  Map = 1,
+  Sequence = 2,
+  NotFound = 3,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Location {
+  pub start_line: usize,
+  pub start_column: usize,
+  pub end_line: usize,
+  pub end_column: usize,
+  pub start_offset: usize,
+  pub end_offset: usize,
+}
+
+#[derive(Debug)]
+pub struct NodeInfo {
+  pub node_type: NodeType,
+  pub is_list: bool,
+  pub value: Option<ScalarValue>,
+  pub list_values: Vec<ScalarValue>,
+  pub location: Location,
+  pub key_name: Option<String>,
+  pub key_location: Location,
+}
+
 #[derive(Debug, Clone)]
 pub enum InsertPosition {
   At(usize),
@@ -135,6 +165,127 @@ impl Document {
           .any(|child| child.kind() == SyntaxKind::BLOCK_MAP || child.kind() == SyntaxKind::BLOCK_SEQ)
       })
       .filter_map(extract_scalar)
+      .collect()
+  }
+
+  pub fn node_type(&self, dot_path: &str) -> NodeType {
+    match self.navigate(dot_path) {
+      Ok(node) => {
+        if let Some(first_structural) = node
+          .descendants()
+          .find(|child| BlockMap::can_cast(child.kind()) || BlockSeq::can_cast(child.kind()))
+        {
+          if BlockMap::can_cast(first_structural.kind()) {
+            NodeType::Map
+          } else {
+            NodeType::Sequence
+          }
+        } else if extract_scalar(&node).is_some() {
+          NodeType::Scalar
+        } else {
+          NodeType::NotFound
+        }
+      }
+      Err(_) => NodeType::NotFound,
+    }
+  }
+
+  pub fn get_node_info(&self, dot_path: &str) -> NodeInfo {
+    let selector = crate::selector::Selector::parse(dot_path);
+    let source = self.root.text().to_string();
+
+    let (location, key_name, key_location) = self.resolve_location(dot_path, &source);
+
+    if selector.has_wildcard() {
+      let values = self.get_all_typed(dot_path);
+
+      return NodeInfo {
+        node_type: NodeType::Sequence,
+        is_list: true,
+        value: None,
+        list_values: values,
+        location,
+        key_name,
+        key_location,
+      };
+    }
+
+    match self.get_typed(dot_path) {
+      Some(scalar) => NodeInfo {
+        node_type: NodeType::Scalar,
+        is_list: false,
+        value: Some(scalar),
+        list_values: vec![],
+        location,
+        key_name,
+        key_location,
+      },
+      None => NodeInfo {
+        node_type: self.node_type(dot_path),
+        is_list: false,
+        value: None,
+        list_values: vec![],
+        location,
+        key_name,
+        key_location,
+      },
+    }
+  }
+
+  fn resolve_location(&self, dot_path: &str, source: &str) -> (Location, Option<String>, Location) {
+    match self.navigate(dot_path) {
+      Ok(node) => {
+        let range = node.text_range();
+        let location = compute_location(source, range.start().into(), range.end().into());
+
+        let (key_name, key_location) = node
+          .parent()
+          .and_then(|parent| {
+            use yaml_parser::ast::BlockMapEntry;
+
+            BlockMapEntry::cast(parent).and_then(|entry| {
+              entry.key().and_then(|key_node| {
+                let key_text = extract_scalar_text(key_node.syntax())?;
+                let key_range = key_node.syntax().text_range();
+                let key_location = compute_location(source, key_range.start().into(), key_range.end().into());
+
+                Some((key_text, key_location))
+              })
+            })
+          })
+          .map(|(name, location)| (Some(name), location))
+          .unwrap_or((None, Location::default()));
+
+        (location, key_name, key_location)
+      }
+      Err(_) => (Location::default(), None, Location::default()),
+    }
+  }
+
+  pub fn find_items(&self, dot_path: &str, condition: Option<&str>, select: Option<&str>) -> Vec<serde_json::Value> {
+    let values = match condition {
+      Some(cond) => self.filter(dot_path, cond),
+      None => self.get_values(dot_path),
+    };
+
+    let select_fields: Option<Vec<&str>> = select.map(|s| s.split(',').collect());
+
+    values
+      .iter()
+      .map(|value| match &select_fields {
+        Some(fields) => {
+          let mut result = serde_json::Map::new();
+
+          for field in fields {
+            let json_value = crate::json::resolve_select_field(value, field);
+            let json_key = crate::json::select_field_key(field);
+            result.insert(json_key, json_value);
+          }
+
+          serde_json::Value::Object(result)
+        }
+        None => crate::json::yaml_to_json(value),
+      })
       .collect()
   }
 
@@ -476,6 +627,58 @@ impl Document {
 
   pub fn append(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
     self.insert_into(dot_path, value, InsertPosition::Last)
+  }
+
+  pub fn detect_sequence_quote_style(&self, dot_path: &str) -> QuoteStyle {
+    let try_paths = if dot_path.is_empty() {
+      vec!["[]".to_string(), "[0]".to_string()]
+    } else {
+      vec![format!("{}[]", dot_path), format!("{}[0]", dot_path)]
+    };
+
+    for try_path in &try_paths {
+      for scalar in self.get_all_typed(try_path) {
+        if scalar.kind == SyntaxKind::DOUBLE_QUOTED_SCALAR {
+          return QuoteStyle::Double;
+        } else if scalar.kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
+          return QuoteStyle::Single;
+        }
+      }
+    }
+
+    if let Some(serde_yaml::Value::Sequence(sequence)) = self.get_value(dot_path).as_ref() {
+      if let Some(serde_yaml::Value::Mapping(map)) = sequence.first() {
+        if let Some((serde_yaml::Value::String(key_name), _)) = map.iter().next() {
+          let deep_path = if dot_path.is_empty() {
+            format!("[].{}", key_name)
+          } else {
+            format!("{}[].{}", dot_path, key_name)
+          };
+
+          for scalar in self.get_all_typed(&deep_path) {
+            if scalar.kind == SyntaxKind::DOUBLE_QUOTED_SCALAR {
+              return QuoteStyle::Double;
+            } else if scalar.kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
+              return QuoteStyle::Single;
+            }
+          }
+        }
+      }
+    }
+
+    QuoteStyle::Plain
+  }
+
+  pub fn insert_object(
+    &mut self,
+    dot_path: &str,
+    json_value: &serde_json::Value,
+    position: InsertPosition,
+  ) -> Result<(), YerbaError> {
+    let quote_style = self.detect_sequence_quote_style(dot_path);
+    let yaml_text = crate::yaml_writer::json_to_yaml_text(json_value, &quote_style, 0);
+
+    self.insert_into(dot_path, &yaml_text, position)
   }
 
   pub fn insert_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
@@ -1720,6 +1923,23 @@ impl Document {
     Ok(())
   }
 
+  pub fn enforce_quote_style(
+    &mut self,
+    key_style: Option<&crate::KeyStyle>,
+    value_style: Option<&QuoteStyle>,
+    selector: Option<&str>,
+  ) -> Result<(), YerbaError> {
+    if let Some(key_style) = key_style {
+      self.enforce_key_style(key_style, selector)?;
+    }
+
+    if let Some(value_style) = value_style {
+      self.enforce_quotes_at(value_style, selector)?;
+    }
+
+    Ok(())
+  }
+
   pub fn enforce_quotes(&mut self, style: &QuoteStyle) -> Result<Vec<String>, YerbaError> {
     self.enforce_quotes_at(style, None)
   }
@@ -2265,6 +2485,28 @@ fn check_duplicate_keys(root: &SyntaxNode) -> Result<(), YerbaError> {
   }
 
   Ok(())
+}
+
+fn compute_location(source: &str, start_offset: usize, end_offset: usize) -> Location {
+  let start = start_offset.min(source.len());
+  let end = end_offset.min(source.len());
+
+  let before_start = &source[..start];
+  let start_line = before_start.chars().filter(|c| *c == '\n').count() + 1;
+  let start_column = start - before_start.rfind('\n').map(|p| p + 1).unwrap_or(0);
+
+  let before_end = &source[..end];
+  let end_line = before_end.chars().filter(|c| *c == '\n').count() + 1;
+  let end_column = end - before_end.rfind('\n').map(|p| p + 1).unwrap_or(0);
+
+  Location {
+    start_offset: start,
+    end_offset: end,
+    start_line,
+    start_column,
+    end_line,
+    end_column,
+  }
 }
 
 pub fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mut Vec<String>) {

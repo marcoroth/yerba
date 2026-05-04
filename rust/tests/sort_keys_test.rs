@@ -248,3 +248,149 @@ fn test_sort_keys_does_not_add_blank_lines_between_map_entries() {
     "#}
   );
 }
+
+#[test]
+fn test_sort_keys_with_nested_sequence_path() {
+  let mut document = parse(indoc! {r#"
+    - title: "Keynote"
+      speakers:
+        - Alice
+    - title: "Panel"
+      talks:
+        - speakers:
+            - Bob
+          title: "Sub Talk"
+        - speakers:
+            - Charlie
+          title: "Another"
+  "#});
+
+  document.sort_keys("[].talks[]", &["title", "speakers"]).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - title: "Keynote"
+      speakers:
+        - Alice
+    - title: "Panel"
+      talks:
+        - title: "Sub Talk"
+          speakers:
+            - Bob
+        - title: "Another"
+          speakers:
+            - Charlie
+  "#}
+  );
+}
+
+#[test]
+fn test_sort_keys_with_nested_sequence_skips_missing() {
+  let mut document = parse(indoc! {r#"
+    - title: "Keynote"
+      speakers:
+        - Alice
+    - title: "Panel"
+      talks:
+        - speakers:
+            - Bob
+          title: "Sub Talk"
+  "#});
+
+  document.sort_keys("[].talks[]", &["title", "speakers"]).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - title: "Keynote"
+      speakers:
+        - Alice
+    - title: "Panel"
+      talks:
+        - title: "Sub Talk"
+          speakers:
+            - Bob
+  "#}
+  );
+}
+
+#[test]
+fn test_sort_keys_with_deeply_nested_sequence() {
+  let mut document = parse(indoc! {r#"
+    - title: "Panel"
+      talks:
+        - title: "Sub Talk"
+          alternative_recordings:
+            - speakers:
+                - Bob
+              title: "Alt Recording"
+  "#});
+
+  document.sort_keys("[].talks[].alternative_recordings[]", &["title", "speakers"]).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - title: "Panel"
+      talks:
+        - title: "Sub Talk"
+          alternative_recordings:
+            - title: "Alt Recording"
+              speakers:
+                - Bob
+  "#}
+  );
+}
+
+#[test]
+fn test_sort_keys_on_file_without_selector() {
+  let mut document = parse(indoc! {r#"
+    - title: "Keynote"
+      speakers:
+        - Alice
+  "#});
+
+  let result = document.sort_keys("[].talks[]", &["title", "speakers"]);
+
+  assert!(result.is_ok());
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - title: "Keynote"
+      speakers:
+        - Alice
+  "#}
+  );
+}
+
+#[test]
+fn test_validate_sort_keys_on_file_without_selector() {
+  let document = parse(indoc! {r#"
+    - title: "Keynote"
+      speakers:
+        - Alice
+  "#});
+
+  let result = document.validate_sort_keys("[].talks[]", &["title", "speakers"]);
+
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_validate_sort_keys_with_nested_sequence_skips_missing() {
+  let document = parse(indoc! {r#"
+    - title: "Keynote"
+      speakers:
+        - Alice
+    - title: "Panel"
+      talks:
+        - title: "Sub Talk"
+          speakers:
+            - Bob
+  "#});
+
+  let result = document.validate_sort_keys("[].talks[]", &["title", "speakers"]);
+
+  assert!(result.is_ok());
+}

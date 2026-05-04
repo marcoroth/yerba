@@ -52,11 +52,7 @@ impl Document {
     self.insert_into(dot_path, &yaml_text, position)
   }
 
-  pub fn insert_objects(
-    &mut self,
-    dot_path: &str,
-    json_values: &[serde_json::Value],
-  ) -> Result<(), YerbaError> {
+  pub fn insert_objects(&mut self, dot_path: &str, json_values: &[serde_json::Value]) -> Result<(), YerbaError> {
     if json_values.is_empty() {
       return Ok(());
     }

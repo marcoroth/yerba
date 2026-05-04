@@ -356,6 +356,46 @@ impl Yerbafile {
       error: None,
     }
   }
+
+  pub fn apply_file(&self, file: &str, write: bool) -> Vec<RuleResult> {
+    let mut results = Vec::new();
+
+    for rule in &self.rules {
+      if let Ok(pattern) = glob::Pattern::new(&rule.files) {
+        if !pattern.matches(file) && !pattern.matches_path(Path::new(file)) {
+          continue;
+        }
+      } else {
+        continue;
+      }
+
+      results.push(self.apply_pipeline_to_file(rule, file, write));
+    }
+
+    results
+  }
+
+  pub fn apply_to_document(&self, document: &mut Document, file_path: &str) -> Result<bool, YerbaError> {
+    let original = document.to_string();
+
+    for rule in &self.rules {
+      if let Ok(pattern) = glob::Pattern::new(&rule.files) {
+        if !pattern.matches(file_path) && !pattern.matches_path(Path::new(file_path)) {
+          continue;
+        }
+      } else {
+        continue;
+      }
+
+      let base_path = rule.path.as_deref();
+
+      for step in &rule.pipeline {
+        execute_step(document, step, base_path)?;
+      }
+    }
+
+    Ok(document.to_string() != original)
+  }
 }
 
 fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<&str>) -> Result<(), YerbaError> {

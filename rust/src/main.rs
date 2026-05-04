@@ -31,7 +31,9 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
     Yerbafile:
       yerba init           Create a new Yerbafile in the current directory
       yerba check          Check if all files match the rules (exits 1 if not)
+      yerba check <file>   Check a specific file against matching rules
       yerba apply          Apply all rules and write changes
+      yerba apply <file>   Apply rules to a specific file
 
     Examples:
       yerba get config.yml "database.host"

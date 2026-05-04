@@ -156,10 +156,8 @@ pub enum Command {
   Selectors(selectors::Args),
   #[command(about = "Create a new Yerbafile in the current directory")]
   Init,
-  #[command(about = "Apply all rules from the Yerbafile and write changes")]
-  Apply,
-  #[command(about = "Check if all files match Yerbafile rules (exits 1 if not)")]
-  Check,
+  Apply(apply::Args),
+  Check(check::Args),
   #[command(about = "Print the yerba version")]
   Version,
   #[command(about = "\u{1f9c9}")]
@@ -184,15 +182,15 @@ impl Command {
       Command::Directives(args) => args.run(),
       Command::Selectors(args) => args.run(),
       Command::Init => init::run(),
-      Command::Apply => apply::run(),
-      Command::Check => check::run(),
+      Command::Apply(args) => args.run(),
+      Command::Check(args) => args.run(),
       Command::Version => version::run(),
       Command::Mate => mate::run(),
     }
   }
 }
 
-pub(crate) fn run_yerbafile(write: bool) {
+pub(crate) fn run_yerbafile(write: bool, files: Vec<String>) {
   use color::*;
 
   let yerbafile_path = yerba::Yerbafile::find().unwrap_or_else(|| {
@@ -207,7 +205,12 @@ pub(crate) fn run_yerbafile(write: bool) {
 
   eprintln!("🧉 {BOLD}Using{RESET} {}", yerbafile_path.display());
 
-  let results = yerbafile.apply(write);
+  let results = if files.is_empty() {
+    yerbafile.apply(write)
+  } else {
+    files.iter().flat_map(|file| yerbafile.apply_file(file, write)).collect()
+  };
+
   let mut has_changes = false;
   let mut has_errors = false;
 

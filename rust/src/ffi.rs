@@ -478,11 +478,7 @@ pub unsafe extern "C" fn yerba_document_delete(document: *mut Document, path: *c
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_insert_objects(
-  document: *mut Document,
-  path: *const c_char,
-  json: *const c_char,
-) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_insert_objects(document: *mut Document, path: *const c_char, json: *const c_char) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
   let json_string = CStr::from_ptr(json).to_str().unwrap_or("");

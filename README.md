@@ -413,7 +413,10 @@ Use `yerba init` to create one, then `yerba apply` to apply all rules, or `yerba
 ```bash
 yerba init
 yerba apply
+yerba apply path/to/file.yml
+
 yerba check
+yerba check path/to/file.yml
 ```
 
 Each rule specifies a file glob and a list of steps to run in order:

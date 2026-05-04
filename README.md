@@ -53,9 +53,9 @@ yerba = "0.3"
 ```rust
 let mut document = yerba::parse_file("config.yml")?;
 document.set("database.host", "0.0.0.0")?;
-document.save()?;
-document.save()?;                                  // saves to original path
-document.save_to("output.yml")?;                   // saves to new path
+
+document.save()?;                  // saves to original path
+document.save_to("output.yml")?;   // saves to new path
 ```
 
 ### Ruby Gem

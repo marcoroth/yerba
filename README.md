@@ -54,6 +54,8 @@ yerba = "0.3"
 let mut document = yerba::parse_file("config.yml")?;
 document.set("database.host", "0.0.0.0")?;
 document.save()?;
+document.save()?;                                  // saves to original path
+document.save_to("output.yml")?;                   // saves to new path
 ```
 
 ### Ruby Gem
@@ -654,10 +656,9 @@ After checking out the repo, run `bundle install` to install Ruby dependencies, 
 
 ### Building from source
 
-The Rust core is in the `rust/` directory:
+The Rust core is in the `rust/` directory, with a workspace `Cargo.toml` at the root so all cargo commands work from the project root:
 
 ```bash
-cd rust
 cargo build
 cargo test
 ```
@@ -673,7 +674,6 @@ cargo run -- get config.yml "database.host"
 Or build a release binary:
 
 ```bash
-cd rust
 cargo build --release
 ./target/release/yerba --help
 ```

@@ -4,6 +4,7 @@
 /vendor/bundle/
 
 # Rust
+/target/
 /rust/target/
 /rust/README.md
 

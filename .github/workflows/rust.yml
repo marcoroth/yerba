@@ -6,10 +6,14 @@ on:
       - main
     paths:
       - "rust/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
 
   pull_request:
     paths:
       - "rust/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
 
   release:
     types: [published]
@@ -45,27 +49,21 @@ jobs:
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
 
       - name: Check Rust formatting
         run: cargo +nightly fmt --check
-        working-directory: rust
 
       - name: Clippy
         run: cargo +stable clippy -- -D warnings
-        working-directory: rust
 
       - name: Copy README for packaging
         run: cp README.md rust/README.md
 
       - name: Build
         run: cargo +stable build
-        working-directory: rust
 
       - name: Run tests
         run: cargo +stable test
-        working-directory: rust
 
       - name: Test cargo package
         run: cargo +stable package

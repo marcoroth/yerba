@@ -33,7 +33,17 @@ impl Document {
     }
 
     for node in nodes.into_iter().rev() {
-      if let Some(scalar_token) = find_scalar_token(&node) {
+      if let Some(block_scalar) = node.descendants().find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR) {
+        let new_text = if value.is_empty() {
+          "\"\"".to_string()
+        } else if value.contains('\n') {
+          format!("|-\n  {}", value.replace('\n', "\n  "))
+        } else {
+          format!("\"{}\"", value.replace('"', "\\\""))
+        };
+
+        self.apply_edit(block_scalar.text_range(), &new_text)?;
+      } else if let Some(scalar_token) = find_scalar_token(&node) {
         let new_text = format_scalar_value(value, scalar_token.kind());
 
         self.replace_token(&scalar_token, &new_text)?;

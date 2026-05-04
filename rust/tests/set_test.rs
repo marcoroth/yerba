@@ -246,3 +246,75 @@ fn test_set_all_errors_on_missing_path() {
   let result = document.set_all("[].missing", "value");
   assert!(result.is_err());
 }
+
+#[test]
+fn test_set_all_replaces_block_scalars_with_empty_string() {
+  let mut document = parse(indoc! {r#"
+    - title: "First"
+      description: |-
+        This is a block scalar
+        with multiple lines
+    - title: "Second"
+      description: |-
+        Another block scalar
+  "#});
+
+  document.set_all("[].description", "").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - title: "First"
+      description: ""
+    - title: "Second"
+      description: ""
+  "#}
+  );
+}
+
+#[test]
+fn test_set_all_replaces_block_scalars_with_value() {
+  let mut document = parse(indoc! {r#"
+    - title: "First"
+      description: |-
+        Old description
+    - title: "Second"
+      description: |-
+        Another old one
+  "#});
+
+  document.set_all("[].description", "Updated").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - title: "First"
+      description: "Updated"
+    - title: "Second"
+      description: "Updated"
+  "#}
+  );
+}
+
+#[test]
+fn test_set_all_handles_mixed_block_and_inline_scalars() {
+  let mut document = parse(indoc! {r#"
+    - title: "First"
+      description: |-
+        Block scalar here
+    - title: "Second"
+      description: "Inline scalar"
+  "#});
+
+  document.set_all("[].description", "").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - title: "First"
+      description: ""
+    - title: "Second"
+      description: ""
+  "#}
+  );
+}

@@ -2,7 +2,7 @@
 
 module Yerba
   class Document
-    ROOT_SELECTOR = "".freeze
+    ROOT_SELECTOR = ""
 
     def root
       self[ROOT_SELECTOR]

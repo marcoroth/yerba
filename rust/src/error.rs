@@ -7,6 +7,12 @@ pub enum YerbaError {
   NotASequence(String),
   IndexOutOfBounds(usize, usize),
   UnknownKeys(Vec<String>),
+  DuplicateKey {
+    key: String,
+    first_line: usize,
+    duplicate_line: usize,
+    line_content: String,
+  },
 }
 
 impl std::fmt::Display for YerbaError {
@@ -15,6 +21,7 @@ impl std::fmt::Display for YerbaError {
       YerbaError::ParseError(msg) => write!(f, "parse error: {}", msg),
       YerbaError::IoError(err) => write!(f, "io error: {}", err),
       YerbaError::SelectorNotFound(selector) => write!(f, "selector not found: {}", selector),
+      YerbaError::NotASequence(path) => write!(f, "not a sequence: {}", path),
 
       YerbaError::AmbiguousSelector(selector, count) => {
         write!(
@@ -24,7 +31,22 @@ impl std::fmt::Display for YerbaError {
         )
       }
 
-      YerbaError::NotASequence(path) => write!(f, "not a sequence: {}", path),
+      YerbaError::DuplicateKey {
+        key,
+        first_line,
+        duplicate_line,
+        line_content,
+      } => {
+        write!(
+          f,
+          "duplicate key \"{}\" on line {} (first defined on line {})\n\n    {} | {}",
+          key,
+          duplicate_line,
+          first_line,
+          duplicate_line,
+          line_content.trim()
+        )
+      }
 
       YerbaError::IndexOutOfBounds(index, length) => {
         write!(f, "index {} out of bounds (length {})", index, length)

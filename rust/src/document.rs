@@ -74,6 +74,8 @@ impl Document {
   pub fn parse(source: &str) -> Result<Self, YerbaError> {
     let tree = yaml_parser::parse(source).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
 
+    check_duplicate_keys(&tree)?;
+
     Ok(Document { root: tree, path: None })
   }
 
@@ -1992,6 +1994,41 @@ impl std::fmt::Display for Document {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.root.text())
   }
+}
+
+fn check_duplicate_keys(root: &SyntaxNode) -> Result<(), YerbaError> {
+  for node in root.descendants() {
+    if let Some(map) = BlockMap::cast(node) {
+      let mut seen: std::collections::HashMap<String, rowan::TextSize> =
+        std::collections::HashMap::new();
+
+      for entry in map.entries() {
+        if let Some(key) = entry.key() {
+          if let Some(key_text) = extract_scalar_text(key.syntax()) {
+            let offset = key.syntax().text_range().start();
+
+            if let Some(&first_offset) = seen.get(&key_text) {
+              let source = root.text().to_string();
+              let first_line = source[..first_offset.into()].matches('\n').count() + 1;
+              let duplicate_line = source[..usize::from(offset)].matches('\n').count() + 1;
+              let line_content = source.lines().nth(duplicate_line - 1).unwrap_or("").to_string();
+
+              return Err(YerbaError::DuplicateKey {
+                key: key_text,
+                first_line,
+                duplicate_line,
+                line_content,
+              });
+            }
+
+            seen.insert(key_text, offset);
+          }
+        }
+      }
+    }
+  }
+
+  Ok(())
 }
 
 pub fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mut Vec<String>) {

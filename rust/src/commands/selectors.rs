@@ -9,8 +9,11 @@ use super::{color, parse_file, resolve_files};
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
     yerba selectors config.yml
-    yerba selectors videos.yml
+    yerba selectors config.yml "database"
+    yerba selectors videos.yml "[]"
+    yerba selectors videos.yml "[].speakers"
     yerba selectors "data/**/videos.yml"
+    yerba selectors "data/**/videos.yml" "[].talks"
   "#})
 });
 
@@ -22,6 +25,8 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
 )]
 pub struct Args {
   file: String,
+  /// Show selectors starting from this path
+  selector: Option<String>,
   /// Sort selectors alphabetically (default: document order)
   #[arg(long)]
   sorted: bool,
@@ -72,12 +77,20 @@ impl Args {
   pub fn run(self) {
     let mut all_selectors: BTreeMap<String, SelectorInfo> = BTreeMap::new();
     let mut counter: usize = 1;
+    let selector = self.selector.as_deref().unwrap_or("");
 
     for resolved_file in resolve_files(&self.file) {
       let document = parse_file(&resolved_file);
+      let prefix = if selector.is_empty() { String::new() } else { selector.to_string() };
 
-      if let Some(value) = document.get_value("") {
-        collect_selectors(&value, "", &mut all_selectors, &mut counter);
+      let values = if selector.is_empty() {
+        document.get_value("").into_iter().collect::<Vec<_>>()
+      } else {
+        document.get_values(selector)
+      };
+
+      for value in values {
+        collect_selectors(&value, &prefix, &mut all_selectors, &mut counter);
       }
     }
 

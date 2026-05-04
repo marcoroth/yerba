@@ -337,10 +337,19 @@ Output:
 [].video_provider
 ```
 
+Pass a selector to scope the output to a specific subtree:
+
+```bash
+yerba selectors config.yml "database"
+yerba selectors videos.yml "[]"
+yerba selectors videos.yml "[].speakers"
+```
+
 Works with glob patterns to show the union of selectors across multiple files:
 
 ```bash
 yerba selectors "data/**/videos.yml"
+yerba selectors "data/**/videos.yml" "[]"
 ```
 
 ## `Yerbafile`

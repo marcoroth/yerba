@@ -1405,12 +1405,7 @@ impl Document {
     Ok(())
   }
 
-  pub fn reorder_items(
-    &mut self,
-    dot_path: &str,
-    by: &str,
-    desired_order: &[&str],
-  ) -> Result<(), YerbaError> {
+  pub fn reorder_items(&mut self, dot_path: &str, by: &str, desired_order: &[&str]) -> Result<(), YerbaError> {
     let field = by.strip_prefix('.').unwrap_or(by);
     let is_scalar = field.is_empty() || field == ".";
 

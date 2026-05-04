@@ -316,9 +316,10 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
 
         let node_type = match document.navigate(path_string) {
           Ok(node) => {
-            if let Some(first_structural) = node.descendants().find(|child| {
-              BlockMap::can_cast(child.kind()) || BlockSeq::can_cast(child.kind())
-            }) {
+            if let Some(first_structural) = node
+              .descendants()
+              .find(|child| BlockMap::can_cast(child.kind()) || BlockSeq::can_cast(child.kind()))
+            {
               if BlockMap::can_cast(first_structural.kind()) {
                 YerbaNodeType::Map
               } else {

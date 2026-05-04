@@ -11,6 +11,7 @@ pub mod move_key;
 pub mod quote_style;
 pub mod remove;
 pub mod rename;
+pub mod selectors;
 pub mod set;
 pub mod sort;
 pub mod sort_keys;
@@ -153,6 +154,7 @@ pub enum Command {
   Sort(sort::Args),
   QuoteStyle(quote_style::Args),
   BlankLines(blank_lines::Args),
+  Selectors(selectors::Args),
   #[command(about = "Create a new Yerbafile in the current directory")]
   Init,
   #[command(about = "Apply all rules from the Yerbafile and write changes")]
@@ -180,6 +182,7 @@ impl Command {
       Command::Sort(args) => args.run(),
       Command::QuoteStyle(args) => args.run(),
       Command::BlankLines(args) => args.run(),
+      Command::Selectors(args) => args.run(),
       Command::Init => init::run(),
       Command::Apply => apply::run(),
       Command::Check => check::run(),

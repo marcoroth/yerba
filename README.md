@@ -301,6 +301,48 @@ yerba blank-lines videos.yml "[]" 1
 yerba blank-lines config.yml "tags" 0
 ```
 
+### `selectors`
+
+Show all valid selectors for a YAML file. Useful for discovering the structure of a file and knowing which selectors you can use with other commands:
+
+```bash
+yerba selectors config.yml
+```
+
+Output:
+```
+database
+database.host
+database.port
+tags
+tags[]
+```
+
+For sequences of objects:
+
+```bash
+yerba selectors videos.yml
+```
+
+Output:
+```
+[]
+[].id
+[].title
+[].speakers
+[].speakers[]
+[].speakers[].name
+[].speakers[].slug
+[].video_id
+[].video_provider
+```
+
+Works with glob patterns to show the union of selectors across multiple files:
+
+```bash
+yerba selectors "data/**/videos.yml"
+```
+
 ## `Yerbafile`
 
 A `Yerbafile` is a YAML configuration file that defines formatting and editing rules as pipelines of operations that are applied to your files across your project.

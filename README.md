@@ -514,8 +514,22 @@ tags = document["tags"]
 tags << "yaml"
 tags << { name: "Rust", version: "1.80" }
 tags.remove("obsolete")
-tags.sort(by: "name")
 ```
+
+### Sorting
+
+Sort sequences in place. Works on both the document and sequence level:
+
+```ruby
+document.sort(by: :name)
+document.sort(by: :name, order: :desc)
+document.sort(by: :name, order: ["Charlie", "Bob", "Alice"])
+document.sort("tags")
+document.sort("tags", order: :desc)
+document.sort("tags", order: ["rust", "ruby", "go"])
+```
+
+The `by:` option accepts symbols, strings, or dot-prefixed strings (`:name`, `"name"`, `".name"`).
 
 ### Quote Style Control
 

@@ -1203,8 +1203,15 @@ impl Document {
           sort_fields
             .iter()
             .map(|field| {
-              let nodes = navigate_from_node(entry.syntax(), &field.path);
-              nodes.first().and_then(extract_scalar_text).unwrap_or_default()
+              if field.path.is_empty() {
+                entry
+                  .flow()
+                  .and_then(|flow| extract_scalar_text(flow.syntax()))
+                  .unwrap_or_default()
+              } else {
+                let nodes = navigate_from_node(entry.syntax(), &field.path);
+                nodes.first().and_then(extract_scalar_text).unwrap_or_default()
+              }
             })
             .collect()
         };
@@ -1311,8 +1318,15 @@ impl Document {
               sort_fields
                 .iter()
                 .map(|field| {
-                  let nodes = navigate_from_node(entry.syntax(), &field.path);
-                  nodes.first().and_then(extract_scalar_text).unwrap_or_default()
+                  if field.path.is_empty() {
+                    entry
+                      .flow()
+                      .and_then(|flow| extract_scalar_text(flow.syntax()))
+                      .unwrap_or_default()
+                  } else {
+                    let nodes = navigate_from_node(entry.syntax(), &field.path);
+                    nodes.first().and_then(extract_scalar_text).unwrap_or_default()
+                  }
                 })
                 .collect()
             };
@@ -1387,6 +1401,94 @@ impl Document {
     let path = self.path.take();
     *self = Self::parse(&new_source)?;
     self.path = path;
+
+    Ok(())
+  }
+
+  pub fn reorder_items(
+    &mut self,
+    dot_path: &str,
+    by: &str,
+    desired_order: &[&str],
+  ) -> Result<(), YerbaError> {
+    let field = by.strip_prefix('.').unwrap_or(by);
+    let is_scalar = field.is_empty() || field == ".";
+
+    let items_selector = if is_scalar {
+      if dot_path.is_empty() {
+        "[]".to_string()
+      } else {
+        format!("{}[]", dot_path)
+      }
+    } else if dot_path.is_empty() {
+      format!("[].{}", field)
+    } else {
+      format!("{}[].{}", dot_path, field)
+    };
+
+    let labels: Vec<String> = match self.get_value(&items_selector) {
+      Some(serde_yaml::Value::Sequence(sequence)) => sequence
+        .iter()
+        .map(|value| match value {
+          serde_yaml::Value::String(string) => string.clone(),
+          _ => String::new(),
+        })
+        .collect(),
+      _ => return Err(YerbaError::SelectorNotFound(items_selector)),
+    };
+
+    let mut used = vec![false; labels.len()];
+    let mut moves: Vec<usize> = Vec::new();
+
+    for desired in desired_order {
+      let found = labels
+        .iter()
+        .enumerate()
+        .find(|(index, label)| label.as_str() == *desired && !used[*index]);
+
+      if let Some((index, _)) = found {
+        moves.push(index);
+        used[index] = true;
+      } else {
+        return Err(YerbaError::SelectorNotFound(format!(
+          "no item found with {} == \"{}\"",
+          by, desired
+        )));
+      }
+    }
+
+    let missing: Vec<&String> = labels
+      .iter()
+      .enumerate()
+      .filter(|(index, _)| !used[*index])
+      .map(|(_, label)| label)
+      .collect();
+
+    if !missing.is_empty() {
+      let missing_list = missing.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+      return Err(YerbaError::SelectorNotFound(format!(
+        "order must specify all {} items, but {} missing: {}",
+        labels.len(),
+        missing.len(),
+        missing_list
+      )));
+    }
+
+    for target in 0..moves.len() {
+      let source = moves[target];
+
+      if source != target {
+        self.move_item(dot_path, source, target)?;
+
+        for item in moves.iter_mut().skip(target + 1) {
+          if *item >= target && *item < source {
+            *item += 1;
+          } else if *item == source {
+            *item = target;
+          }
+        }
+      }
+    }
 
     Ok(())
   }

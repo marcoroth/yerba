@@ -533,24 +533,83 @@ static VALUE document_rename(VALUE self, VALUE source, VALUE destination) {
   return self;
 }
 
-/* document.sort(path, by: nil, case_sensitive: false) */
+/* document.sort(path = "", by: nil, order: nil, case_sensitive: false) */
 static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
   VALUE path, opts;
-  rb_scan_args(argc, argv, "1:", &path, &opts);
+  rb_scan_args(argc, argv, "01:", &path, &opts);
+
+  if (NIL_P(path)) path = rb_str_new_cstr("");
 
   const char *by = NULL;
   bool case_sensitive = false;
+  VALUE v_order = Qnil;
 
   if (!NIL_P(opts)) {
     VALUE v_by = rb_hash_aref(opts, ID2SYM(rb_intern("by")));
+    v_order = rb_hash_aref(opts, ID2SYM(rb_intern("order")));
     VALUE v_case_sensitive = rb_hash_aref(opts, ID2SYM(rb_intern("case_sensitive")));
 
-    if (!NIL_P(v_by)) by = StringValueCStr(v_by);
-    if (RTEST(v_case_sensitive)) case_sensitive = true;
+    if (SYMBOL_P(v_by)) {
+      VALUE by_string = rb_sym2str(v_by);
+      by = StringValueCStr(by_string);
+    } else if (!NIL_P(v_by)) {
+      by = StringValueCStr(v_by);
+    }
+
+    if (RTEST(v_case_sensitive)) {
+      case_sensitive = true;
+    }
   }
 
   struct Document *document = get_document(self);
-  YerbaResult result = yerba_document_sort(document, StringValueCStr(path), by, case_sensitive);
+  const char *path_string = StringValueCStr(path);
+
+  if (RB_TYPE_P(v_order, T_ARRAY)) {
+    VALUE order_csv = rb_ary_join(v_order, rb_str_new_cstr(","));
+    const char *order_string = StringValueCStr(order_csv);
+    const char *reorder_path = StringValueCStr(path);
+    const char *reorder_by;
+
+    if (by) {
+      VALUE reorder_by_value = rb_hash_aref(opts, ID2SYM(rb_intern("by")));
+
+      if (SYMBOL_P(reorder_by_value)) {
+        reorder_by_value = rb_sym2str(reorder_by_value);
+      }
+
+      reorder_by = StringValueCStr(reorder_by_value);
+    } else {
+      reorder_by = ".";
+    }
+
+    YerbaResult result = yerba_document_reorder(document, reorder_path, reorder_by, order_string);
+    check_result(result);
+
+    return self;
+  }
+
+  const char *order = NULL;
+
+  if (SYMBOL_P(v_order)) {
+    VALUE order_string = rb_sym2str(v_order);
+    order = StringValueCStr(order_string);
+  } else if (!NIL_P(v_order)) {
+    order = StringValueCStr(v_order);
+  }
+
+  VALUE by_with_order = Qnil;
+
+  if (order && strcmp(order, "desc") == 0) {
+    if (by) {
+      by_with_order = rb_sprintf("%s:desc", by);
+    } else {
+      by_with_order = rb_str_new_cstr(":desc");
+    }
+
+    by = StringValueCStr(by_with_order);
+  }
+
+  YerbaResult result = yerba_document_sort(document, path_string, by, case_sensitive);
 
   check_result(result);
 

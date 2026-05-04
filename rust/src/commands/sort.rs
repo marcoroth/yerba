@@ -311,90 +311,15 @@ impl Args {
     }
 
     let desired_order: Vec<&str> = order.split(',').map(|s| s.trim()).collect();
+    let container = if selector.is_empty() { "" } else { selector };
 
-    let mut used = vec![false; labels.len()];
-    let mut moves: Vec<usize> = Vec::new();
-
-    for desired in &desired_order {
-      let found = labels
-        .iter()
-        .enumerate()
-        .find(|(index, label)| label.as_str() == *desired && !used[*index]);
-
-      if let Some((index, _)) = found {
-        moves.push(index);
-        used[index] = true;
-      } else {
-        eprintln!("{RED}Error:{RESET} no item found with {by} == \"{desired}\"");
-        eprintln!();
-        eprintln!("  {BOLD}Available values:{RESET}");
-
-        for (index, label) in labels.iter().enumerate() {
-          eprintln!("    {DIM}{index}:{RESET} {label}");
-        }
-
+    match document.reorder_items(container, by, &desired_order) {
+      Ok(()) => output(&self.file, &document, self.dry_run),
+      Err(error) => {
+        eprintln!("{RED}Error:{RESET} {}", error);
         process::exit(1);
       }
     }
-
-    let missing: Vec<&String> = labels
-      .iter()
-      .enumerate()
-      .filter(|(index, _)| !used[*index])
-      .map(|(_, label)| label)
-      .collect();
-
-    if !missing.is_empty() {
-      eprintln!(
-        "{RED}Error:{RESET} --order must specify all {} items, but {} are missing",
-        labels.len(),
-        missing.len()
-      );
-      eprintln!();
-      eprintln!("  {BOLD}Missing values:{RESET}");
-
-      for label in &missing {
-        eprintln!("    {label}");
-      }
-
-      eprintln!();
-      eprintln!("  {BOLD}All values (by {by}):{RESET}");
-
-      for label in &labels {
-        eprintln!("    {label}");
-      }
-
-      eprintln!();
-      eprintln!("  {BOLD}To move individual items, use:{RESET}");
-      eprintln!("    yerba move <file> <selector> <item> --before/--after <target>");
-
-      process::exit(1);
-    }
-
-    let container = if selector.is_empty() { "" } else { selector };
-
-    for target in 0..moves.len() {
-      let source = moves[target];
-
-      if source != target {
-        let result = document.move_item(container, source, target);
-
-        if let Err(error) = result {
-          eprintln!("{RED}Error:{RESET} {}", error);
-          process::exit(1);
-        }
-
-        for item in moves.iter_mut().skip(target + 1) {
-          if *item >= target && *item < source {
-            *item += 1;
-          } else if *item == source {
-            *item = target;
-          }
-        }
-      }
-    }
-
-    output(&self.file, &document, self.dry_run);
   }
 
   fn resolve_labels(

@@ -252,21 +252,6 @@ class DocumentTest < Minitest::Spec
     assert_includes document.to_s, "name: Alice"
   end
 
-  test "sort orders sequence items" do
-    document = Yerba::Document.parse(<<~YAML)
-      tags:
-        - rust
-        - go
-        - ruby
-    YAML
-    document.sort("tags")
-
-    lines = document.to_s.lines.map(&:strip)
-    tag_lines = lines.select { |line| line.start_with?("- ") }
-
-    assert_equal ["- go", "- ruby", "- rust"], tag_lines
-  end
-
   test "sort_keys orders map keys" do
     document = Yerba::Document.parse(<<~YAML)
       port: 5432

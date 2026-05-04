@@ -677,6 +677,22 @@ pub unsafe extern "C" fn yerba_document_remove_at(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_move_item(
+  document: *mut Document,
+  path: *const c_char,
+  from: usize,
+  to: usize,
+) -> YerbaResult {
+  let document = &mut *document;
+  let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  match document.move_item(path_string, from, to) {
+    Ok(()) => YerbaResult::ok(),
+    Err(e) => YerbaResult::err(&e.to_string()),
+  }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_rename(
   document: *mut Document,
   source: *const c_char,
@@ -729,6 +745,26 @@ pub unsafe extern "C" fn yerba_document_sort(
   };
 
   match document.sort_items(path_string, &sort_fields, case_sensitive) {
+    Ok(()) => YerbaResult::ok(),
+    Err(e) => YerbaResult::err(&e.to_string()),
+  }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_document_reorder(
+  document: *mut Document,
+  path: *const c_char,
+  by: *const c_char,
+  order_csv: *const c_char,
+) -> YerbaResult {
+  let document = &mut *document;
+  let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
+  let by_string = CStr::from_ptr(by).to_str().unwrap_or("");
+  let order_string = CStr::from_ptr(order_csv).to_str().unwrap_or("");
+
+  let desired_order: Vec<&str> = order_string.split(',').map(|s| s.trim()).collect();
+
+  match document.reorder_items(path_string, by_string, &desired_order) {
     Ok(()) => YerbaResult::ok(),
     Err(e) => YerbaResult::err(&e.to_string()),
   }

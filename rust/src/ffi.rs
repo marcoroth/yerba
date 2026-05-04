@@ -199,7 +199,6 @@ pub unsafe extern "C" fn yerba_document_free(document: *mut Document) {
 pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *const c_char) -> YerbaGetResult {
   let document = &*document;
   let path_string = CStr::from_ptr(path).to_str().unwrap_or("");
-
   let selector = Selector::parse(path_string);
 
   if let Err(e) = Document::validate_path(path_string) {
@@ -317,14 +316,14 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
 
         let node_type = match document.navigate(path_string) {
           Ok(node) => {
-            if node.children().any(|child| BlockSeq::can_cast(child.kind())) {
-              YerbaNodeType::Sequence
-            } else if node.children().any(|child| BlockMap::can_cast(child.kind())) {
-              YerbaNodeType::Map
-            } else if node.descendants().any(|child| BlockSeq::can_cast(child.kind())) {
-              YerbaNodeType::Sequence
-            } else if node.descendants().any(|child| BlockMap::can_cast(child.kind())) {
-              YerbaNodeType::Map
+            if let Some(first_structural) = node.descendants().find(|child| {
+              BlockMap::can_cast(child.kind()) || BlockSeq::can_cast(child.kind())
+            }) {
+              if BlockMap::can_cast(first_structural.kind()) {
+                YerbaNodeType::Map
+              } else {
+                YerbaNodeType::Sequence
+              }
             } else {
               YerbaNodeType::NotFound
             }

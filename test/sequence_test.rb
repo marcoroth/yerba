@@ -499,6 +499,132 @@ class SequenceTest < Minitest::Spec
     assert_equal [["Alice", "alice", "aalice"], ["Bob", "bob", "bbob"]], document.root.pluck(:name, :slug, :github)
   end
 
+  test "find_by with nested selector" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+          - name: Bob
+      - id: talk-2
+        speakers:
+          - name: Charlie
+    YAML
+
+    result = document.root.find_by("speakers[].name", "Alice")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "talk-1", result["id"].value
+  end
+
+  test "find_by with nested selector finds correct entry" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+      - id: talk-2
+        speakers:
+          - name: Charlie
+    YAML
+
+    result = document.root.find_by("speakers[].name", "Charlie")
+
+    assert_equal "talk-2", result["id"].value
+  end
+
+  test "find_by with nested hash syntax" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+          - name: Bob
+      - id: talk-2
+        speakers:
+          - name: Charlie
+    YAML
+
+    result = document.root.find_by(speakers: { name: "Charlie" })
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "talk-2", result["id"].value
+  end
+
+  test "where with nested hash syntax" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+      - id: talk-2
+        speakers:
+          - name: Alice
+          - name: Bob
+      - id: talk-3
+        speakers:
+          - name: Charlie
+    YAML
+
+    results = document.root.where(speakers: { name: "Alice" })
+
+    assert_equal 2, results.length
+    assert_equal "talk-1", results[0]["id"].value
+    assert_equal "talk-2", results[1]["id"].value
+  end
+
+  test "find_by with nested hash and additional flat criteria" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        kind: keynote
+        speakers:
+          - name: Alice
+      - id: talk-2
+        kind: talk
+        speakers:
+          - name: Alice
+    YAML
+
+    result = document.root.find_by(kind: "talk", speakers: { name: "Alice" })
+
+    assert_equal "talk-2", result["id"].value
+  end
+
+  test "find_by with deeply nested hash" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+            links:
+              - url: https://alice.dev
+      - id: talk-2
+        speakers:
+          - name: Bob
+            links:
+              - url: https://bob.dev
+    YAML
+
+    result = document.root.find_by(speakers: { links: { url: "https://bob.dev" } })
+
+    assert_equal "talk-2", result["id"].value
+  end
+
+  test "sequence entry with nested sequence returns Map" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+    YAML
+
+    assert_instance_of Yerba::Map, document[""][0]
+    assert_instance_of Yerba::Sequence, document[""][0]["speakers"]
+  end
+
+  test "root sequence returns Sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: first
+      - id: second
+    YAML
+
+    assert_instance_of Yerba::Sequence, document.root
+  end
+
   test "index_of with kwargs on scalar sequence returns nil" do
     document = Yerba::Document.parse(<<~YAML)
       tags:

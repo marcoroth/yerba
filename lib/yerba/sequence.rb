@@ -74,14 +74,13 @@ module Yerba
     def pluck(*fields)
       return [] unless @document
 
+      all_values = @document.get_value(@selector)
+      return [] unless all_values.is_a?(Array)
+
       if fields.length == 1
-        all_values = @document.get_value(@selector)
-        return [] unless all_values.is_a?(Array)
 
         all_values.map { |item| item.is_a?(Hash) ? item[fields.first.to_s] : item }
       else
-        all_values = @document.get_value(@selector)
-        return [] unless all_values.is_a?(Array)
 
         all_values.map { |item| fields.map(&:to_s).map { |field| item.is_a?(Hash) ? item[field] : nil } }
       end
@@ -97,15 +96,22 @@ module Yerba
       end
 
       criteria[selector] = value if selector && value
+      criteria = expand_nested_criteria(criteria)
 
       indices = nil
 
       criteria.each do |field, expected|
-        values = @document&.get("#{@selector}[].#{field}")
+        field_string = field.to_s
 
-        next unless values.is_a?(Array)
+        if field_string.include?("[]")
+          matching = nested_indices_for(field_string, expected)
+        else
+          values = @document&.get("#{@selector}[].#{field_string}")
 
-        matching = values.each_with_index.filter_map { |actual, index| index if actual == expected }
+          next unless values.is_a?(Array)
+
+          matching = values.each_with_index.filter_map { |actual, index| index if actual == expected }
+        end
 
         indices = indices ? indices & matching : matching
       end
@@ -125,15 +131,22 @@ module Yerba
       end
 
       criteria[selector] = value if selector && value
+      criteria = expand_nested_criteria(criteria)
 
       indices = nil
 
       criteria.each do |field, expected|
-        values = @document&.get("#{@selector}[].#{field}")
+        field_string = field.to_s
 
-        next unless values.is_a?(Array)
+        if field_string.include?("[]")
+          matching = nested_indices_for(field_string, expected)
+        else
+          values = @document&.get("#{@selector}[].#{field_string}")
 
-        matching = values.each_with_index.filter_map { |actual, index| index if actual == expected }
+          next unless values.is_a?(Array)
+
+          matching = values.each_with_index.filter_map { |actual, index| index if actual == expected }
+        end
 
         indices = indices ? indices & matching : matching
       end
@@ -236,6 +249,75 @@ module Yerba
     end
 
     private
+
+    def expand_nested_criteria(criteria)
+      expanded = {}
+
+      criteria.each do |field, value|
+        if value.is_a?(Hash)
+          flatten_hash("#{field}[]", value).each do |path, leaf_value|
+            expanded[path] = leaf_value
+          end
+        else
+          expanded[field] = value
+        end
+      end
+
+      expanded
+    end
+
+    def flatten_hash(prefix, hash)
+      result = {}
+
+      hash.each do |key, value|
+        path = "#{prefix}.#{key}"
+
+        if value.is_a?(Hash)
+          flatten_hash("#{path}[]", value).each { |nested_path, leaf| result[nested_path] = leaf }
+        else
+          result[path] = value
+        end
+      end
+
+      result
+    end
+
+    def nested_indices_for(field, expected)
+      all_values = @document&.get_value(@selector)
+      return [] unless all_values.is_a?(Array)
+
+      all_values.each_with_index.filter_map do |item, index|
+        next unless item.is_a?(Hash)
+
+        nested_values = dig_values(item, field)
+        index if nested_values.include?(expected)
+      end
+    end
+
+    def dig_values(hash, path)
+      parts = path.split(".")
+      current = [hash]
+
+      parts.each do |part|
+        next_values = []
+
+        current.each do |value|
+          if part == "[]" && value.is_a?(Array)
+            next_values.concat(value)
+          elsif part.end_with?("[]")
+            key = part.chomp("[]")
+            child = value.is_a?(Hash) ? value[key] : nil
+            next_values.concat(child) if child.is_a?(Array)
+          elsif value.is_a?(Hash)
+            next_values << value[part] if value.key?(part)
+          end
+        end
+
+        current = next_values
+      end
+
+      current
+    end
 
     def format_for_insert(value)
       Formatting.quote(value, detect_quote_style)

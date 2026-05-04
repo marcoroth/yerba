@@ -20,6 +20,41 @@ module Yerba
       self.class.find(@glob, path, condition: condition, select: select)
     end
 
+    def find_by(...)
+      each do |document|
+        next unless document.sequence?
+
+        result = document.root.find_by(...)
+        return result if result
+      end
+
+      nil
+    end
+
+    def where(...)
+      results = []
+
+      each do |document|
+        next unless document.sequence?
+
+        results.concat(document.root.where(...))
+      end
+
+      results
+    end
+
+    def pluck(...)
+      results = []
+
+      each do |document|
+        next unless document.sequence?
+
+        results.concat(document.root.pluck(...))
+      end
+
+      results
+    end
+
     def apply!
       each do |document|
         yield document

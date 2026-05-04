@@ -701,4 +701,47 @@ class DocumentTest < Minitest::Spec
         description: ""
     YAML
   end
+
+  test "document.find_by delegates to root sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        role: admin
+      - name: Bob
+        role: user
+    YAML
+
+    result = document.find_by(name: "Bob")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "user", result["role"].value
+  end
+
+  test "document.where delegates to root sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        role: admin
+      - name: Bob
+        role: user
+      - name: Charlie
+        role: admin
+    YAML
+
+    results = document.where(role: "admin")
+
+    assert_equal 2, results.length
+    assert_equal "Alice", results[0]["name"].value
+    assert_equal "Charlie", results[1]["name"].value
+  end
+
+  test "document.pluck delegates to root sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+      - name: Bob
+      - name: Charlie
+    YAML
+
+    names = document.pluck(:name)
+
+    assert_equal ["Alice", "Bob", "Charlie"], names
+  end
 end

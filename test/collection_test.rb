@@ -67,6 +67,86 @@ class CollectionTest < Minitest::Spec
     assert result[0].key?("__file")
   end
 
+  test "find_by searches across files" do
+    File.write(File.join(@dir, "d.yml"), <<~YAML)
+      - id: talk-1
+        name: Hello
+      - id: talk-2
+        name: World
+    YAML
+    File.write(File.join(@dir, "e.yml"), <<~YAML)
+      - id: talk-3
+        name: Foo
+    YAML
+
+    collection = Yerba.files(File.join(@dir, "[de].yml"))
+    result = collection.find_by(name: "World")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "talk-2", result["id"].value
+  end
+
+  test "find_by returns nil when no match" do
+    File.write(File.join(@dir, "d.yml"), <<~YAML)
+      - id: talk-1
+        name: Hello
+    YAML
+
+    collection = Yerba.files(File.join(@dir, "d.yml"))
+    result = collection.find_by(name: "Missing")
+
+    assert_nil result
+  end
+
+  test "where searches across files" do
+    File.write(File.join(@dir, "d.yml"), <<~YAML)
+      - id: talk-1
+        kind: talk
+      - id: talk-2
+        kind: keynote
+    YAML
+    File.write(File.join(@dir, "e.yml"), <<~YAML)
+      - id: talk-3
+        kind: talk
+    YAML
+
+    collection = Yerba.files(File.join(@dir, "[de].yml"))
+    results = collection.where(kind: "talk")
+
+    assert_equal 2, results.length
+    ids = results.map { |r| r["id"].value }
+    assert_includes ids, "talk-1"
+    assert_includes ids, "talk-3"
+  end
+
+  test "pluck collects values across files" do
+    File.write(File.join(@dir, "d.yml"), <<~YAML)
+      - id: talk-1
+        name: Hello
+      - id: talk-2
+        name: World
+    YAML
+    File.write(File.join(@dir, "e.yml"), <<~YAML)
+      - id: talk-3
+        name: Foo
+    YAML
+
+    collection = Yerba.files(File.join(@dir, "[de].yml"))
+    names = collection.pluck(:name)
+
+    assert_equal 3, names.length
+    assert_includes names, "Hello"
+    assert_includes names, "World"
+    assert_includes names, "Foo"
+  end
+
+  test "find_by skips non-sequence documents" do
+    collection = Yerba.files(File.join(@dir, "a.yml"))
+    result = collection.find_by(name: "Alpha")
+
+    assert_nil result
+  end
+
   test "apply yields each document and saves" do
     collection = Yerba.files(File.join(@dir, "[ab].yml"))
 

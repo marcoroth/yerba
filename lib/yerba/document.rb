@@ -48,6 +48,18 @@ module Yerba
       end
     end
 
+    def find_by(...)
+      root.find_by(...)
+    end
+
+    def where(...)
+      root.where(...)
+    end
+
+    def pluck(...)
+      root.pluck(...)
+    end
+
     def inspect
       if path
         "#<Yerba::Document path=#{path.inspect}>"

@@ -68,6 +68,26 @@ module Yerba
       root.concat(items)
     end
 
+    def save!(apply: false)
+      Yerbafile.apply!(self, apply) if apply
+      write!
+
+      self
+    end
+
+    def apply!(yerbafile = nil)
+      apply(yerbafile)
+      write! if changed?
+
+      self
+    end
+
+    def apply(yerbafile = nil)
+      Yerbafile.apply!(self, yerbafile)
+
+      self
+    end
+
     def inspect
       if path
         "#<Yerba::Document path=#{path.inspect}>"

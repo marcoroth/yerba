@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "tempfile"
+require "fileutils"
 
 class DocumentTest < Minitest::Spec
   test "Yerba.parse parses YAML content" do
@@ -740,5 +742,124 @@ class DocumentTest < Minitest::Spec
 
     assert_equal 3, document.root.length
     assert_equal "Charlie", document.find_by(name: "Charlie")["name"].value
+  end
+
+  test "document.apply reorders keys from Yerbafile" do
+    yerbafile = Tempfile.new(["Yerbafile", ".yml"])
+    yerbafile.write(<<~YAML)
+      rules:
+        - files: "**/*.yml"
+          pipeline:
+            - sort_keys:
+                path: "[]"
+                order:
+                  - name
+                  - slug
+                  - github
+    YAML
+    yerbafile.close
+
+    document = Yerba::Document.parse(<<~YAML)
+      - github: aalice
+        name: Alice
+        slug: alice
+    YAML
+
+    document.apply(yerbafile.path)
+
+    assert_equal <<~YAML, document.to_s
+      - name: Alice
+        slug: alice
+        github: aalice
+    YAML
+  ensure
+    yerbafile&.unlink
+  end
+
+  test "document.apply with quote_style enforces style" do
+    yerbafile = Tempfile.new(["Yerbafile", ".yml"])
+    yerbafile.write(<<~YAML)
+      rules:
+        - files: "**/*.yml"
+          pipeline:
+            - quote_style:
+                key_style: plain
+                value_style: double
+    YAML
+
+    yerbafile.close
+
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    document.apply(yerbafile.path)
+
+    assert_equal <<~YAML, document.to_s
+      name: "Alice"
+    YAML
+  ensure
+    yerbafile&.unlink
+  end
+
+  test "document.save! with apply: true applies rules before saving" do
+    dir = Dir.mktmpdir
+    yerbafile_path = File.join(dir, "Yerbafile")
+    File.write(yerbafile_path, <<~YAML)
+      rules:
+        - files: "**/*.yml"
+          pipeline:
+            - sort_keys:
+                path: "[]"
+                order:
+                  - name
+                  - slug
+    YAML
+
+    file_path = File.join(dir, "test.yml")
+    File.write(file_path, "- slug: alice\n  name: Alice\n")
+
+    Dir.chdir(dir) do
+      document = Yerba.parse_file(file_path)
+      document.save!(apply: true)
+    end
+
+    assert_equal <<~YAML, File.read(file_path)
+      - name: Alice
+        slug: alice
+    YAML
+  ensure
+    FileUtils.rm_rf(dir)
+  end
+
+  test "document.save! without apply does not reorder keys" do
+    dir = Dir.mktmpdir
+    yerbafile_path = File.join(dir, "Yerbafile")
+
+    File.write(yerbafile_path, <<~YAML)
+      rules:
+        - files: "**/*.yml"
+          pipeline:
+            - sort_keys:
+                path: "[]"
+                order:
+                  - name
+                  - slug
+    YAML
+
+    file_path = File.join(dir, "test.yml")
+    File.write(file_path, "- slug: alice\n  name: Alice\n")
+
+    Dir.chdir(dir) do
+      document = Yerba.parse_file(file_path)
+      document.save!
+    end
+
+    assert_equal <<~YAML, File.read(file_path)
+      - slug: alice
+        name: Alice
+    YAML
+  ensure
+    FileUtils.rm_rf(dir)
   end
 end

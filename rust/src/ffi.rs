@@ -626,6 +626,55 @@ pub unsafe extern "C" fn yerba_document_blank_lines(document: *mut Document, pat
   }
 }
 
+/// Caller must free with yerba_string_free.
+#[no_mangle]
+pub unsafe extern "C" fn yerba_yerbafile_find(directory: *const c_char) -> *mut c_char {
+  let start = if directory.is_null() {
+    std::env::current_dir().ok()
+  } else {
+    CStr::from_ptr(directory).to_str().ok().map(std::path::PathBuf::from)
+  };
+
+  let path = match start {
+    Some(dir) => crate::Yerbafile::find_from(dir),
+    None => None,
+  };
+
+  match path {
+    Some(path) => CString::new(path.to_string_lossy().to_string()).unwrap_or_default().into_raw(),
+    None => ptr::null_mut(),
+  }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_document_apply_yerbafile(document: *mut Document, file_path: *const c_char, yerbafile_path: *const c_char) -> YerbaResult {
+  let document = &mut *document;
+  let file_path_string = CStr::from_ptr(file_path).to_str().unwrap_or("");
+
+  let yerbafile = if yerbafile_path.is_null() {
+    match crate::Yerbafile::find() {
+      Some(path) => match crate::Yerbafile::load(&path) {
+        Ok(yerbafile) => yerbafile,
+        Err(e) => return YerbaResult::err(&e.to_string()),
+      },
+
+      None => return YerbaResult::err("No Yerbafile found"),
+    }
+  } else {
+    let path = CStr::from_ptr(yerbafile_path).to_str().unwrap_or("");
+
+    match crate::Yerbafile::load(path) {
+      Ok(yerbafile) => yerbafile,
+      Err(e) => return YerbaResult::err(&e.to_string()),
+    }
+  };
+
+  match yerbafile.apply_to_document(document, file_path_string) {
+    Ok(_) => YerbaResult::ok(),
+    Err(e) => YerbaResult::err(&e.to_string()),
+  }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn yerba_document_to_string(document: *const Document) -> *mut c_char {
   let document = &*document;

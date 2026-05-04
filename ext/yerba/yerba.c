@@ -682,6 +682,23 @@ static VALUE document_blank_lines(VALUE self, VALUE path, VALUE count) {
   return self;
 }
 
+/* document.apply_yerbafile(yerbafile_path = nil) */
+static VALUE document_apply_yerbafile(int argc, VALUE *argv, VALUE self) {
+  VALUE yerbafile_path;
+  rb_scan_args(argc, argv, "01", &yerbafile_path);
+
+  struct Document *document = get_document(self);
+  VALUE file_path = rb_iv_get(self, "@path");
+
+  const char *file_path_str = NIL_P(file_path) ? "" : StringValueCStr(file_path);
+  const char *yerbafile_path_str = NIL_P(yerbafile_path) ? NULL : StringValueCStr(yerbafile_path);
+
+  YerbaResult result = yerba_document_apply_yerbafile(document, file_path_str, yerbafile_path_str);
+  check_result(result);
+
+  return self;
+}
+
 /* document.to_s */
 static VALUE document_to_s(VALUE self) {
   struct Document *document = get_document(self);
@@ -784,6 +801,22 @@ static VALUE collection_s_find(int argc, VALUE *argv, VALUE self) {
   return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
 }
 
+/* Yerbafile.locate(directory = nil) → path string or nil */
+static VALUE yerbafile_s_locate(int argc, VALUE *argv, VALUE klass) {
+  VALUE directory;
+  rb_scan_args(argc, argv, "01", &directory);
+
+  const char *dir = NIL_P(directory) ? NULL : StringValueCStr(directory);
+  char *result = yerba_yerbafile_find(dir);
+
+  if (!result) return Qnil;
+
+  VALUE path = make_utf8_string(result);
+  yerba_string_free(result);
+
+  return path;
+}
+
 void Init_yerba(void) {
   rb_require("json");
 
@@ -823,8 +856,12 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "sort_keys", document_sort_keys, 2);
   rb_define_method(rb_cDocument, "quote_style", document_quote_style, -1);
   rb_define_method(rb_cDocument, "blank_lines", document_blank_lines, 2);
+  rb_define_method(rb_cDocument, "apply_yerbafile", document_apply_yerbafile, -1);
   rb_define_method(rb_cDocument, "to_s", document_to_s, 0);
-  rb_define_method(rb_cDocument, "save!", document_save, 0);
+  rb_define_method(rb_cDocument, "write!", document_save, 0);
   rb_define_method(rb_cDocument, "changed?", document_changed_p, 0);
   rb_define_method(rb_cDocument, "path", document_path, 0);
+
+  VALUE rb_cYerbafile = rb_define_class_under(rb_mYerba, "Yerbafile", rb_cObject);
+  rb_define_singleton_method(rb_cYerbafile, "locate", yerbafile_s_locate, -1);
 }

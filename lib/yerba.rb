@@ -11,6 +11,7 @@ require_relative "yerba/sequence"
 require_relative "yerba/query_result"
 require_relative "yerba/document"
 require_relative "yerba/collection"
+require_relative "yerba/yerbafile"
 
 begin
   major, minor, = RUBY_VERSION.split(".")

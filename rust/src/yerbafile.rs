@@ -195,9 +195,13 @@ impl Yerbafile {
   }
 
   pub fn find() -> Option<PathBuf> {
+    Self::find_from(std::env::current_dir().ok()?)
+  }
+
+  pub fn find_from(start: impl AsRef<Path>) -> Option<PathBuf> {
     let candidates = ["Yerbafile", "Yerbafile.yml", "Yerbafile.yaml", ".yerbafile"];
 
-    let mut directory = std::env::current_dir().ok()?;
+    let mut directory = start.as_ref().to_path_buf();
 
     loop {
       for candidate in &candidates {
@@ -379,12 +383,14 @@ impl Yerbafile {
     let original = document.to_string();
 
     for rule in &self.rules {
-      if let Ok(pattern) = glob::Pattern::new(&rule.files) {
-        if !pattern.matches(file_path) && !pattern.matches_path(Path::new(file_path)) {
+      if !file_path.is_empty() {
+        if let Ok(pattern) = glob::Pattern::new(&rule.files) {
+          if !pattern.matches(file_path) && !pattern.matches_path(Path::new(file_path)) {
+            continue;
+          }
+        } else {
           continue;
         }
-      } else {
-        continue;
       }
 
       let base_path = rule.path.as_deref();

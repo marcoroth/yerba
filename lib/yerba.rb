@@ -35,9 +35,9 @@ module Yerba
   NATIVE_PLATFORMS = {
     "arm64-darwin" => "arm64-darwin",
     "x86_64-darwin" => "x86_64-darwin",
-    "aarch64-linux" => "aarch64-linux",
-    "arm64-linux" => "aarch64-linux",
-    "x86_64-linux" => "x86_64-linux",
+    "aarch64-linux" => "aarch64-linux-gnu",
+    "arm64-linux" => "aarch64-linux-gnu",
+    "x86_64-linux" => "x86_64-linux-gnu",
   }.freeze
 
   def self.executable(exe_path: nil)
@@ -104,14 +104,18 @@ module Yerba
 
     FileUtils.mkdir_p(exe_directory)
 
-    unless system("cd #{rust_dir} && cargo build --release")
+    root_dir = File.expand_path(File.join("..", ".."), __dir__)
+    workspace_target = File.join(root_dir, "target", "release", EXECUTABLE_NAME)
+    crate_target = File.join(rust_dir, "target", "release", EXECUTABLE_NAME)
+
+    unless system("cd #{root_dir} && cargo build --release")
       raise CompilationError, "Failed to compile yerba from source. Is Rust installed?"
     end
 
-    source_binary = File.join(rust_dir, "target", "release", EXECUTABLE_NAME)
+    source_binary = [workspace_target, crate_target].find { |p| File.exist?(p) }
 
-    unless File.exist?(source_binary)
-      raise CompilationError, "Compilation succeeded but binary not found at #{source_binary}"
+    unless source_binary
+      raise CompilationError, "Compilation succeeded but binary not found at #{workspace_target} or #{crate_target}"
     end
 
     FileUtils.cp(source_binary, exe_file)

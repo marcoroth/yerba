@@ -5,6 +5,7 @@ mod insert;
 mod set;
 mod sort;
 mod style;
+mod unique;
 
 use std::fs;
 use std::path::{Path, PathBuf};

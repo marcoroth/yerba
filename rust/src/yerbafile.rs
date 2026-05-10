@@ -31,6 +31,7 @@ pub enum PipelineStep {
   BlankLines(BlankLinesConfig),
   Sort(SortConfig),
   Directives(DirectivesConfig),
+  Unique(UniqueConfig),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -56,6 +57,22 @@ pub struct DirectivesConfig {
   pub ensure: bool,
   #[serde(default)]
   pub remove: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UniqueConfig {
+  #[serde(default)]
+  pub path: Option<String>,
+  #[serde(default = "default_dot")]
+  pub by: String,
+  #[serde(default)]
+  pub remove: bool,
+  #[serde(default)]
+  pub allow_blank_duplicates: bool,
+}
+
+fn default_dot() -> String {
+  ".".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -131,8 +148,13 @@ impl<'de> Deserialize<'de> for PipelineStep {
       return Ok(PipelineStep::Sort(config));
     }
 
+    if let Some(value) = mapping.get(serde_yaml::Value::String("unique".to_string())) {
+      let config: UniqueConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      return Ok(PipelineStep::Unique(config));
+    }
+
     Err(serde::de::Error::custom(
-      "unknown pipeline step: expected sort_keys, quote_style, set, insert, delete, rename, remove, blank_lines, sort, or directives",
+      "unknown pipeline step: expected sort_keys, quote_style, set, insert, delete, rename, remove, blank_lines, sort, directives, or unique",
     ))
   }
 }
@@ -525,6 +547,19 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
       } else {
         Ok(())
       }
+    }
+
+    PipelineStep::Unique(config) => {
+      let full_path = resolve_step_path(base_path, config.path.as_deref());
+      let duplicates = document.unique_with_options(&full_path, &config.by, config.remove, config.allow_blank_duplicates)?;
+
+      if !duplicates.is_empty() && !config.remove {
+        for duplicate in &duplicates {
+          eprintln!("  duplicate: {} == {}", config.by, duplicate);
+        }
+      }
+
+      Ok(())
     }
   }
 }

@@ -353,6 +353,23 @@ yerba directives config.yml --remove
 yerba directives "data/**/*.yml" --ensure
 ```
 
+### `unique`
+
+Find or remove duplicate items in a sequence. Use `--by` to specify which field determines uniqueness:
+
+```bash
+yerba unique videos.yml --by ".id"
+yerba unique speakers.yml --by ".name"
+yerba unique config.yml "tags" --by "."
+```
+
+By default, duplicates are reported but not removed. Use `--remove` to remove them (keeps the first occurrence):
+
+```bash
+yerba unique videos.yml --by ".id" --remove
+yerba unique speakers.yml --by ".name" --remove --dry-run
+```
+
 ### `selectors`
 
 Show all valid selectors for a YAML file. Useful for discovering the structure of a file and knowing which selectors you can use with other commands:
@@ -471,6 +488,7 @@ Available pipeline steps:
 - `rename` Rename a key
 - `remove` Remove an item from a sequence
 - `directives` Add or remove the document start marker (`---`)
+- `unique` Find or remove duplicate items in a sequence
 - `get` Read a value and store it as a variable for subsequent steps
 
 This makes it easy to enforce project-wide YAML conventions in CI:

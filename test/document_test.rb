@@ -832,6 +832,68 @@ class DocumentTest < Minitest::Spec
     FileUtils.rm_rf(dir)
   end
 
+  test "document.selector returns empty string" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    assert_equal "", document.selector
+  end
+
+  test "scalar.selector returns the selector path" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
+
+    assert_equal "database.host", document["database"]["host"].selector
+    assert_equal "database.host", document["database.host"].selector
+  end
+
+  test "map.selector returns the selector path" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
+
+    assert_equal "database", document["database"].selector
+  end
+
+  test "sequence.selector returns the selector path" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+    YAML
+
+    assert_equal "tags", document["tags"].selector
+  end
+
+  test "selector on indexed sequence item" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        title: First
+      - id: talk-2
+        title: Second
+    YAML
+
+    assert_equal "[0]", document["[0]"].selector
+    assert_equal "[0].id", document["[0]"]["id"].selector
+    assert_equal "[1].title", document["[1]"]["title"].selector
+  end
+
+  test "selector on nested structures" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+    YAML
+
+    assert_equal "[0].speakers", document[0]["speakers"].selector
+    assert_equal "[0].speakers[0]", document[0]["speakers"][0].selector
+    assert_equal "[0].speakers[0].name", document[0]["speakers"][0]["name"].selector
+  end
+
   test "integer index access on document" do
     document = Yerba::Document.parse(<<~YAML)
       - id: talk-1

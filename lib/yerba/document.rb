@@ -4,6 +4,10 @@ module Yerba
   class Document
     ROOT_SELECTOR = ""
 
+    def selector
+      ROOT_SELECTOR
+    end
+
     def root
       self[ROOT_SELECTOR]
     end

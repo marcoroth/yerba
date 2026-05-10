@@ -209,6 +209,14 @@ static VALUE location_to_ruby(YerbaLocation location) {
 /* document[](path) → Yerba::Scalar, Yerba::Map, Yerba::Sequence, or nil */
 static VALUE document_bracket(VALUE self, VALUE path) {
   struct Document *document = get_document(self);
+
+  char index_buffer[32];
+
+  if (RB_TYPE_P(path, T_FIXNUM)) {
+    snprintf(index_buffer, sizeof(index_buffer), "[%ld]", FIX2LONG(path));
+    path = rb_str_new_cstr(index_buffer);
+  }
+
   YerbaGetResult result = yerba_document_get(document, StringValueCStr(path));
 
   if (result.error) {

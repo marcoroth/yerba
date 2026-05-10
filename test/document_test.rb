@@ -832,6 +832,21 @@ class DocumentTest < Minitest::Spec
     FileUtils.rm_rf(dir)
   end
 
+  test "integer index access on document" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - name: Alice
+    YAML
+
+    assert_equal "[0]", document[0].selector
+    assert_equal "[0].id", document[0]["id"].selector
+    assert_equal "[0].speakers", document[0]["speakers"].selector
+    assert_equal "[0].speakers[0]", document[0]["speakers"][0].selector
+    assert_equal "[0].speakers[0].name", document[0]["speakers"][0]["name"].selector
+    assert_equal "Alice", document[0]["speakers"][0]["name"].value
+  end
+
   test "document.save! without apply does not reorder keys" do
     dir = Dir.mktmpdir
     yerbafile_path = File.join(dir, "Yerbafile")

@@ -7,6 +7,7 @@ pub enum YerbaError {
   NotASequence(String),
   IndexOutOfBounds(usize, usize),
   UnknownKeys(Vec<String>),
+  DuplicateValues(Vec<crate::DuplicateInfo>),
   DuplicateKey {
     key: String,
     first_line: usize,
@@ -48,6 +49,16 @@ impl std::fmt::Display for YerbaError {
         )
       }
 
+      YerbaError::DuplicateValues(duplicates) => {
+        let noun = if duplicates.len() == 1 { "duplicate" } else { "duplicates" };
+        let details: Vec<String> = duplicates
+          .iter()
+          .map(|duplicate| format!("\"{}\" (line {})", duplicate.value, duplicate.line))
+          .collect();
+
+        write!(f, "found {} {}: {}", duplicates.len(), noun, details.join(", "))
+      }
+
       YerbaError::IndexOutOfBounds(index, length) => {
         write!(f, "index {} out of bounds (length {})", index, length)
       }
@@ -69,5 +80,55 @@ impl std::fmt::Display for YerbaError {
 impl From<std::io::Error> for YerbaError {
   fn from(err: std::io::Error) -> Self {
     YerbaError::IoError(err)
+  }
+}
+
+pub struct GitHubAnnotation {
+  pub level: &'static str,
+  pub file: String,
+  pub line: Option<usize>,
+  pub message: String,
+}
+
+impl std::fmt::Display for GitHubAnnotation {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self.line {
+      Some(line) => write!(f, "::{}file={},line={}::{}", self.level, self.file, line, self.message),
+      None => write!(f, "::{}file={}::{}", self.level, self.file, self.message),
+    }
+  }
+}
+
+pub trait GitHubAnnotations {
+  fn github_annotations(&self, file: &str) -> Vec<GitHubAnnotation>;
+}
+
+impl GitHubAnnotations for YerbaError {
+  fn github_annotations(&self, file: &str) -> Vec<GitHubAnnotation> {
+    match self {
+      YerbaError::DuplicateValues(duplicates) => duplicates
+        .iter()
+        .map(|duplicate| GitHubAnnotation {
+          level: "error ",
+          file: file.to_string(),
+          line: Some(duplicate.line),
+          message: format!("duplicate: \"{}\"", duplicate.value),
+        })
+        .collect(),
+
+      YerbaError::DuplicateKey { key, duplicate_line, .. } => vec![GitHubAnnotation {
+        level: "error ",
+        file: file.to_string(),
+        line: Some(*duplicate_line),
+        message: format!("duplicate key: \"{}\"", key),
+      }],
+
+      _ => vec![GitHubAnnotation {
+        level: "error ",
+        file: file.to_string(),
+        line: None,
+        message: self.to_string(),
+      }],
+    }
   }
 }

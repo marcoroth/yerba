@@ -24,6 +24,10 @@ use std::process;
 
 use clap::Subcommand;
 
+pub(crate) fn is_github_actions() -> bool {
+  std::env::var("GITHUB_ACTIONS").is_ok()
+}
+
 pub(crate) mod color {
   pub const GREEN: &str = "\x1b[32m";
   pub const RED: &str = "\x1b[31m";
@@ -217,15 +221,30 @@ pub(crate) fn run_yerbafile(write: bool, files: Vec<String>) {
   let mut has_changes = false;
   let mut has_errors = false;
 
+  let github = is_github_actions();
+
   for result in &results {
     if let Some(error) = &result.error {
       eprintln!("  {RED}error:{RESET} {} {DIM}—{RESET} {}", result.file, error);
+
+      if github {
+        use yerba::error::GitHubAnnotations;
+
+        for annotation in error.github_annotations(&result.file) {
+          eprintln!("{}", annotation);
+        }
+      }
+
       has_errors = true;
     } else if result.changed {
       if write {
         eprintln!("  {GREEN}updated:{RESET} {}", result.file);
       } else {
         eprintln!("  {YELLOW}would change:{RESET} {}", result.file);
+
+        if github {
+          eprintln!("::error file={}::File does not match Yerbafile rules", result.file);
+        }
       }
 
       has_changes = true;

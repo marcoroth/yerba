@@ -1,6 +1,6 @@
 pub mod didyoumean;
 mod document;
-mod error;
+pub mod error;
 pub mod ffi;
 pub mod json;
 mod quote_style;
@@ -9,7 +9,7 @@ mod syntax;
 mod yaml_writer;
 pub mod yerbafile;
 
-pub use document::{collect_selectors, Document, InsertPosition, Location, NodeInfo, NodeType, SortField};
+pub use document::{collect_selectors, Document, DuplicateInfo, InsertPosition, Location, NodeInfo, NodeType, SortField};
 pub use error::YerbaError;
 pub use quote_style::{KeyStyle, QuoteStyle};
 pub use selector::Selector;

@@ -5,13 +5,20 @@ use rowan::ast::AstNode;
 use crate::document::{extract_scalar_text, navigate_from_node, Document};
 use crate::error::YerbaError;
 
+#[derive(Debug, Clone)]
+pub struct DuplicateInfo {
+  pub value: String,
+  pub line: usize,
+}
+
 impl Document {
-  pub fn unique(&mut self, dot_path: &str, by: &str, remove: bool) -> Result<Vec<String>, YerbaError> {
+  pub fn unique(&mut self, dot_path: &str, by: &str, remove: bool) -> Result<Vec<DuplicateInfo>, YerbaError> {
     self.unique_with_options(dot_path, by, remove, false)
   }
 
-  pub fn unique_with_options(&mut self, dot_path: &str, by: &str, remove: bool, allow_blank_duplicates: bool) -> Result<Vec<String>, YerbaError> {
+  pub fn unique_with_options(&mut self, dot_path: &str, by: &str, remove: bool, allow_blank_duplicates: bool) -> Result<Vec<DuplicateInfo>, YerbaError> {
     let current_node = self.navigate(dot_path)?;
+    let source = self.root.text().to_string();
 
     let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
       Some(sequence) => sequence,
@@ -26,25 +33,30 @@ impl Document {
 
     let by_is_scalar = by == ".";
 
-    let labels: Vec<Option<String>> = entries
+    let labels: Vec<(Option<String>, usize)> = entries
       .iter()
       .map(|entry| {
-        if by_is_scalar {
+        let offset: usize = entry.syntax().text_range().start().into();
+        let line = source[..offset].matches('\n').count() + 1;
+
+        let value = if by_is_scalar {
           Some(entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default())
         } else {
           let field = by.strip_prefix('.').unwrap_or(by);
           let nodes = navigate_from_node(entry.syntax(), field);
 
           nodes.first().and_then(extract_scalar_text)
-        }
+        };
+
+        (value, line)
       })
       .collect();
 
     let mut seen = std::collections::HashSet::new();
     let mut duplicate_indices: Vec<usize> = Vec::new();
-    let mut duplicate_labels: Vec<String> = Vec::new();
+    let mut duplicates: Vec<DuplicateInfo> = Vec::new();
 
-    for (index, label) in labels.iter().enumerate() {
+    for (index, (label, line)) in labels.iter().enumerate() {
       let label = match label {
         None => continue,
         Some(value) => value,
@@ -56,7 +68,10 @@ impl Document {
 
       if !seen.insert(label.clone()) {
         duplicate_indices.push(index);
-        duplicate_labels.push(label.clone());
+        duplicates.push(DuplicateInfo {
+          value: label.clone(),
+          line: *line,
+        });
       }
     }
 
@@ -66,6 +81,6 @@ impl Document {
       }
     }
 
-    Ok(duplicate_labels)
+    Ok(duplicates)
   }
 }

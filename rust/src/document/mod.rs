@@ -6,6 +6,7 @@ mod set;
 mod sort;
 mod style;
 mod unique;
+pub use unique::DuplicateInfo;
 
 use std::fs;
 use std::path::{Path, PathBuf};

@@ -2,6 +2,10 @@ mod support;
 use indoc::indoc;
 use support::parse;
 
+fn values(duplicates: &[yerba::DuplicateInfo]) -> Vec<&str> {
+  duplicates.iter().map(|duplicate| duplicate.value.as_str()).collect()
+}
+
 #[test]
 fn test_unique_finds_duplicates() {
   let mut document = parse(indoc! {"
@@ -15,7 +19,7 @@ fn test_unique_finds_duplicates() {
 
   let duplicates = document.unique("", ".id", false).unwrap();
 
-  assert_eq!(duplicates, vec!["a"]);
+  assert_eq!(values(&duplicates), vec!["a"]);
 }
 
 #[test]
@@ -44,7 +48,7 @@ fn test_unique_removes_duplicates() {
 
   let duplicates = document.unique("", ".id", true).unwrap();
 
-  assert_eq!(duplicates, vec!["a"]);
+  assert_eq!(values(&duplicates), vec!["a"]);
   assert_eq!(
     document.to_string(),
     indoc! {"
@@ -68,7 +72,7 @@ fn test_unique_scalar_array() {
 
   let duplicates = document.unique("tags", ".", true).unwrap();
 
-  assert_eq!(duplicates, vec!["ruby"]);
+  assert_eq!(values(&duplicates), vec!["ruby"]);
   assert_eq!(
     document.to_string(),
     indoc! {"
@@ -92,7 +96,7 @@ fn test_unique_multiple_duplicates() {
 
   let duplicates = document.unique("", ".id", true).unwrap();
 
-  assert_eq!(duplicates, vec!["a", "b"]);
+  assert_eq!(values(&duplicates), vec!["a", "b"]);
   assert_eq!(
     document.to_string(),
     indoc! {"
@@ -131,7 +135,7 @@ fn test_unique_nested_sequence() {
 
   let duplicates = document.unique("speakers", ".name", true).unwrap();
 
-  assert_eq!(duplicates, vec!["Alice"]);
+  assert_eq!(values(&duplicates), vec!["Alice"]);
   assert_eq!(
     document.to_string(),
     indoc! {"
@@ -152,7 +156,7 @@ fn test_unique_without_remove_does_not_modify() {
   let original = document.to_string();
   let duplicates = document.unique("", ".id", false).unwrap();
 
-  assert_eq!(duplicates, vec!["a"]);
+  assert_eq!(values(&duplicates), vec!["a"]);
   assert_eq!(document.to_string(), original);
 }
 
@@ -178,7 +182,7 @@ fn test_unique_blank_values_are_duplicates_by_default() {
 
   let duplicates = document.unique("", ".github", false).unwrap();
 
-  assert_eq!(duplicates, vec![""]);
+  assert_eq!(values(&duplicates), vec![""]);
 }
 
 #[test]
@@ -208,7 +212,7 @@ fn test_unique_allow_blank_duplicates_still_finds_non_blank() {
 
   let duplicates = document.unique_with_options("", ".github", false, true).unwrap();
 
-  assert_eq!(duplicates, vec!["alice"]);
+  assert_eq!(values(&duplicates), vec!["alice"]);
 }
 
 #[test]
@@ -247,7 +251,7 @@ fn test_unique_mixed_missing_and_present() {
 
   let duplicates = document.unique("", ".github", false).unwrap();
 
-  assert_eq!(duplicates, vec!["alice"]);
+  assert_eq!(values(&duplicates), vec!["alice"]);
 }
 
 #[test]
@@ -262,7 +266,7 @@ fn test_unique_missing_vs_empty_are_different() {
 
   let duplicates = document.unique("", ".github", false).unwrap();
 
-  assert_eq!(duplicates, vec![""]);
+  assert_eq!(values(&duplicates), vec![""]);
 }
 
 #[test]
@@ -278,7 +282,7 @@ fn test_unique_remove_blank_duplicates() {
 
   let duplicates = document.unique("", ".github", true).unwrap();
 
-  assert_eq!(duplicates, vec![""]);
+  assert_eq!(values(&duplicates), vec![""]);
   assert_eq!(document.get_all("[].name"), vec!["Alice", "Bob"]);
 }
 
@@ -295,7 +299,7 @@ fn test_unique_scalar_array_with_blanks() {
 
   let duplicates = document.unique("tags", ".", true).unwrap();
 
-  assert_eq!(duplicates, vec!["", "ruby"]);
+  assert_eq!(values(&duplicates), vec!["", "ruby"]);
   assert_eq!(
     document.to_string(),
     indoc! {r#"
@@ -320,7 +324,7 @@ fn test_unique_scalar_array_with_blanks_allow() {
 
   let duplicates = document.unique_with_options("tags", ".", true, true).unwrap();
 
-  assert_eq!(duplicates, vec!["ruby"]);
+  assert_eq!(values(&duplicates), vec!["ruby"]);
   assert_eq!(
     document.to_string(),
     indoc! {r#"

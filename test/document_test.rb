@@ -1043,7 +1043,7 @@ class DocumentTest < Minitest::Spec
         kind: keynote
     YAML
 
-    results = document.find("[]", condition: '.kind not_contains keynote')
+    results = document.find("[]", condition: ".kind not_contains keynote")
 
     assert_equal 1, results.length
     assert_equal "Workshop", results[0]["title"]

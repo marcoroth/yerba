@@ -206,7 +206,7 @@ fn default_key_style() -> String {
 pub struct RuleResult {
   pub file: String,
   pub changed: bool,
-  pub error: Option<String>,
+  pub error: Option<YerbaError>,
 }
 
 impl Yerbafile {
@@ -277,7 +277,7 @@ impl Yerbafile {
           results.push(RuleResult {
             file: rule.files.clone(),
             changed: false,
-            error: Some(format!("invalid glob: {}", error)),
+            error: Some(YerbaError::ParseError(format!("invalid glob: {}", error))),
           });
 
           continue;
@@ -302,7 +302,7 @@ impl Yerbafile {
                   return Some(RuleResult {
                     file: file.clone(),
                     changed: false,
-                    error: Some(format!("{}", error)),
+                    error: Some(error),
                   });
                 }
               };
@@ -311,7 +311,7 @@ impl Yerbafile {
                 Some(RuleResult {
                   file: file.clone(),
                   changed: false,
-                  error: Some(format!("{}", error)),
+                  error: Some(error),
                 })
               } else {
                 None
@@ -345,7 +345,7 @@ impl Yerbafile {
         return RuleResult {
           file: file.to_string(),
           changed: false,
-          error: Some(format!("{}", error)),
+          error: Some(error),
         }
       }
     };
@@ -354,11 +354,11 @@ impl Yerbafile {
     let base_path = rule.path.as_deref();
 
     for step in &rule.pipeline {
-      if let Err(error) = execute_step(&mut document, step, base_path) {
+      if let Err(error) = execute_step(&mut document, step, base_path, file) {
         return RuleResult {
           file: file.to_string(),
           changed: false,
-          error: Some(format!("{}", error)),
+          error: Some(error),
         };
       }
     }
@@ -371,7 +371,7 @@ impl Yerbafile {
         return RuleResult {
           file: file.to_string(),
           changed,
-          error: Some(format!("{}", error)),
+          error: Some(YerbaError::IoError(error)),
         };
       }
     }
@@ -418,7 +418,7 @@ impl Yerbafile {
       let base_path = rule.path.as_deref();
 
       for step in &rule.pipeline {
-        execute_step(document, step, base_path)?;
+        execute_step(document, step, base_path, file_path)?;
       }
     }
 
@@ -426,7 +426,7 @@ impl Yerbafile {
   }
 }
 
-fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<&str>) -> Result<(), YerbaError> {
+fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<&str>, _file: &str) -> Result<(), YerbaError> {
   match step {
     PipelineStep::QuoteStyle(config) => {
       let dot_path = config.path.as_deref();
@@ -554,9 +554,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
       let duplicates = document.unique_with_options(&full_path, &config.by, config.remove, config.allow_blank_duplicates)?;
 
       if !duplicates.is_empty() && !config.remove {
-        for duplicate in &duplicates {
-          eprintln!("  duplicate: {} == {}", config.by, duplicate);
-        }
+        return Err(YerbaError::DuplicateValues(duplicates));
       }
 
       Ok(())

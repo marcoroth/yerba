@@ -55,7 +55,7 @@ impl Args {
             eprintln!("{YELLOW}Removed {} {noun}{RESET} from {}", duplicates.len(), resolved_file);
 
             for duplicate in &duplicates {
-              eprintln!("  {DIM}{} == {}{RESET}", by, duplicate);
+              eprintln!("  {DIM}line {}: {} == {}{RESET}", duplicate.line, by, duplicate.value);
             }
 
             output(&resolved_file, &document, self.dry_run);
@@ -63,7 +63,7 @@ impl Args {
             eprintln!("{RED}Found {} {noun}{RESET} in {}", duplicates.len(), resolved_file);
 
             for duplicate in &duplicates {
-              eprintln!("  {DIM}{} == {}{RESET}", by, duplicate);
+              eprintln!("  {DIM}line {}: {} == {}{RESET}", duplicate.line, by, duplicate.value);
             }
 
             process::exit(1);

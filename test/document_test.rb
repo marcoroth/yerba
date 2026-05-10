@@ -939,4 +939,138 @@ class DocumentTest < Minitest::Spec
   ensure
     FileUtils.rm_rf(dir)
   end
+
+  test "document.find returns all entries" do
+    document = Yerba::Document.parse(<<~YAML)
+      - title: Keynote
+        kind: keynote
+      - title: Workshop
+        kind: talk
+    YAML
+
+    results = document.find("[]")
+
+    assert_equal 2, results.length
+    assert_equal "Keynote", results[0]["title"]
+    assert_equal "Workshop", results[1]["title"]
+  end
+
+  test "document.find with condition filters entries" do
+    document = Yerba::Document.parse(<<~YAML)
+      - title: Keynote
+        kind: keynote
+      - title: Workshop
+        kind: talk
+      - title: Panel
+        kind: keynote
+    YAML
+
+    results = document.find("[]", condition: '.kind == "keynote"')
+
+    assert_equal 2, results.length
+    assert_equal "Keynote", results[0]["title"]
+    assert_equal "Panel", results[1]["title"]
+  end
+
+  test "document.find with select returns only specified fields" do
+    document = Yerba::Document.parse(<<~YAML)
+      - title: Keynote
+        kind: keynote
+        year: 2024
+      - title: Workshop
+        kind: talk
+        year: 2025
+    YAML
+
+    results = document.find("[]", select: "title,kind")
+
+    assert_equal 2, results.length
+    assert_equal "Keynote", results[0]["title"]
+    assert_equal "keynote", results[0]["kind"]
+    refute results[0].key?("year")
+  end
+
+  test "document.find with condition and select" do
+    document = Yerba::Document.parse(<<~YAML)
+      - title: Keynote
+        kind: keynote
+        speakers:
+          - Alice
+      - title: Workshop
+        kind: talk
+        speakers:
+          - Bob
+      - title: Panel
+        kind: keynote
+        speakers:
+          - Charlie
+    YAML
+
+    results = document.find("[]", condition: '.kind == "keynote"', select: "title,speakers")
+
+    assert_equal 2, results.length
+    assert_equal "Keynote", results[0]["title"]
+    assert_equal ["Alice"], results[0]["speakers"]
+    refute results[0].key?("kind")
+    assert_equal "Panel", results[1]["title"]
+    assert_equal ["Charlie"], results[1]["speakers"]
+  end
+
+  test "document.find with contains condition" do
+    document = Yerba::Document.parse(<<~YAML)
+      - title: Keynote
+        slides_url: "https://speakerdeck.com/alice"
+      - title: Workshop
+        slides_url: ""
+      - title: Panel
+        slides_url: "https://example.com/slides"
+    YAML
+
+    results = document.find("[]", condition: ".slides_url contains speakerdeck", select: "title,slides_url")
+
+    assert_equal 1, results.length
+    assert_equal "Keynote", results[0]["title"]
+    assert_equal "https://speakerdeck.com/alice", results[0]["slides_url"]
+  end
+
+  test "document.find with not_contains condition" do
+    document = Yerba::Document.parse(<<~YAML)
+      - title: Keynote
+        kind: keynote
+      - title: Workshop
+        kind: talk
+      - title: Panel
+        kind: keynote
+    YAML
+
+    results = document.find("[]", condition: '.kind not_contains keynote')
+
+    assert_equal 1, results.length
+    assert_equal "Workshop", results[0]["title"]
+  end
+
+  test "document.find with != condition" do
+    document = Yerba::Document.parse(<<~YAML)
+      - title: Keynote
+        kind: keynote
+      - title: Workshop
+        kind: talk
+    YAML
+
+    results = document.find("[]", condition: '.kind != "keynote"')
+
+    assert_equal 1, results.length
+    assert_equal "Workshop", results[0]["title"]
+  end
+
+  test "document.find returns empty array when no matches" do
+    document = Yerba::Document.parse(<<~YAML)
+      - title: Keynote
+        kind: keynote
+    YAML
+
+    results = document.find("[]", condition: '.kind == "talk"')
+
+    assert_equal [], results
+  end
 end

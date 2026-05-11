@@ -4,6 +4,7 @@ pub mod error;
 pub mod ffi;
 pub mod json;
 mod quote_style;
+pub mod schema;
 pub mod selector;
 mod syntax;
 mod yaml_writer;

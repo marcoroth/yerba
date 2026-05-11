@@ -370,6 +370,22 @@ yerba unique videos.yml --by ".id" --remove
 yerba unique speakers.yml --by ".name" --remove --dry-run
 ```
 
+### `schema`
+
+Validate YAML files against a JSON schema:
+
+```bash
+yerba schema data/speakers.yml --schema lib/schemas/speaker_schema.json
+yerba schema "data/**/videos.yml" --schema lib/schemas/video_schema.json
+```
+
+Use `--path` to scope validation to a specific selector (e.g. validate each item in an array):
+
+```bash
+yerba schema data/speakers.yml --schema speaker_schema.json --selector "[]"
+yerba schema data/sponsors.yml --schema tier_schema.json --selector "tiers[]"
+```
+
 ### `selectors`
 
 Show all valid selectors for a YAML file. Useful for discovering the structure of a file and knowing which selectors you can use with other commands:
@@ -489,6 +505,7 @@ Available pipeline steps:
 - `remove` Remove an item from a sequence
 - `directives` Add or remove the document start marker (`---`)
 - `unique` Find or remove duplicate items in a sequence
+- `schema` Validate against a JSON schema (with optional `path` for scoping)
 - `get` Read a value and store it as a variable for subsequent steps
 
 This makes it easy to enforce project-wide YAML conventions in CI:
@@ -616,6 +633,32 @@ collection = Yerba.files("data/**/*.yml")
 collection.find_by(name: "Alice")
 collection.where(kind: "talk")
 collection.pluck(:name)
+```
+
+### Schema Validation
+
+Validate documents against JSON schemas from Ruby:
+
+```ruby
+schema = {
+  type: "object",
+  properties: { name: { type: "string" }, slug: { type: "string" } },
+  required: ["name", "slug"]
+}
+
+document.valid?(schema)                     # => true/false
+document.valid?(schema, selector: "[]")     # validate each array item
+
+errors = document.validate(schema, selector: "[]")
+errors.each do |error|
+  puts "#{error["message"]} at #{error["path"]} (line #{error["line"]})"
+end
+```
+
+Also accepts a JSON string:
+
+```ruby
+document.valid?('{"type":"object","required":["name"]}')
 ```
 
 ### Quote Style Control

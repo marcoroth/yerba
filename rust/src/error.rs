@@ -8,6 +8,7 @@ pub enum YerbaError {
   IndexOutOfBounds(usize, usize),
   UnknownKeys(Vec<String>),
   DuplicateValues(Vec<crate::DuplicateInfo>),
+  SchemaValidation(Vec<crate::schema::ValidationError>),
   DuplicateKey {
     key: String,
     first_line: usize,
@@ -63,6 +64,12 @@ impl std::fmt::Display for YerbaError {
         write!(f, "index {} out of bounds (length {})", index, length)
       }
 
+      YerbaError::SchemaValidation(errors) => {
+        let details: Vec<String> = errors.iter().map(|error| error.to_string()).collect();
+
+        write!(f, "schema validation failed:\n{}", details.join("\n"))
+      }
+
       YerbaError::UnknownKeys(keys) => {
         let suggestion = keys.iter().map(|key| format!("\"{}\"", key)).collect::<Vec<_>>().join(", ");
 
@@ -113,6 +120,16 @@ impl GitHubAnnotations for YerbaError {
           file: file.to_string(),
           line: Some(duplicate.line),
           message: format!("duplicate: \"{}\"", duplicate.value),
+        })
+        .collect(),
+
+      YerbaError::SchemaValidation(errors) => errors
+        .iter()
+        .map(|error| GitHubAnnotation {
+          level: "error ",
+          file: file.to_string(),
+          line: error.line,
+          message: error.to_string(),
         })
         .collect(),
 

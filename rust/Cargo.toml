@@ -29,6 +29,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 clap = { version = "4", features = ["derive"] }
 indoc = "2"
 rayon = "1"
+jsonschema = "0.29"
 
 [build-dependencies]
 cbindgen = "0.28"

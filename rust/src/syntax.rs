@@ -32,27 +32,40 @@ pub fn detect_yaml_type(scalar: &ScalarValue) -> YerbaValueType {
 }
 
 pub fn extract_scalar(node: &SyntaxNode) -> Option<ScalarValue> {
-  let token = find_scalar_token(node)?;
+  if let Some(token) = find_scalar_token(node) {
+    let text = match token.kind() {
+      SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
 
-  let text = match token.kind() {
-    SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
+      SyntaxKind::DOUBLE_QUOTED_SCALAR => {
+        let raw = token.text();
+        unescape_double_quoted(&raw[1..raw.len() - 1])
+      }
 
-    SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-      let raw = token.text();
-      unescape_double_quoted(&raw[1..raw.len() - 1])
-    }
+      SyntaxKind::SINGLE_QUOTED_SCALAR => {
+        let raw = token.text();
+        unescape_single_quoted(&raw[1..raw.len() - 1])
+      }
 
-    SyntaxKind::SINGLE_QUOTED_SCALAR => {
-      let raw = token.text();
-      unescape_single_quoted(&raw[1..raw.len() - 1])
-    }
+      _ => return None,
+    };
 
-    _ => return None,
-  };
+    return Some(ScalarValue {
+      text,
+      kind: token.kind(),
+      file_path: None,
+      selector: None,
+      line: None,
+    });
+  }
+
+  let block_token = node
+    .descendants_with_tokens()
+    .filter_map(|element| element.into_token())
+    .find(|token| token.kind() == SyntaxKind::BLOCK_SCALAR_TEXT)?;
 
   Some(ScalarValue {
-    text,
-    kind: token.kind(),
+    text: dedent_block_scalar(block_token.text()),
+    kind: SyntaxKind::BLOCK_SCALAR_TEXT,
     file_path: None,
     selector: None,
     line: None,
@@ -99,27 +112,52 @@ pub fn format_scalar_value(value: &str, kind: SyntaxKind) -> String {
 }
 
 pub fn extract_scalar_text(node: &SyntaxNode) -> Option<String> {
-  let token = find_scalar_token(node)?;
+  if let Some(token) = find_scalar_token(node) {
+    return match token.kind() {
+      SyntaxKind::PLAIN_SCALAR => Some(token.text().to_string()),
 
-  match token.kind() {
-    SyntaxKind::PLAIN_SCALAR => Some(token.text().to_string()),
+      SyntaxKind::DOUBLE_QUOTED_SCALAR => {
+        let text = token.text();
+        let inner = &text[1..text.len() - 1];
 
-    SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-      let text = token.text();
-      let inner = &text[1..text.len() - 1];
+        Some(unescape_double_quoted(inner))
+      }
 
-      Some(unescape_double_quoted(inner))
-    }
+      SyntaxKind::SINGLE_QUOTED_SCALAR => {
+        let text = token.text();
+        let inner = &text[1..text.len() - 1];
 
-    SyntaxKind::SINGLE_QUOTED_SCALAR => {
-      let text = token.text();
-      let inner = &text[1..text.len() - 1];
+        Some(unescape_single_quoted(inner))
+      }
 
-      Some(unescape_single_quoted(inner))
-    }
-
-    _ => None,
+      _ => None,
+    };
   }
+
+  let block_scalar_text = node
+    .descendants_with_tokens()
+    .filter_map(|element| element.into_token())
+    .find(|token| token.kind() == SyntaxKind::BLOCK_SCALAR_TEXT)?;
+
+  Some(dedent_block_scalar(block_scalar_text.text()))
+}
+
+pub fn dedent_block_scalar(text: &str) -> String {
+  let lines: Vec<&str> = text.lines().collect();
+  let min_indent = lines
+    .iter()
+    .filter(|line| !line.trim().is_empty())
+    .map(|line| line.len() - line.trim_start().len())
+    .min()
+    .unwrap_or(0);
+
+  let dedented: String = lines
+    .iter()
+    .map(|line| if line.len() >= min_indent { &line[min_indent..] } else { line.trim() })
+    .collect::<Vec<_>>()
+    .join("\n");
+
+  dedented.trim().to_string()
 }
 
 pub fn unescape_double_quoted(text: &str) -> String {

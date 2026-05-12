@@ -1170,4 +1170,91 @@ class DocumentTest < Minitest::Spec
 
     assert document.valid?(schema, selector: "[]")
   end
+
+  test "get returns clean text for block scalar" do
+    document = Yerba::Document.parse(<<~YAML)
+      description: |-
+        Hello World
+    YAML
+
+    assert_equal "Hello World", document.get("description")
+  end
+
+  test "get returns multiline block scalar with newlines" do
+    document = Yerba::Document.parse(<<~YAML)
+      description: |-
+        First line.
+        Second line.
+        Third line.
+    YAML
+
+    assert_equal "First line.\nSecond line.\nThird line.", document.get("description")
+  end
+
+  test "get block scalar has no leading newline or whitespace" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        description: |-
+          Some text here.
+    YAML
+
+    value = document.get("[0].description")
+
+    refute value.start_with?("\n")
+    refute value.start_with?(" ")
+    assert_equal "Some text here.", value
+  end
+
+  test "get block scalar nested in sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        description: |-
+          First paragraph.
+          Second paragraph.
+      - id: talk-2
+        description: |-
+          Another description.
+    YAML
+
+    assert_equal "First paragraph.\nSecond paragraph.", document.get("[0].description")
+    assert_equal "Another description.", document.get("[1].description")
+  end
+
+  test "get_value returns clean string for block scalar" do
+    document = Yerba::Document.parse(<<~YAML)
+      description: |-
+        Hello World
+    YAML
+
+    assert_equal "Hello World", document.get_value("description")
+  end
+
+  test "get_value returns multiline block scalar with newlines" do
+    document = Yerba::Document.parse(<<~YAML)
+      description: |-
+        First line.
+        Second line.
+    YAML
+
+    assert_equal "First line.\nSecond line.", document.get_value("description")
+  end
+
+  test "scalar.value returns clean text for block scalar" do
+    document = Yerba::Document.parse(<<~YAML)
+      description: |-
+        Hello World
+    YAML
+
+    assert_equal "Hello World", document["description"].value
+  end
+
+  test "scalar.value returns multiline block scalar with newlines" do
+    document = Yerba::Document.parse(<<~YAML)
+      description: |-
+        First paragraph.
+        Second paragraph.
+    YAML
+
+    assert_equal "First paragraph.\nSecond paragraph.", document["description"].value
+  end
 end

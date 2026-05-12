@@ -34,8 +34,8 @@ use crate::error::YerbaError;
 use crate::QuoteStyle;
 
 use crate::syntax::{
-  extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key, is_yaml_non_string, preceding_whitespace_indent,
-  removal_range, unescape_double_quoted, unescape_single_quoted, ScalarValue,
+  dedent_block_scalar, extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key, is_yaml_non_string,
+  preceding_whitespace_indent, removal_range, unescape_double_quoted, unescape_single_quoted, ScalarValue,
 };
 
 #[derive(Debug, Clone)]
@@ -477,6 +477,8 @@ pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> serde_yaml::Value {
       .find(|token| token.kind() == SyntaxKind::BLOCK_SCALAR_TEXT)
       .map(|token| token.text().to_string())
       .unwrap_or_default();
+
+    let text = dedent_block_scalar(&text);
 
     return serde_yaml::Value::String(text);
   }

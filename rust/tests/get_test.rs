@@ -1059,3 +1059,96 @@ fn test_get_all_located_with_file_path() {
   assert!(results[0].file_path.is_some());
   assert!(!results[0].file_path.as_ref().unwrap().is_empty());
 }
+
+#[test]
+fn test_get_block_scalar_single_line() {
+  let document = parse(indoc! {"
+    description: |-
+      Hello World
+  "});
+
+  assert_eq!(document.get("description"), Some("Hello World".to_string()));
+}
+
+#[test]
+fn test_get_block_scalar_multiline() {
+  let document = parse(indoc! {"
+    description: |-
+      First line.
+      Second line.
+      Third line.
+  "});
+
+  assert_eq!(document.get("description"), Some("First line.\nSecond line.\nThird line.".to_string()));
+}
+
+#[test]
+fn test_get_block_scalar_no_leading_newline() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      description: |-
+        Some text here.
+  "});
+
+  let value = document.get("[0].description").unwrap();
+
+  assert!(!value.starts_with('\n'));
+  assert!(!value.starts_with(' '));
+  assert_eq!(value, "Some text here.");
+}
+
+#[test]
+fn test_get_block_scalar_nested() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      description: |-
+        First paragraph.
+        Second paragraph.
+    - id: talk-2
+      description: |-
+        Another description.
+  "});
+
+  assert_eq!(document.get("[0].description"), Some("First paragraph.\nSecond paragraph.".to_string()));
+
+  assert_eq!(document.get("[1].description"), Some("Another description.".to_string()));
+}
+
+#[test]
+fn test_get_value_block_scalar_no_leading_newline() {
+  let document = parse(indoc! {"
+    description: |-
+      Hello World
+  "});
+
+  let value = document.get_value("description");
+
+  assert_eq!(value, Some(serde_yaml::Value::String("Hello World".to_string())));
+}
+
+#[test]
+fn test_get_value_block_scalar_multiline() {
+  let document = parse(indoc! {"
+    description: |-
+      First line.
+      Second line.
+  "});
+
+  let value = document.get_value("description");
+
+  assert_eq!(value, Some(serde_yaml::Value::String("First line.\nSecond line.".to_string())));
+}
+
+#[test]
+fn test_get_all_block_scalars() {
+  let document = parse(indoc! {"
+    - description: |-
+        First
+    - description: |-
+        Second
+  "});
+
+  let values = document.get_all("[].description");
+
+  assert_eq!(values, vec!["First", "Second"]);
+}

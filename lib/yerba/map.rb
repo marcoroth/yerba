@@ -72,12 +72,29 @@ module Yerba
       end
     end
 
+    def fetch(key)
+      if connected?
+        new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
+        document.fetch(new_path)
+      else
+        @data.fetch(key)
+      end
+    end
+
     def dig(*keys)
       if connected?
-        result = keys.reduce(self) { |node, key| node.nil? ? nil : node[key] }
-        result&.value
+        keys.reduce(self) { |node, key| node.nil? ? nil : node[key] }
       else
         @data.dig(*keys)
+      end
+    end
+
+    def value_at(key)
+      if connected?
+        new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
+        document.value_at(new_path)
+      else
+        @data[key]
       end
     end
 

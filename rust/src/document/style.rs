@@ -3,7 +3,7 @@ use super::*;
 impl Document {
   pub fn enforce_blank_lines(&mut self, dot_path: &str, blank_lines: usize) -> Result<(), YerbaError> {
     let nodes = if dot_path.contains('[') {
-      self.navigate_all(dot_path)
+      self.navigate_all_compact(dot_path)
     } else {
       vec![self.navigate(dot_path)?]
     };
@@ -105,7 +105,7 @@ impl Document {
     let source = self.root.text().to_string();
 
     let scope_ranges: Vec<TextRange> = match dot_path {
-      Some(path) if !path.is_empty() => self.navigate_all(path).iter().map(|node| node.text_range()).collect(),
+      Some(path) if !path.is_empty() => self.navigate_all_compact(path).iter().map(|node| node.text_range()).collect(),
       _ => vec![self.root.text_range()],
     };
 
@@ -219,7 +219,7 @@ impl Document {
     let source = self.root.text().to_string();
 
     let scope_ranges: Vec<TextRange> = match dot_path {
-      Some(path) if !path.is_empty() => self.navigate_all(path).iter().map(|node| node.text_range()).collect(),
+      Some(path) if !path.is_empty() => self.navigate_all_compact(path).iter().map(|node| node.text_range()).collect(),
       _ => vec![self.root.text_range()],
     };
 

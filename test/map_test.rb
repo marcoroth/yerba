@@ -86,7 +86,7 @@ class MapTest < Minitest::Spec
     YAML
     document["database"].each { |key, node| node.value = "changed" if key == "host" }
 
-    assert_equal "changed", document.get("database.host")
+    assert_equal "changed", document.value_at("database.host")
   end
 
   test "map.insert adds new key at end" do
@@ -365,5 +365,105 @@ class MapTest < Minitest::Spec
   ensure
     file&.unlink
     Yerba::Document.clear_cache!
+  end
+
+  test "fetch returns node for existing key" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
+
+    result = document["database"].fetch("host")
+
+    assert_instance_of Yerba::Scalar, result
+    assert_equal "localhost", result.value
+  end
+
+  test "fetch raises SelectorNotFoundError for missing key" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
+
+    assert_raises(Yerba::SelectorNotFoundError) { document["database"].fetch("missing") }
+  end
+
+  test "fetch suggests similar keys" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
+
+    error = assert_raises(Yerba::SelectorNotFoundError) { document["database"].fetch("hots") }
+
+    assert_includes error.message, "host"
+  end
+
+  test "dig returns node for nested path" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        settings:
+          pool: 5
+    YAML
+
+    result = document["database"].dig("settings", "pool")
+
+    assert_instance_of Yerba::Scalar, result
+    assert_equal 5, result.value
+  end
+
+  test "dig returns nil for missing path" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
+
+    assert_nil document["database"].dig("missing", "key")
+  end
+
+  test "dig returns Map for intermediate path" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        settings:
+          pool: 5
+    YAML
+
+    result = document["database"].dig("settings")
+
+    assert_instance_of Yerba::Map, result
+  end
+
+  test "value_at returns plain value" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
+
+    assert_equal "localhost", document["database"].value_at("host")
+    assert_equal 5432, document["database"].value_at("port")
+  end
+
+  test "value_at returns nil for missing key" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
+
+    assert_nil document["database"].value_at("missing")
+  end
+
+  test "value_at returns hash for nested map" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        settings:
+          pool: 5
+          timeout: 30
+    YAML
+
+    assert_equal({ "pool" => 5, "timeout" => 30 }, document["database"].value_at("settings"))
   end
 end

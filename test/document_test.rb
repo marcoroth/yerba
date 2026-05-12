@@ -10,7 +10,7 @@ class DocumentTest < Minitest::Spec
       name: Alice
     YAML
 
-    assert_equal "Alice", document.get("name")
+    assert_equal "Alice", document.value_at("name")
     assert_instance_of Yerba::Document, document
   end
 
@@ -23,7 +23,7 @@ class DocumentTest < Minitest::Spec
 
     document = Yerba.parse_file(file.path)
 
-    assert_equal "Alice", document.get("name")
+    assert_equal "Alice", document.value_at("name")
     assert_equal file.path, document.path
   ensure
     file&.unlink
@@ -34,7 +34,7 @@ class DocumentTest < Minitest::Spec
       name: Alice
     YAML
 
-    assert_equal "Alice", document.get("name")
+    assert_equal "Alice", document.value_at("name")
   end
 
   test "Document.parse returns string representation" do
@@ -51,7 +51,7 @@ class DocumentTest < Minitest::Spec
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
     YAML
-    result = document.get("name")
+    result = document.value_at("name")
 
     assert_equal "Alice", result
     assert_instance_of String, result
@@ -61,7 +61,7 @@ class DocumentTest < Minitest::Spec
     document = Yerba::Document.parse(<<~YAML)
       port: 5432
     YAML
-    result = document.get("port")
+    result = document.value_at("port")
 
     assert_equal 5432, result
     assert_instance_of Integer, result
@@ -71,7 +71,7 @@ class DocumentTest < Minitest::Spec
     document = Yerba::Document.parse(<<~YAML)
       ratio: 3.14
     YAML
-    result = document.get("ratio")
+    result = document.value_at("ratio")
 
     assert_in_delta 3.14, result
     assert_instance_of Float, result
@@ -82,7 +82,7 @@ class DocumentTest < Minitest::Spec
       ssl: true
     YAML
 
-    assert_equal true, document.get("ssl")
+    assert_equal true, document.value_at("ssl")
   end
 
   test "get returns false for plain boolean false" do
@@ -90,7 +90,7 @@ class DocumentTest < Minitest::Spec
       debug: false
     YAML
 
-    assert_equal false, document.get("debug")
+    assert_equal false, document.value_at("debug")
   end
 
   test "get returns nil for plain null" do
@@ -98,14 +98,14 @@ class DocumentTest < Minitest::Spec
       timeout: null
     YAML
 
-    assert_nil document.get("timeout")
+    assert_nil document.value_at("timeout")
   end
 
   test "get returns string for quoted boolean" do
     document = Yerba::Document.parse(<<~YAML)
       flag: "true"
     YAML
-    result = document.get("flag")
+    result = document.value_at("flag")
 
     assert_equal "true", result
     assert_instance_of String, result
@@ -115,7 +115,7 @@ class DocumentTest < Minitest::Spec
     document = Yerba::Document.parse(<<~YAML)
       version: "3.2"
     YAML
-    result = document.get("version")
+    result = document.value_at("version")
 
     assert_equal "3.2", result
     assert_instance_of String, result
@@ -126,7 +126,7 @@ class DocumentTest < Minitest::Spec
       name: Alice
     YAML
 
-    assert_nil document.get("missing")
+    assert_nil document.value_at("missing")
   end
 
   test "get returns array for wildcard path" do
@@ -135,7 +135,7 @@ class DocumentTest < Minitest::Spec
         - name: Ruby
         - name: Rust
     YAML
-    result = document.get("items[].name")
+    result = document.value_at("items[].name")
 
     assert_equal ["Ruby", "Rust"], result
     assert_instance_of Array, result
@@ -147,7 +147,7 @@ class DocumentTest < Minitest::Spec
         - count: 1
         - count: 2
     YAML
-    result = document.get("items[].count")
+    result = document.value_at("items[].count")
 
     assert_equal [1, 2], result
     assert_instance_of Integer, result.first
@@ -291,8 +291,9 @@ class DocumentTest < Minitest::Spec
         port: 5432
     YAML
 
-    assert_equal "localhost", document.dig("database", "host")
-    assert_equal 5432, document.dig("database", "port")
+    assert_instance_of Yerba::Scalar, document.dig("database", "host")
+    assert_equal "localhost", document.dig("database", "host").value
+    assert_equal 5432, document.dig("database", "port").value
   end
 
   test "dig with integer index into sequence" do
@@ -302,8 +303,9 @@ class DocumentTest < Minitest::Spec
         - name: Rust
     YAML
 
-    assert_equal "Ruby", document.dig("items", 0, "name")
-    assert_equal "Rust", document.dig("items", 1, "name")
+    assert_instance_of Yerba::Scalar, document.dig("items", 0, "name")
+    assert_equal "Ruby", document.dig("items", 0, "name").value
+    assert_equal "Rust", document.dig("items", 1, "name").value
   end
 
   test "dig returns nil for missing path" do
@@ -352,55 +354,13 @@ class DocumentTest < Minitest::Spec
     refute document.map?
   end
 
-  test "at_path returns Scalar for scalar path" do
-    document = Yerba::Document.parse(<<~YAML)
-      database:
-        host: localhost
-    YAML
-
-    assert_instance_of Yerba::Scalar, document.at_path("database.host")
-    assert_equal "localhost", document.at_path("database.host").value
-  end
-
-  test "at_path returns Map for map path" do
-    document = Yerba::Document.parse(<<~YAML)
-      database:
-        host: localhost
-        port: 5432
-    YAML
-
-    assert_instance_of Yerba::Map, document.at_path("database")
-  end
-
-  test "at_path returns Sequence for sequence path" do
-    document = Yerba::Document.parse(<<~YAML)
-      tags:
-        - ruby
-        - rust
-    YAML
-
-    assert_instance_of Yerba::Sequence, document.at_path("tags")
-  end
-
-  test "at_path with index returns typed node" do
+  test "[] with wildcard returns array of typed nodes" do
     document = Yerba::Document.parse(<<~YAML)
       items:
         - name: Ruby
         - name: Rust
     YAML
-
-    assert_instance_of Yerba::Map, document.at_path("items[0]")
-    assert_instance_of Yerba::Scalar, document.at_path("items[0].name")
-    assert_equal "Ruby", document.at_path("items[0].name").value
-  end
-
-  test "at_path with wildcard returns array of typed nodes" do
-    document = Yerba::Document.parse(<<~YAML)
-      items:
-        - name: Ruby
-        - name: Rust
-    YAML
-    nodes = document.at_path("items[].name")
+    nodes = document["items[].name"]
 
     assert_instance_of Array, nodes
     assert_equal 2, nodes.length
@@ -409,48 +369,75 @@ class DocumentTest < Minitest::Spec
     assert_equal "Rust", nodes.last.value
   end
 
-  test "at_path with wildcard allows mutation" do
+  test "[] with wildcard allows mutation" do
     document = Yerba::Document.parse(<<~YAML)
       items:
         - name: Ruby
         - name: Rust
     YAML
-    document.at_path("items[].name").each { |node| node.value = "Go" }
+    document["items[].name"].each { |node| node.value = "Go" }
 
-    assert_equal "Go", document.get("items[0].name")
-    assert_equal "Go", document.get("items[1].name")
+    assert_equal "Go", document.value_at("items[0].name")
+    assert_equal "Go", document.value_at("items[1].name")
   end
 
-  test "get raises on invalid path with trailing dot" do
+  test "[] with wildcard returns Maps" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: Ruby
+          year: 1995
+        - name: Rust
+          year: 2015
+    YAML
+    nodes = document["items[]"]
+
+    assert_instance_of Array, nodes
+    assert_equal 2, nodes.length
+    assert_instance_of Yerba::Map, nodes.first
+  end
+
+  test "[] with root wildcard returns array" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Ruby
+      - name: Rust
+    YAML
+    nodes = document["[].name"]
+
+    assert_instance_of Array, nodes
+    assert_equal 2, nodes.length
+    assert_equal "Ruby", nodes.first.value
+  end
+
+  test "[] raises on invalid path with trailing dot" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
     YAML
 
-    assert_raises(Yerba::PathValidationError) { document.get("name.") }
+    assert_raises(Yerba::PathValidationError) { document["name."] }
   end
 
-  test "get raises on invalid path with double dot" do
+  test "[] raises on invalid path with double dot" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
     YAML
 
-    assert_raises(Yerba::PathValidationError) { document.get("name..x") }
+    assert_raises(Yerba::PathValidationError) { document["name..x"] }
   end
 
-  test "get raises on invalid path with leading dot" do
+  test "[] raises on invalid path with leading dot" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
     YAML
 
-    assert_raises(Yerba::PathValidationError) { document.get(".name") }
+    assert_raises(Yerba::PathValidationError) { document[".name"] }
   end
 
-  test "get raises on invalid path with unclosed bracket" do
+  test "[] raises on invalid path with unclosed bracket" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
     YAML
 
-    assert_raises(Yerba::PathValidationError) { document.get("[") }
+    assert_raises(Yerba::PathValidationError) { document["["] }
   end
 
   test "set raises on invalid path" do
@@ -503,7 +490,7 @@ class DocumentTest < Minitest::Spec
         port: 5432
     YAML
 
-    assert_equal({ "host" => "localhost", "port" => 5432 }, document.get_value("database"))
+    assert_equal({ "host" => "localhost", "port" => 5432 }, document.value_at("database"))
   end
 
   test "get_value returns array for sequence path" do
@@ -513,7 +500,7 @@ class DocumentTest < Minitest::Spec
         - rust
     YAML
 
-    assert_equal ["ruby", "rust"], document.get_value("tags")
+    assert_equal ["ruby", "rust"], document.value_at("tags")
   end
 
   test "get_value returns scalar for scalar path" do
@@ -522,8 +509,8 @@ class DocumentTest < Minitest::Spec
       port: 5432
     YAML
 
-    assert_equal "Alice", document.get_value("name")
-    assert_equal 5432, document.get_value("port")
+    assert_equal "Alice", document.value_at("name")
+    assert_equal 5432, document.value_at("port")
   end
 
   test "get_value returns nil for missing path" do
@@ -531,7 +518,7 @@ class DocumentTest < Minitest::Spec
       name: Alice
     YAML
 
-    assert_nil document.get_value("missing")
+    assert_nil document.value_at("missing")
   end
 
   test "get_value returns full document for empty path" do
@@ -540,10 +527,10 @@ class DocumentTest < Minitest::Spec
       port: 5432
     YAML
 
-    assert_equal({ "name" => "Alice", "port" => 5432 }, document.get_value(""))
+    assert_equal({ "name" => "Alice", "port" => 5432 }, document.value_at(""))
   end
 
-  test "get_values returns array of values for wildcard path" do
+  test "value_at returns array of values for wildcard path" do
     document = Yerba::Document.parse(<<~YAML)
       items:
         - name: Ruby
@@ -552,25 +539,25 @@ class DocumentTest < Minitest::Spec
           year: 2015
     YAML
 
-    assert_equal [{ "name" => "Ruby", "year" => 1995 }, { "name" => "Rust", "year" => 2015 }], document.get_values("items[]")
+    assert_equal [{ "name" => "Ruby", "year" => 1995 }, { "name" => "Rust", "year" => 2015 }], document.value_at("items[]")
   end
 
-  test "get_values returns scalar values for scalar wildcard" do
+  test "value_at returns scalar values for scalar wildcard" do
     document = Yerba::Document.parse(<<~YAML)
       tags:
         - ruby
         - rust
     YAML
 
-    assert_equal ["ruby", "rust"], document.get_values("tags[]")
+    assert_equal ["ruby", "rust"], document.value_at("tags[]")
   end
 
-  test "get_values returns empty array for missing path" do
+  test "value_at returns nil for missing wildcard path" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
     YAML
 
-    assert_equal [], document.get_values("missing[]")
+    assert_nil document.value_at("missing[]")
   end
 
   test "find returns items from root sequence" do
@@ -1177,7 +1164,7 @@ class DocumentTest < Minitest::Spec
         Hello World
     YAML
 
-    assert_equal "Hello World", document.get("description")
+    assert_equal "Hello World", document.value_at("description")
   end
 
   test "get returns multiline block scalar with newlines" do
@@ -1188,7 +1175,7 @@ class DocumentTest < Minitest::Spec
         Third line.
     YAML
 
-    assert_equal "First line.\nSecond line.\nThird line.", document.get("description")
+    assert_equal "First line.\nSecond line.\nThird line.", document.value_at("description")
   end
 
   test "get block scalar has no leading newline or whitespace" do
@@ -1198,7 +1185,7 @@ class DocumentTest < Minitest::Spec
           Some text here.
     YAML
 
-    value = document.get("[0].description")
+    value = document.value_at("[0].description")
 
     refute value.start_with?("\n")
     refute value.start_with?(" ")
@@ -1216,8 +1203,8 @@ class DocumentTest < Minitest::Spec
           Another description.
     YAML
 
-    assert_equal "First paragraph.\nSecond paragraph.", document.get("[0].description")
-    assert_equal "Another description.", document.get("[1].description")
+    assert_equal "First paragraph.\nSecond paragraph.", document.value_at("[0].description")
+    assert_equal "Another description.", document.value_at("[1].description")
   end
 
   test "get_value returns clean string for block scalar" do
@@ -1226,7 +1213,7 @@ class DocumentTest < Minitest::Spec
         Hello World
     YAML
 
-    assert_equal "Hello World", document.get_value("description")
+    assert_equal "Hello World", document.value_at("description")
   end
 
   test "get_value returns multiline block scalar with newlines" do
@@ -1236,7 +1223,7 @@ class DocumentTest < Minitest::Spec
         Second line.
     YAML
 
-    assert_equal "First line.\nSecond line.", document.get_value("description")
+    assert_equal "First line.\nSecond line.", document.value_at("description")
   end
 
   test "scalar.value returns clean text for block scalar" do
@@ -1256,5 +1243,162 @@ class DocumentTest < Minitest::Spec
     YAML
 
     assert_equal "First paragraph.\nSecond paragraph.", document["description"].value
+  end
+
+  test "fetch returns Scalar for valid selector" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      port: 5432
+    YAML
+
+    scalar = document.fetch("name")
+
+    assert_instance_of Yerba::Scalar, scalar
+    assert_equal "Alice", scalar.value
+  end
+
+  test "fetch returns Map for valid map selector" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
+
+    map = document.fetch("database")
+
+    assert_instance_of Yerba::Map, map
+  end
+
+  test "fetch raises SelectorNotFoundError for invalid selector on sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        title: First
+    YAML
+
+    error = assert_raises(Yerba::SelectorNotFoundError) { document.fetch("title") }
+
+    assert_includes error.message, "selector \"title\" is not valid"
+    assert_includes error.message, "[].title"
+  end
+
+  test "fetch raises SelectorNotFoundError for invalid selector on map" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    error = assert_raises(Yerba::SelectorNotFoundError) { document.fetch("nonexistent") }
+
+    assert_includes error.message, "selector \"nonexistent\" is not valid"
+  end
+
+  test "fetch suggests similar selectors" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        speakers:
+          - Alice
+    YAML
+
+    error = assert_raises(Yerba::SelectorNotFoundError) { document.fetch("speakers") }
+
+    assert_includes error.message, "Did you mean"
+    assert_includes error.message, "[].speakers"
+  end
+
+  test "fetch shows available selectors when no close match" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      port: 5432
+    YAML
+
+    error = assert_raises(Yerba::SelectorNotFoundError) { document.fetch("zzzzz") }
+
+    assert_includes error.message, "Available selectors"
+    assert_includes error.message, "name"
+  end
+
+  test "[] returns nil for invalid selector without raising" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        title: First
+    YAML
+
+    assert_nil document["nonexistent"]
+    assert_nil document["foo.bar.baz"]
+  end
+
+  test "get returns nil for invalid selector without raising" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        title: First
+    YAML
+
+    assert_nil document.value_at("nonexistent")
+    assert_nil document.value_at("foo.bar.baz")
+  end
+
+  test "valid_selector? returns true for valid selectors" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        title: First
+        speakers:
+          - Alice
+    YAML
+
+    assert document.valid_selector?("[].id")
+    assert document.valid_selector?("[].title")
+    assert document.valid_selector?("[].speakers")
+    assert document.valid_selector?("[].speakers[]")
+    assert document.valid_selector?("[]")
+    assert document.valid_selector?("[0].title")
+  end
+
+  test "valid_selector? returns false for invalid selectors" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        title: First
+    YAML
+
+    refute document.valid_selector?("title")
+    refute document.valid_selector?("speakers")
+    refute document.valid_selector?("nonexistent")
+    refute document.valid_selector?("database.host")
+  end
+
+  test "validate_selector! does not raise for valid selectors" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      port: 5432
+    YAML
+
+    document.validate_selector!("name")
+    document.validate_selector!("port")
+  end
+
+  test "validate_selector! raises for invalid selectors" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    assert_raises(Yerba::SelectorNotFoundError) { document.validate_selector!("missing") }
+  end
+
+  test "fetch with bracket index works" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+      - id: talk-2
+    YAML
+
+    scalar = document.fetch("[1].id")
+
+    assert_equal "talk-2", scalar.value
+  end
+
+  test "fetch returns nil for valid selector with missing value" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: talk-1
+        title: First
+      - id: talk-2
+    YAML
+
+    assert_nil document.fetch("[1].title")
   end
 end

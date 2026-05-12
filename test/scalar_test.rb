@@ -247,7 +247,7 @@ class ScalarTest < Minitest::Spec
 
     scalar1.value = "Bob"
 
-    assert_equal "Bob", scalar2.document.get("name")
+    assert_equal "Bob", scalar2.document.value_at("name")
   ensure
     file&.unlink
     Yerba::Document.clear_cache!

@@ -146,53 +146,6 @@ static VALUE document_s_parse(VALUE klass, VALUE content) {
   return instance;
 }
 
-/* document.get(path) */
-static VALUE document_get(VALUE self, VALUE path) {
-  struct Document *document = get_document(self);
-  YerbaGetResult result = yerba_document_get(document, StringValueCStr(path));
-
-  if (result.error) {
-    VALUE message = make_utf8_string(result.error);
-    yerba_get_result_free(result);
-
-    rb_raise(rb_ePathValidationError, "%s", StringValueCStr(message));
-  }
-
-  if (!result.is_list) {
-    VALUE ruby_value = typed_value_to_ruby(result.single);
-    yerba_get_result_free(result);
-
-    return ruby_value;
-  } else {
-    VALUE json_string = make_utf8_string(result.list.json);
-    yerba_get_result_free(result);
-
-    VALUE items = rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
-    long length = RARRAY_LEN(items);
-    VALUE array = rb_ary_new_capa(length);
-
-    for (long i = 0; i < length; i++) {
-      VALUE item = rb_ary_entry(items, i);
-      VALUE text = rb_hash_aref(item, rb_str_new_cstr("text"));
-      int type_value = NUM2INT(rb_hash_aref(item, rb_str_new_cstr("type")));
-
-      if (NIL_P(text)) {
-        rb_ary_push(array, Qnil);
-
-        continue;
-      }
-
-      YerbaTypedValue typed_value;
-      typed_value.text = (char *)StringValueCStr(text);
-      typed_value.value_type = (YerbaValueType)type_value;
-
-      rb_ary_push(array, typed_value_to_ruby(typed_value));
-    }
-
-    return array;
-  }
-}
-
 static VALUE location_to_ruby(YerbaLocation location) {
   VALUE klass = rb_path2class("Yerba::Location");
 
@@ -206,19 +159,9 @@ static VALUE location_to_ruby(YerbaLocation location) {
   );
 }
 
-/* document[](path) → Yerba::Scalar, Yerba::Map, Yerba::Sequence, or nil */
-static VALUE document_bracket(VALUE self, VALUE path) {
-  struct Document *document = get_document(self);
-
-  char index_buffer[32];
-
-  if (RB_TYPE_P(path, T_FIXNUM)) {
-    snprintf(index_buffer, sizeof(index_buffer), "[%ld]", FIX2LONG(path));
-    path = rb_str_new_cstr(index_buffer);
-  }
-
-  YerbaGetResult result = yerba_document_get(document, StringValueCStr(path));
-
+/* Build a Yerba::Scalar, Map, Sequence, or nil from a YerbaGetResult.
+   Frees the result internally. */
+static VALUE node_from_get_result(YerbaGetResult result, VALUE self, VALUE path) {
   if (result.error) {
     VALUE message = make_utf8_string(result.error);
     yerba_get_result_free(result);
@@ -226,7 +169,6 @@ static VALUE document_bracket(VALUE self, VALUE path) {
     rb_raise(rb_ePathValidationError, "%s", StringValueCStr(message));
   }
 
-  VALUE instance;
   VALUE location = location_to_ruby(result.location);
   VALUE key = Qnil;
 
@@ -241,34 +183,24 @@ static VALUE document_bracket(VALUE self, VALUE path) {
 
   switch (result.node_type) {
     case NODE_TYPE_SCALAR: {
-      VALUE klass = rb_path2class("Yerba::Scalar");
       VALUE value = typed_value_to_ruby(result.single);
       yerba_get_result_free(result);
 
       VALUE kwargs = rb_hash_new();
       rb_hash_aset(kwargs, ID2SYM(rb_intern("value")), value);
-      VALUE args[4] = { self, path, location, key };
 
-      instance = rb_funcallv_kw(klass, rb_intern("from_document"), 5, (VALUE[]){ self, path, location, key, kwargs }, RB_PASS_KEYWORDS);
-
-      return instance;
+      return rb_funcallv_kw(rb_path2class("Yerba::Scalar"), rb_intern("from_document"), 5, (VALUE[]){ self, path, location, key, kwargs }, RB_PASS_KEYWORDS);
     }
 
-    case NODE_TYPE_MAP: {
+    case NODE_TYPE_MAP:
       yerba_get_result_free(result);
 
-      instance = rb_funcall(rb_path2class("Yerba::Map"), rb_intern("from_document"), 4, self, path, location, key);
+      return rb_funcall(rb_path2class("Yerba::Map"), rb_intern("from_document"), 4, self, path, location, key);
 
-      return instance;
-    }
-
-    case NODE_TYPE_SEQUENCE: {
+    case NODE_TYPE_SEQUENCE:
       yerba_get_result_free(result);
 
-      instance = rb_funcall(rb_path2class("Yerba::Sequence"), rb_intern("from_document"), 4, self, path, location, key);
-
-      return instance;
-    }
+      return rb_funcall(rb_path2class("Yerba::Sequence"), rb_intern("from_document"), 4, self, path, location, key);
 
     default:
       yerba_get_result_free(result);
@@ -277,11 +209,59 @@ static VALUE document_bracket(VALUE self, VALUE path) {
   }
 }
 
+/* document[](path) → Yerba::Scalar, Yerba::Map, Yerba::Sequence, Array, or nil */
+static VALUE document_bracket(VALUE self, VALUE path) {
+  struct Document *document = get_document(self);
+  char index_buffer[32];
+
+  if (RB_TYPE_P(path, T_FIXNUM)) {
+    snprintf(index_buffer, sizeof(index_buffer), "[%ld]", FIX2LONG(path));
+    path = rb_str_new_cstr(index_buffer);
+  }
+
+  const char *selector = StringValueCStr(path);
+
+  /* Wildcard: resolve to concrete selectors and return array of nodes */
+  if (strstr(selector, "[]") != NULL) {
+    char *json = yerba_document_resolve_selectors(document, selector);
+
+    if (!json) return rb_ary_new();
+
+    VALUE json_string = make_utf8_string(json);
+    yerba_string_free(json);
+
+    VALUE resolved = rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+    long length = RARRAY_LEN(resolved);
+    VALUE array = rb_ary_new_capa(length);
+
+    for (long i = 0; i < length; i++) {
+      VALUE concrete_path = rb_ary_entry(resolved, i);
+      YerbaGetResult result = yerba_document_get(document, StringValueCStr(concrete_path));
+      VALUE node = node_from_get_result(result, self, concrete_path);
+
+      if (!NIL_P(node)) rb_ary_push(array, node);
+    }
+
+    return array;
+  }
+
+  YerbaGetResult result = yerba_document_get(document, selector);
+
+  return node_from_get_result(result, self, path);
+}
+
 /* document.exists?(path) */
 static VALUE document_exists_p(VALUE self, VALUE path) {
   struct Document *document = get_document(self);
 
   return yerba_document_exists(document, StringValueCStr(path)) ? Qtrue : Qfalse;
+}
+
+/* document.valid_selector?(selector) → true/false */
+static VALUE document_valid_selector_p(VALUE self, VALUE path) {
+  struct Document *document = get_document(self);
+
+  return yerba_document_valid_selector(document, StringValueCStr(path)) ? Qtrue : Qfalse;
 }
 
 /* document.get_value(path) → parsed Ruby object (Hash/Array/String/Integer/etc) */
@@ -297,10 +277,10 @@ static VALUE document_get_value(VALUE self, VALUE path) {
   return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
 }
 
-/* document.get_values(path) → Array of parsed Ruby objects */
-static VALUE document_get_values(VALUE self, VALUE path) {
+/* document.selectors → ["database", "database.host", "tags", "tags[]", ...] */
+static VALUE document_selectors(VALUE self) {
   struct Document *document = get_document(self);
-  char *json = yerba_document_get_values(document, StringValueCStr(path));
+  char *json = yerba_document_selectors(document);
 
   if (!json) return rb_ary_new();
 
@@ -308,6 +288,42 @@ static VALUE document_get_values(VALUE self, VALUE path) {
   yerba_string_free(json);
 
   return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+}
+
+/* document.locations(selector) → [Yerba::Location, ...] */
+static VALUE document_locations(VALUE self, VALUE path) {
+  struct Document *document = get_document(self);
+  char *json = yerba_document_resolve_selectors(document, StringValueCStr(path));
+
+  if (!json) return rb_ary_new();
+
+  VALUE json_string = make_utf8_string(json);
+  yerba_string_free(json);
+
+  VALUE resolved = rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+  long length = RARRAY_LEN(resolved);
+  VALUE array = rb_ary_new_capa(length);
+
+  for (long i = 0; i < length; i++) {
+    VALUE concrete_path = rb_ary_entry(resolved, i);
+    YerbaGetResult result = yerba_document_get(document, StringValueCStr(concrete_path));
+
+    if (result.error) {
+      yerba_get_result_free(result);
+      continue;
+    }
+
+    if (result.location.start_line == 0 && result.location.end_line == 0) {
+      yerba_get_result_free(result);
+      continue;
+    }
+
+    VALUE location = location_to_ruby(result.location);
+    yerba_get_result_free(result);
+    rb_ary_push(array, location);
+  }
+
+  return array;
 }
 
 /* document.resolve_selectors(path) → ["[0].speakers[0]", "[0].speakers[1]", ...] */
@@ -925,15 +941,17 @@ void Init_yerba(void) {
   rb_define_alloc_func(rb_cDocument, document_alloc);
   rb_define_method(rb_cDocument, "initialize", document_initialize, 1);
   rb_define_singleton_method(rb_cDocument, "parse", document_s_parse, 1);
-  rb_define_method(rb_cDocument, "get", document_get, 1);
   rb_define_method(rb_cDocument, "[]", document_bracket, 1);
-  rb_define_method(rb_cDocument, "get_value", document_get_value, 1);
-  rb_define_method(rb_cDocument, "get_values", document_get_values, 1);
+  rb_define_method(rb_cDocument, "node_at", document_bracket, 1);
+  rb_define_method(rb_cDocument, "value_at", document_get_value, 1);
   rb_define_method(rb_cDocument, "location", document_location, -1);
+  rb_define_method(rb_cDocument, "locations", document_locations, 1);
+  rb_define_method(rb_cDocument, "selectors", document_selectors, 0);
   rb_define_method(rb_cDocument, "resolve_selectors", document_resolve_selectors, 1);
   rb_define_method(rb_cDocument, "get_quote_style", document_get_quote_style, 1);
   rb_define_method(rb_cDocument, "set_quote_style", document_set_quote_style, 2);
   rb_define_method(rb_cDocument, "exists?", document_exists_p, 1);
+  rb_define_method(rb_cDocument, "valid_selector?", document_valid_selector_p, 1);
   rb_define_method(rb_cDocument, "condition?", document_condition_p, -1);
   rb_define_method(rb_cDocument, "find", document_find, -1);
   rb_define_method(rb_cDocument, "set", document_set, -1);

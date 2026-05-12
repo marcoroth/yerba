@@ -298,13 +298,11 @@ pub unsafe extern "C" fn yerba_document_get_value(document: *const Document, pat
 
 /// Caller must free with yerba_string_free.
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_get_values(document: *const Document, path: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn yerba_document_selectors(document: *const Document) -> *mut c_char {
   let document = &*document;
-  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
 
-  let values = document.get_values(selector_string);
-  let json_values: Vec<serde_json::Value> = values.iter().map(crate::json::yaml_to_json).collect();
-  let json_string = serde_json::to_string(&json_values).unwrap_or_else(|_| "[]".to_string());
+  let selectors = document.selectors();
+  let json_string = serde_json::to_string(&selectors).unwrap_or_else(|_| "[]".to_string());
 
   CString::new(json_string).unwrap_or_default().into_raw()
 }
@@ -366,6 +364,13 @@ pub unsafe extern "C" fn yerba_document_exists(document: *const Document, path: 
   let document = &*document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
   document.exists(selector_string)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_document_valid_selector(document: *const Document, path: *const c_char) -> bool {
+  let document = &*document;
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+  document.is_valid_selector(selector_string)
 }
 
 #[no_mangle]

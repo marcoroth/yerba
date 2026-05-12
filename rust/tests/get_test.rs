@@ -839,8 +839,6 @@ fn test_select_field_key_returns_root_name() {
   assert_eq!(yerba::json::select_field_key("speakers[0]"), "speakers");
 }
 
-// --- resolve_selectors ---
-
 #[test]
 fn test_resolve_selectors_root_sequence() {
   let document = parse(indoc! {"
@@ -928,11 +926,8 @@ fn test_resolve_selectors_missing_field_skipped() {
       title: Third
   "});
 
-  // Only items with title are resolved
   assert_eq!(document.resolve_selectors("[].title"), vec!["[0].title", "[2].title"]);
 }
-
-// --- get_all_located ---
 
 #[test]
 fn test_get_all_located_returns_values_with_lines() {
@@ -1151,4 +1146,122 @@ fn test_get_all_block_scalars() {
   let values = document.get_all("[].description");
 
   assert_eq!(values, vec!["First", "Second"]);
+}
+
+#[test]
+fn test_get_value_preserves_null_for_missing_keys() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      speakers:
+        - Alice
+    - id: talk-2
+    - id: talk-3
+      speakers:
+        - Charlie
+  "});
+
+  let value = document.get_value("[].speakers").unwrap();
+
+  if let serde_yaml::Value::Sequence(items) = value {
+    assert_eq!(items.len(), 3);
+    assert!(items[0].is_sequence(), "First item should be a sequence");
+    assert!(items[1].is_null(), "Second item should be null");
+    assert!(items[2].is_sequence(), "Third item should be a sequence");
+  } else {
+    panic!("Expected Sequence, got: {:?}", value);
+  }
+}
+
+#[test]
+fn test_get_values_preserves_null_for_missing_keys() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: First
+    - id: talk-2
+    - id: talk-3
+      title: Third
+  "});
+
+  let values = document.get_values("[].title");
+
+  assert_eq!(values.len(), 3);
+  assert_eq!(values[0], serde_yaml::Value::String("First".to_string()));
+  assert_eq!(values[1], serde_yaml::Value::Null);
+  assert_eq!(values[2], serde_yaml::Value::String("Third".to_string()));
+}
+
+#[test]
+fn test_get_value_all_items_have_key() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      title: First
+    - id: talk-2
+      title: Second
+  "});
+
+  let value = document.get_value("[].title").unwrap();
+
+  if let serde_yaml::Value::Sequence(items) = value {
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0], serde_yaml::Value::String("First".to_string()));
+    assert_eq!(items[1], serde_yaml::Value::String("Second".to_string()));
+  } else {
+    panic!("Expected Sequence, got: {:?}", value);
+  }
+}
+
+#[test]
+fn test_get_value_no_items_have_key() {
+  let document = parse(indoc! {"
+    - id: talk-1
+    - id: talk-2
+  "});
+
+  let value = document.get_value("[].missing").unwrap();
+
+  if let serde_yaml::Value::Sequence(items) = value {
+    assert_eq!(items.len(), 2);
+    assert!(items[0].is_null());
+    assert!(items[1].is_null());
+  } else {
+    panic!("Expected Sequence, got: {:?}", value);
+  }
+}
+
+#[test]
+fn test_get_values_nested_wildcard_with_missing() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      speakers:
+        - name: Alice
+        - name: Bob
+    - id: talk-2
+    - id: talk-3
+      speakers:
+        - name: Charlie
+  "});
+
+  let values = document.get_values("[].speakers[]");
+
+  assert_eq!(values.len(), 4);
+
+  if let serde_yaml::Value::Mapping(m) = &values[0] {
+    assert_eq!(m.get("name"), Some(&serde_yaml::Value::String("Alice".to_string())));
+  } else {
+    panic!("Expected Mapping for Alice, got: {:?}", values[0]);
+  }
+
+  if let serde_yaml::Value::Mapping(m) = &values[1] {
+    assert_eq!(m.get("name"), Some(&serde_yaml::Value::String("Bob".to_string())));
+  } else {
+    panic!("Expected Mapping for Bob, got: {:?}", values[1]);
+  }
+
+  assert!(values[2].is_null(), "Item without speakers should be null");
+
+  if let serde_yaml::Value::Mapping(m) = &values[3] {
+    assert_eq!(m.get("name"), Some(&serde_yaml::Value::String("Charlie".to_string())));
+  } else {
+    panic!("Expected Mapping for Charlie, got: {:?}", values[3]);
+  }
 }

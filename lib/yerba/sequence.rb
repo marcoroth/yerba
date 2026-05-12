@@ -20,6 +20,38 @@ module Yerba
       end
     end
 
+    def fetch(index)
+      if connected?
+        new_path = "#{@selector}[#{index}]"
+        result = document[new_path]
+
+        if result.nil?
+          raise IndexError, "index #{index} outside of sequence bounds: 0...#{length}"
+        end
+
+        result
+      else
+        @data.fetch(index)
+      end
+    end
+
+    def dig(*keys)
+      if connected?
+        keys.reduce(self) { |node, key| node.nil? ? nil : node[key] }
+      else
+        @data.dig(*keys)
+      end
+    end
+
+    def value_at(index)
+      if connected?
+        new_path = "#{@selector}[#{index}]"
+        document.value_at(new_path)
+      else
+        @data[index]
+      end
+    end
+
     def <<(item)
       if connected?
         case item
@@ -77,7 +109,7 @@ module Yerba
     def pluck(*fields)
       return [] unless connected?
 
-      all_values = document.get_value(@selector)
+      all_values = document.value_at(@selector)
       return [] unless all_values.is_a?(Array)
 
       if fields.length == 1
@@ -91,7 +123,7 @@ module Yerba
 
     def index_of(selector = nil, value = nil, **criteria)
       if selector && value.nil? && criteria.empty?
-        all_values = document&.get_value(@selector)
+        all_values = document&.value_at(@selector)
 
         return nil unless all_values.is_a?(Array)
 
@@ -109,7 +141,7 @@ module Yerba
         if field_string.include?("[]")
           matching = nested_indices_for(field_string, expected)
         else
-          all_values = document&.get_value(@selector)
+          all_values = document&.value_at(@selector)
 
           next unless all_values.is_a?(Array)
 
@@ -129,7 +161,7 @@ module Yerba
 
     def indices_of(selector = nil, value = nil, **criteria)
       if selector && value.nil? && criteria.empty?
-        all_values = document&.get_value(@selector)
+        all_values = document&.value_at(@selector)
 
         if all_values.is_a?(Array)
           return all_values.each_with_index.filter_map { |actual, index| index if actual.to_s == selector.to_s }
@@ -149,7 +181,7 @@ module Yerba
         if field_string.include?("[]")
           matching = nested_indices_for(field_string, expected)
         else
-          all_values = document&.get_value(@selector)
+          all_values = document&.value_at(@selector)
 
           next unless all_values.is_a?(Array)
 
@@ -169,12 +201,12 @@ module Yerba
 
     def length
       if connected?
-        scalar_items = document.get("#{@selector}[]")
+        scalar_items = document.value_at("#{@selector}[]")
 
         if scalar_items.is_a?(Array) && !scalar_items.empty?
           scalar_items.length
         else
-          data = document.get_value(@selector)
+          data = document.value_at(@selector)
 
           data.is_a?(Array) ? data.length : 0
         end
@@ -306,7 +338,7 @@ module Yerba
     end
 
     def nested_indices_for(field, expected)
-      all_values = document&.get_value(@selector)
+      all_values = document&.value_at(@selector)
       return [] unless all_values.is_a?(Array)
 
       all_values.each_with_index.filter_map do |item, index|
@@ -352,12 +384,12 @@ module Yerba
 
     def items
       if connected?
-        result = document.get("#{@selector}[]")
+        result = document.value_at("#{@selector}[]")
 
         if result.is_a?(Array) && !result.empty?
           result
         else
-          data = document.get_value(@selector)
+          data = document.value_at(@selector)
 
           data.is_a?(Array) ? data : []
         end

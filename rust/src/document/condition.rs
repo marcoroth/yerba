@@ -3,7 +3,7 @@ use super::*;
 impl Document {
   pub fn filter(&self, dot_path: &str, condition: &str) -> Vec<serde_yaml::Value> {
     self
-      .navigate_all(dot_path)
+      .navigate_all_compact(dot_path)
       .iter()
       .filter(|node| self.evaluate_condition_on_node(node, condition))
       .map(node_to_yaml_value)

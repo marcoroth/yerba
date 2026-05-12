@@ -181,15 +181,43 @@ impl Document {
         key_name,
         key_location,
       },
-      None => NodeInfo {
-        node_type: self.node_type(dot_path),
-        is_list: false,
-        value: None,
-        list_values: vec![],
-        location,
-        key_name,
-        key_location,
-      },
+      None => {
+        let (node_type, entry_location, entry_key_name, entry_key_location) = if self.navigate(dot_path).is_err() {
+          if let Some(entry_node) = self.find_entry(dot_path) {
+            let range = entry_node.text_range();
+            let entry_location = compute_location(&source, range.start().into(), range.end().into());
+
+            let (node, location) = yaml_parser::ast::BlockMapEntry::cast(entry_node.clone())
+              .and_then(|entry| {
+                entry.key().and_then(|key_node| {
+                  let key_text = extract_scalar_text(key_node.syntax())?;
+                  let key_range = key_node.syntax().text_range();
+                  let key_location = compute_location(&source, key_range.start().into(), key_range.end().into());
+
+                  Some((key_text, key_location))
+                })
+              })
+              .map(|(name, location)| (Some(name), location))
+              .unwrap_or((None, Location::default()));
+
+            (NodeType::Scalar, entry_location, node, location)
+          } else {
+            (self.node_type(dot_path), location, key_name, key_location)
+          }
+        } else {
+          (self.node_type(dot_path), location, key_name, key_location)
+        };
+
+        NodeInfo {
+          node_type,
+          is_list: false,
+          value: None,
+          list_values: vec![],
+          location: entry_location,
+          key_name: entry_key_name,
+          key_location: entry_key_location,
+        }
+      }
     }
   }
 
@@ -323,10 +351,33 @@ impl Document {
 
   pub fn exists(&self, dot_path: &str) -> bool {
     if dot_path.contains('[') {
-      return !self.navigate_all_compact(dot_path).is_empty();
+      if !self.navigate_all_compact(dot_path).is_empty() {
+        return true;
+      }
+    } else if self.navigate(dot_path).is_ok() {
+      return true;
     }
 
-    self.get(dot_path).is_some()
+    self.find_entry(dot_path).is_some()
+  }
+
+  fn find_entry(&self, dot_path: &str) -> Option<SyntaxNode> {
+    let (parent_path, last_key) = match dot_path.rsplit_once('.') {
+      Some((parent, key)) => (parent, key),
+      None => ("", dot_path),
+    };
+
+    let parent_node = if parent_path.is_empty() {
+      let root = Root::cast(self.root.clone())?;
+      let document = root.documents().next()?;
+      document.syntax().clone()
+    } else {
+      self.navigate(parent_path).ok()?
+    };
+
+    let map = parent_node.descendants().find_map(BlockMap::cast)?;
+
+    find_entry_by_key(&map, last_key).map(|entry| entry.syntax().clone())
   }
 
   pub fn get_sequence_values(&self, dot_path: &str) -> Vec<String> {

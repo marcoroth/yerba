@@ -672,6 +672,53 @@ fn test_get_value_null() {
 }
 
 #[test]
+fn test_null_value_vs_empty_string_vs_absent() {
+  let document = parse(indoc! {r#"
+    null_val:
+    empty_str: ""
+    name: Alice
+  "#});
+
+  assert!(document.exists("null_val"));
+  assert_eq!(document.get("null_val"), None);
+
+  assert!(document.exists("empty_str"));
+  assert_eq!(document.get("empty_str"), Some("".to_string()));
+
+  assert!(!document.exists("missing"));
+  assert_eq!(document.get("missing"), None);
+}
+
+#[test]
+fn test_null_value_nested() {
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+      password:
+  "});
+
+  assert!(document.exists("database.password"));
+  assert_eq!(document.get("database.password"), None);
+  assert!(document.exists("database.host"));
+  assert!(!document.exists("database.missing"));
+}
+
+#[test]
+fn test_null_value_in_sequence() {
+  let document = parse(indoc! {r#"
+    - name: "Alice"
+      website: "https://alice.dev"
+    - name: "Bob"
+      website:
+    - name: "Charlie"
+  "#});
+
+  assert!(document.exists("[0].website"));
+  assert!(document.exists("[1].website"));
+  assert!(!document.exists("[2].website"));
+}
+
+#[test]
 fn test_path_ref_tags_vs_tags_bracket() {
   use yerba::Selector;
 

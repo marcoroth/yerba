@@ -101,6 +101,78 @@ class DocumentTest < Minitest::Spec
     assert_nil document.value_at("timeout")
   end
 
+  test "null value key: exists and returns Scalar with nil value" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      website:
+      port: 5432
+    YAML
+
+    assert document.exists?("website")
+    assert_instance_of Yerba::Scalar, document["website"]
+    assert_nil document["website"].value
+    assert_nil document.value_at("website")
+    refute_nil document.location("website")
+  end
+
+  test "empty string key: exists and returns Scalar with empty string" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      website: ""
+      port: 5432
+    YAML
+
+    assert document.exists?("website")
+    assert_instance_of Yerba::Scalar, document["website"]
+    assert_equal "", document["website"].value
+    assert_equal "", document.value_at("website")
+    refute_nil document.location("website")
+  end
+
+  test "absent key: does not exist and returns nil" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      port: 5432
+    YAML
+
+    refute document.exists?("website")
+    assert_nil document["website"]
+    assert_nil document.value_at("website")
+    assert_nil document.location("website")
+  end
+
+  test "null value vs empty string vs absent are all distinguishable" do
+    document = Yerba::Document.parse(<<~YAML)
+      null_val:
+      empty_str: ""
+      name: Alice
+    YAML
+
+    assert document.exists?("null_val")
+    assert_instance_of Yerba::Scalar, document["null_val"]
+    assert_nil document["null_val"].value
+
+    assert document.exists?("empty_str")
+    assert_instance_of Yerba::Scalar, document["empty_str"]
+    assert_equal "", document["empty_str"].value
+
+    refute document.exists?("missing")
+    assert_nil document["missing"]
+  end
+
+  test "nested null value key exists" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        password:
+    YAML
+
+    assert document.exists?("database.password")
+    assert_instance_of Yerba::Scalar, document["database"]["password"]
+    assert_nil document["database"]["password"].value
+    refute_nil document.location("database.password")
+  end
+
   test "get returns string for quoted boolean" do
     document = Yerba::Document.parse(<<~YAML)
       flag: "true"

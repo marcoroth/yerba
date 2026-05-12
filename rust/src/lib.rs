@@ -9,7 +9,7 @@ mod syntax;
 mod yaml_writer;
 pub mod yerbafile;
 
-pub use document::{collect_selectors, Document, DuplicateInfo, InsertPosition, Location, NodeInfo, NodeType, SortField};
+pub use document::{collect_selectors, Document, DuplicateInfo, InsertPosition, LocatedNode, Location, NodeInfo, NodeType, SortField};
 pub use error::YerbaError;
 pub use quote_style::{KeyStyle, QuoteStyle};
 pub use selector::Selector;
@@ -29,10 +29,8 @@ pub fn parse_file(path: impl AsRef<std::path::Path>) -> Result<Document, YerbaEr
   Document::parse_file(path)
 }
 
-pub fn glob_get(pattern: &str, selector: &str) -> Vec<ScalarValue> {
+pub fn glob_get(pattern: &str, selector: &str) -> Vec<document::LocatedNode> {
   use rayon::prelude::*;
-
-  let parsed_selector = Selector::parse(selector);
 
   let files = match glob::glob(pattern) {
     Ok(paths) => paths.filter_map(|p| p.ok()).collect::<Vec<_>>(),
@@ -45,11 +43,7 @@ pub fn glob_get(pattern: &str, selector: &str) -> Vec<ScalarValue> {
       let mut results = Vec::new();
 
       if let Ok(document) = Document::parse_file(file) {
-        if parsed_selector.has_wildcard() {
-          results.extend(document.get_all_typed(selector));
-        } else if let Some(scalar) = document.get_typed(selector) {
-          results.push(scalar);
-        }
+        results.extend(document.get_all_located(selector));
       }
 
       results

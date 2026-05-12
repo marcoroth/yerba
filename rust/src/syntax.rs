@@ -8,6 +8,9 @@ use yaml_parser::{SyntaxKind, SyntaxNode, SyntaxToken};
 pub struct ScalarValue {
   pub text: String,
   pub kind: SyntaxKind,
+  pub file_path: Option<String>,
+  pub selector: Option<String>,
+  pub line: Option<usize>,
 }
 
 #[repr(C)]
@@ -47,7 +50,13 @@ pub fn extract_scalar(node: &SyntaxNode) -> Option<ScalarValue> {
     _ => return None,
   };
 
-  Some(ScalarValue { text, kind: token.kind() })
+  Some(ScalarValue {
+    text,
+    kind: token.kind(),
+    file_path: None,
+    selector: None,
+    line: None,
+  })
 }
 
 pub fn is_map_key(token: &SyntaxToken) -> bool {

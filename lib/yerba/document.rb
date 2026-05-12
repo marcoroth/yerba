@@ -4,6 +4,14 @@ module Yerba
   class Document
     ROOT_SELECTOR = ""
 
+    def self.cache
+      @cache ||= Hash.new { |hash, path| hash[path] = new(path) }
+    end
+
+    def self.clear_cache!
+      @cache = nil
+    end
+
     def selector
       ROOT_SELECTOR
     end
@@ -39,19 +47,9 @@ module Yerba
     end
 
     def at_path(path)
-      if path.include?("[]")
-        values = get(path)
-        return [] unless values.is_a?(Array)
+      return self[path] unless path.include?("[]")
 
-        path.sub("[]", "")
-
-        values.each_with_index.map do |_value, index|
-          resolved_path = path.sub("[]", "[#{index}]")
-          self[resolved_path]
-        end
-      else
-        self[path]
-      end
+      resolve_selectors(path).filter_map { |selector| self[selector] }
     end
 
     def find_by(...)

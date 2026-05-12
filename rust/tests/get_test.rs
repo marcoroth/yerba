@@ -838,3 +838,224 @@ fn test_select_field_key_returns_root_name() {
   assert_eq!(yerba::json::select_field_key(".speakers[].name"), "speakers");
   assert_eq!(yerba::json::select_field_key("speakers[0]"), "speakers");
 }
+
+// --- resolve_selectors ---
+
+#[test]
+fn test_resolve_selectors_root_sequence() {
+  let document = parse(indoc! {"
+    - id: a
+    - id: b
+    - id: c
+  "});
+
+  assert_eq!(document.resolve_selectors("[]"), vec!["[0]", "[1]", "[2]"]);
+}
+
+#[test]
+fn test_resolve_selectors_nested_field() {
+  let document = parse(indoc! {"
+    - id: a
+      title: First
+    - id: b
+      title: Second
+  "});
+
+  assert_eq!(document.resolve_selectors("[].title"), vec!["[0].title", "[1].title"]);
+}
+
+#[test]
+fn test_resolve_selectors_nested_sequence() {
+  let document = parse(indoc! {"
+    - id: a
+      speakers:
+        - Alice
+        - Bob
+    - id: b
+      speakers:
+        - Charlie
+  "});
+
+  assert_eq!(
+    document.resolve_selectors("[].speakers[]"),
+    vec!["[0].speakers[0]", "[0].speakers[1]", "[1].speakers[0]"]
+  );
+}
+
+#[test]
+fn test_resolve_selectors_triple_nesting() {
+  let document = parse(indoc! {"
+    - talks:
+        - speakers:
+            - Alice
+            - Bob
+        - speakers:
+            - Charlie
+  "});
+
+  assert_eq!(
+    document.resolve_selectors("[].talks[].speakers[]"),
+    vec!["[0].talks[0].speakers[0]", "[0].talks[0].speakers[1]", "[0].talks[1].speakers[0]"]
+  );
+}
+
+#[test]
+fn test_resolve_selectors_non_wildcard() {
+  let document = parse(indoc! {"
+    database:
+      host: localhost
+  "});
+
+  assert_eq!(document.resolve_selectors("database.host"), vec!["database.host"]);
+}
+
+#[test]
+fn test_resolve_selectors_empty_sequence() {
+  let document = parse(indoc! {"
+    tags: []
+  "});
+
+  assert_eq!(document.resolve_selectors("tags[]"), Vec::<String>::new());
+}
+
+#[test]
+fn test_resolve_selectors_missing_field_skipped() {
+  let document = parse(indoc! {"
+    - id: a
+      title: First
+    - id: b
+    - id: c
+      title: Third
+  "});
+
+  // Only items with title are resolved
+  assert_eq!(document.resolve_selectors("[].title"), vec!["[0].title", "[2].title"]);
+}
+
+// --- get_all_located ---
+
+#[test]
+fn test_get_all_located_returns_values_with_lines() {
+  let document = parse(indoc! {"
+    - id: a
+      title: First
+    - id: b
+      title: Second
+  "});
+
+  let results = document.get_all_located("[].title");
+
+  assert_eq!(results.len(), 2);
+  assert_eq!(results[0].text, Some("First".to_string()));
+  assert_eq!(results[0].line, 2);
+  assert_eq!(results[1].text, Some("Second".to_string()));
+  assert_eq!(results[1].line, 4);
+}
+
+#[test]
+fn test_get_all_located_returns_selectors() {
+  let document = parse(indoc! {"
+    - id: a
+      speakers:
+        - Alice
+        - Bob
+    - id: b
+      speakers:
+        - Charlie
+  "});
+
+  let results = document.get_all_located("[].speakers[]");
+
+  assert_eq!(results.len(), 3);
+  assert_eq!(results[0].text, Some("Alice".to_string()));
+  assert_eq!(results[0].selector, "[0].speakers[0]");
+  assert_eq!(results[1].text, Some("Bob".to_string()));
+  assert_eq!(results[1].selector, "[0].speakers[1]");
+  assert_eq!(results[2].text, Some("Charlie".to_string()));
+  assert_eq!(results[2].selector, "[1].speakers[0]");
+}
+
+#[test]
+fn test_get_all_located_scalars_have_text_and_type() {
+  let document = parse(indoc! {"
+    - name: Alice
+    - name: Bob
+  "});
+
+  let results = document.get_all_located("[].name");
+
+  assert_eq!(results.len(), 2);
+  assert_eq!(results[0].text, Some("Alice".to_string()));
+  assert_eq!(results[0].node_type, "scalar");
+  assert!(results[0].value_type.is_some());
+}
+
+#[test]
+fn test_get_all_located_maps_have_no_text() {
+  let document = parse(indoc! {"
+    - id: a
+      title: First
+    - id: b
+      title: Second
+  "});
+
+  let results = document.get_all_located("[]");
+
+  assert_eq!(results.len(), 2);
+  assert_eq!(results[0].node_type, "map");
+  assert_eq!(results[0].text, None);
+  assert_eq!(results[0].selector, "[0]");
+  assert_eq!(results[1].selector, "[1]");
+}
+
+#[test]
+fn test_get_all_located_sequences_have_no_text() {
+  let document = parse(indoc! {"
+    - id: a
+      speakers:
+        - Alice
+    - id: b
+      speakers:
+        - Bob
+  "});
+
+  let results = document.get_all_located("[].speakers");
+
+  assert_eq!(results.len(), 2);
+  assert_eq!(results[0].node_type, "sequence");
+  assert_eq!(results[0].text, None);
+  assert_eq!(results[0].selector, "[0].speakers");
+  assert_eq!(results[1].selector, "[1].speakers");
+}
+
+#[test]
+fn test_get_all_located_lines_are_correct() {
+  let document = parse(indoc! {"
+    host: localhost
+    port: 5432
+    name: mydb
+  "});
+
+  let results = document.get_all_located("port");
+
+  assert_eq!(results.len(), 1);
+  assert_eq!(results[0].text, Some("5432".to_string()));
+  assert_eq!(results[0].line, 2);
+  assert_eq!(results[0].selector, "port");
+}
+
+#[test]
+fn test_get_all_located_with_file_path() {
+  use std::io::Write;
+
+  let mut file = tempfile::NamedTempFile::new().unwrap();
+  writeln!(file, "name: Alice").unwrap();
+
+  let document = yerba::Document::parse_file(file.path()).unwrap();
+  let results = document.get_all_located("name");
+
+  assert_eq!(results.len(), 1);
+  assert_eq!(results[0].text, Some("Alice".to_string()));
+  assert!(results[0].file_path.is_some());
+  assert!(!results[0].file_path.as_ref().unwrap().is_empty());
+}

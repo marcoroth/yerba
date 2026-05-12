@@ -8,6 +8,18 @@ mod style;
 mod unique;
 pub use unique::DuplicateInfo;
 
+use crate::syntax::YerbaValueType;
+
+#[derive(Debug, Clone)]
+pub struct LocatedNode {
+  pub node_type: String,
+  pub text: Option<String>,
+  pub value_type: Option<YerbaValueType>,
+  pub file_path: Option<String>,
+  pub selector: String,
+  pub line: usize,
+}
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

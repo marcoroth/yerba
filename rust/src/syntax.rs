@@ -315,8 +315,13 @@ pub fn detect_yaml_type_from_plain(value: &str) -> YerbaValueType {
     return YerbaValueType::Integer;
   }
 
-  // Octal (0o...) and hex (0x...)
-  if value.starts_with("0x") || value.starts_with("0X") || value.starts_with("0o") || value.starts_with("0O") {
+  // Hex (0x...) — only valid hex digits after prefix
+  if (value.starts_with("0x") || value.starts_with("0X")) && value.len() > 2 && value[2..].chars().all(|c| c.is_ascii_hexdigit()) {
+    return YerbaValueType::Integer;
+  }
+
+  // Octal (0o...) — only valid octal digits after prefix
+  if (value.starts_with("0o") || value.starts_with("0O")) && value.len() > 2 && value[2..].chars().all(|c| matches!(c, '0'..='7')) {
     return YerbaValueType::Integer;
   }
 

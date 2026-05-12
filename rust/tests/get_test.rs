@@ -647,6 +647,22 @@ fn test_get_value_boolean() {
 }
 
 #[test]
+fn test_get_value_hex_like_string() {
+  let document = parse(indoc! {"
+    twitter: 0xabc_user
+    color: 0xff00aa
+    octal: 0o777
+    invalid_octal: 0o999
+  "});
+
+  assert_eq!(document.get_value("twitter"), Some(serde_yaml::Value::String("0xabc_user".to_string())));
+  assert_eq!(document.get("twitter"), Some("0xabc_user".to_string()));
+  assert_eq!(document.get("color"), Some("0xff00aa".to_string()));
+  assert_eq!(document.get("octal"), Some("0o777".to_string()));
+  assert_eq!(document.get("invalid_octal"), Some("0o999".to_string()));
+}
+
+#[test]
 fn test_get_value_null() {
   let document = parse(indoc! {"
     empty: null

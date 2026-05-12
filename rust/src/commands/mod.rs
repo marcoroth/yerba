@@ -6,6 +6,7 @@ pub mod directives;
 pub mod get;
 pub mod init;
 pub mod insert;
+pub mod location;
 pub mod mate;
 pub mod move_item;
 pub mod move_key;
@@ -160,6 +161,7 @@ pub enum Command {
   BlankLines(blank_lines::Args),
   Directives(directives::Args),
   Unique(unique::Args),
+  Location(location::Args),
   Schema(schema::Args),
   Selectors(selectors::Args),
   #[command(about = "Create a new Yerbafile in the current directory")]
@@ -189,6 +191,7 @@ impl Command {
       Command::BlankLines(args) => args.run(),
       Command::Directives(args) => args.run(),
       Command::Unique(args) => args.run(),
+      Command::Location(args) => args.run(),
       Command::Schema(args) => args.run(),
       Command::Selectors(args) => args.run(),
       Command::Init => init::run(),

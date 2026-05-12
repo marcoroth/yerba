@@ -779,6 +779,32 @@ static VALUE document_changed_p(VALUE self) {
   return rb_str_equal(current, original) ? Qfalse : Qtrue;
 }
 
+/* document.location(selector = nil) → Yerba::Location */
+static VALUE document_location(int argc, VALUE *argv, VALUE self) {
+  VALUE path;
+  rb_scan_args(argc, argv, "01", &path);
+
+  struct Document *document = get_document(self);
+  const char *selector = NIL_P(path) ? "" : StringValueCStr(path);
+
+  YerbaGetResult result = yerba_document_get(document, selector);
+
+  if (result.error) {
+    yerba_get_result_free(result);
+    return Qnil;
+  }
+
+  if (result.location.start_line == 0 && result.location.end_line == 0 && strlen(selector) > 0) {
+    yerba_get_result_free(result);
+    return Qnil;
+  }
+
+  VALUE location = location_to_ruby(result.location);
+  yerba_get_result_free(result);
+
+  return location;
+}
+
 /* document.path */
 static VALUE document_path(VALUE self) {
   return rb_iv_get(self, "@path");
@@ -903,6 +929,7 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "[]", document_bracket, 1);
   rb_define_method(rb_cDocument, "get_value", document_get_value, 1);
   rb_define_method(rb_cDocument, "get_values", document_get_values, 1);
+  rb_define_method(rb_cDocument, "location", document_location, -1);
   rb_define_method(rb_cDocument, "resolve_selectors", document_resolve_selectors, 1);
   rb_define_method(rb_cDocument, "get_quote_style", document_get_quote_style, 1);
   rb_define_method(rb_cDocument, "set_quote_style", document_set_quote_style, 2);

@@ -50,6 +50,7 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
       yerba sort videos.yml "[]" --by ".id" --order "talk-3,talk-1,talk-2"
       yerba schema "data/**/*.yml" --schema schema.json
       yerba selectors videos.yml
+      yerba location videos.yml "[0].title"
   "#})
 });
 

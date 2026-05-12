@@ -52,6 +52,10 @@ module Yerba
       resolve_selectors(path).filter_map { |selector| self[selector] }
     end
 
+    def locations(selector)
+      resolve_selectors(selector).filter_map { |selector| location(selector) }
+    end
+
     def find_by(...)
       root.find_by(...)
     end

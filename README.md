@@ -370,6 +370,30 @@ yerba unique videos.yml --by ".id" --remove
 yerba unique speakers.yml --by ".name" --remove --dry-run
 ```
 
+### `location`
+
+Show the location (line, column, byte offset) of a selector in a YAML file:
+
+```bash
+yerba location config.yml "database.host"
+yerba location videos.yml "[0].title"
+yerba location videos.yml "[0]"
+```
+
+Output:
+```json
+{
+  "selector": "[0].title",
+  "file": "videos.yml",
+  "start_line": 2,
+  "start_column": 9,
+  "end_line": 2,
+  "end_column": 19,
+  "start_offset": 22,
+  "end_offset": 32
+}
+```
+
 ### `schema`
 
 Validate YAML files against a JSON schema:
@@ -669,6 +693,38 @@ Read and set the quote style on individual scalars:
 scalar = document["database.host"]
 scalar.quote_style # => :double
 scalar.quote_style = :single
+```
+
+### Location
+
+Get the precise location (line, column, byte offset) of any selector in a document:
+
+```ruby
+loc = document.location("[0].title")
+loc.start_line    # => 2
+loc.start_column  # => 9
+loc.end_line      # => 2
+loc.end_column    # => 19
+loc.start_offset  # => 22
+loc.end_offset    # => 32
+```
+
+Omit the selector to get the whole document's location:
+
+```ruby
+document.location  # => #<Yerba::Location start_line=1, ...>
+```
+
+Returns `nil` for non-existent selectors. Use `locations` for wildcard selectors that match multiple nodes:
+
+```ruby
+locs = document.locations("[].title")
+locs.each { |loc| puts "line #{loc.start_line}" }
+# line 2
+# line 4
+
+document.locations("[]")
+document.locations("[].speakers[]")
 ```
 
 ### Wildcard Access

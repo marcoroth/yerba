@@ -29,6 +29,7 @@ module Yerba
   class UnsupportedPlatformError < StandardError; end
   class ExecutableNotFoundError < StandardError; end
   class CompilationError < StandardError; end
+  class SelectorNotFoundError < StandardError; end
 
   GEM_NAME = "yerba"
   EXECUTABLE_NAME = "yerba"

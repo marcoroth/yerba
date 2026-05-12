@@ -26,7 +26,7 @@ impl Document {
   }
 
   pub fn set_all(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    let nodes = self.navigate_all(dot_path);
+    let nodes = self.navigate_all_compact(dot_path);
 
     if nodes.is_empty() {
       return Err(YerbaError::SelectorNotFound(dot_path.to_string()));

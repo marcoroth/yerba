@@ -29,11 +29,11 @@ module Yerba
     end
 
     def to_h
-      get_value(ROOT_SELECTOR)
+      value_at(ROOT_SELECTOR)
     end
 
     def to_a
-      get_value(ROOT_SELECTOR)
+      value_at(ROOT_SELECTOR)
     end
 
     def to_yaml
@@ -41,19 +41,13 @@ module Yerba
     end
 
     def dig(*keys)
-      result = keys.reduce(self) { |node, key| node.nil? ? nil : node[key] }
-
-      result&.value
+      keys.reduce(self) { |node, key| node.nil? ? nil : node[key] }
     end
 
-    def at_path(path)
-      return self[path] unless path.include?("[]")
+    def fetch(selector)
+      validate_selector!(selector)
 
-      resolve_selectors(path).filter_map { |selector| self[selector] }
-    end
-
-    def locations(selector)
-      resolve_selectors(selector).filter_map { |selector| location(selector) }
+      self[selector]
     end
 
     def find_by(...)
@@ -98,6 +92,7 @@ module Yerba
 
     def valid?(schema, selector: nil)
       errors = validate(schema, selector: selector)
+
       errors.empty?
     end
 
@@ -105,6 +100,26 @@ module Yerba
       schema_json = schema.is_a?(String) ? schema : JSON.generate(schema)
 
       validate_schema(schema_json, selector)
+    end
+
+    def validate_selector!(selector)
+      return if valid_selector?(selector)
+
+      available = selectors
+      message = "selector \"#{selector}\" is not valid for this document"
+
+      if available.any?
+        suggestions = DidYouMean::SpellChecker.new(dictionary: available).correct(selector)
+
+        if suggestions.any?
+          message += ". Did you mean: #{suggestions.first(3).join(", ")}?"
+        else
+          message += ". Available selectors: #{available.first(5).join(", ")}"
+          message += ", ..." if available.length > 5
+        end
+      end
+
+      raise Yerba::SelectorNotFoundError, message
     end
 
     def inspect

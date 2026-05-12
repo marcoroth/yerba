@@ -12,7 +12,7 @@ module Yerba
     end
 
     def value
-      @value ||= document&.get(@selector)
+      @value ||= document&.value_at(@selector)
     end
 
     def quote_style

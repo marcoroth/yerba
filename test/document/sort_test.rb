@@ -31,9 +31,9 @@ module Document
 
       document.sort(by: "name")
 
-      assert_equal "Alice", document.get("[0].name")
-      assert_equal "Bob", document.get("[1].name")
-      assert_equal "Charlie", document.get("[2].name")
+      assert_equal "Alice", document.value_at("[0].name")
+      assert_equal "Bob", document.value_at("[1].name")
+      assert_equal "Charlie", document.value_at("[2].name")
     end
 
     test "document.sort with order: :desc sorts descending" do
@@ -45,9 +45,9 @@ module Document
 
       document.sort(by: "name", order: :desc)
 
-      assert_equal "Charlie", document.get("[0].name")
-      assert_equal "Bob", document.get("[1].name")
-      assert_equal "Alice", document.get("[2].name")
+      assert_equal "Charlie", document.value_at("[0].name")
+      assert_equal "Bob", document.value_at("[1].name")
+      assert_equal "Alice", document.value_at("[2].name")
     end
 
     test "document.sort with order: 'desc' accepts string" do
@@ -59,9 +59,9 @@ module Document
 
       document.sort(by: "name", order: "desc")
 
-      assert_equal "Charlie", document.get("[0].name")
-      assert_equal "Bob", document.get("[1].name")
-      assert_equal "Alice", document.get("[2].name")
+      assert_equal "Charlie", document.value_at("[0].name")
+      assert_equal "Bob", document.value_at("[1].name")
+      assert_equal "Alice", document.value_at("[2].name")
     end
 
     test "document.sort with order: array reorders explicitly" do
@@ -73,9 +73,9 @@ module Document
 
       document.sort(by: "name", order: ["Charlie", "Bob", "Alice"])
 
-      assert_equal "Charlie", document.get("[0].name")
-      assert_equal "Bob", document.get("[1].name")
-      assert_equal "Alice", document.get("[2].name")
+      assert_equal "Charlie", document.value_at("[0].name")
+      assert_equal "Bob", document.value_at("[1].name")
+      assert_equal "Alice", document.value_at("[2].name")
     end
 
     test "document.sort with order: array raises on missing values" do
@@ -127,9 +127,9 @@ module Document
 
       document.sort(by: :name, order: :desc)
 
-      assert_equal "Charlie", document.get("[0].name")
-      assert_equal "Bob", document.get("[1].name")
-      assert_equal "Alice", document.get("[2].name")
+      assert_equal "Charlie", document.value_at("[0].name")
+      assert_equal "Bob", document.value_at("[1].name")
+      assert_equal "Alice", document.value_at("[2].name")
     end
 
     test "document.sort with by: as symbol and array order" do
@@ -141,9 +141,9 @@ module Document
 
       document.sort(by: :name, order: ["Bob", "Alice", "Charlie"])
 
-      assert_equal "Bob", document.get("[0].name")
-      assert_equal "Alice", document.get("[1].name")
-      assert_equal "Charlie", document.get("[2].name")
+      assert_equal "Bob", document.value_at("[0].name")
+      assert_equal "Alice", document.value_at("[1].name")
+      assert_equal "Charlie", document.value_at("[2].name")
     end
 
     test "document.sort with by: using dot prefix" do
@@ -155,9 +155,9 @@ module Document
 
       document.sort(by: ".name", order: :desc)
 
-      assert_equal "Charlie", document.get("[0].name")
-      assert_equal "Bob", document.get("[1].name")
-      assert_equal "Alice", document.get("[2].name")
+      assert_equal "Charlie", document.value_at("[0].name")
+      assert_equal "Bob", document.value_at("[1].name")
+      assert_equal "Alice", document.value_at("[2].name")
     end
 
     test "document.sort scalar sequence ascending" do
@@ -169,9 +169,9 @@ module Document
 
       document.sort
 
-      assert_equal "go", document.get("[0]")
-      assert_equal "ruby", document.get("[1]")
-      assert_equal "rust", document.get("[2]")
+      assert_equal "go", document.value_at("[0]")
+      assert_equal "ruby", document.value_at("[1]")
+      assert_equal "rust", document.value_at("[2]")
     end
 
     test "document.sort scalar sequence descending" do
@@ -183,9 +183,9 @@ module Document
 
       document.sort(order: :desc)
 
-      assert_equal "rust", document.get("[0]")
-      assert_equal "ruby", document.get("[1]")
-      assert_equal "go", document.get("[2]")
+      assert_equal "rust", document.value_at("[0]")
+      assert_equal "ruby", document.value_at("[1]")
+      assert_equal "go", document.value_at("[2]")
     end
 
     test "document.sort nested scalar sequence descending" do
@@ -198,9 +198,9 @@ module Document
 
       document.sort("tags", order: :desc)
 
-      assert_equal "rust", document.get("tags[0]")
-      assert_equal "ruby", document.get("tags[1]")
-      assert_equal "go", document.get("tags[2]")
+      assert_equal "rust", document.value_at("tags[0]")
+      assert_equal "ruby", document.value_at("tags[1]")
+      assert_equal "go", document.value_at("tags[2]")
     end
 
     test "document.sort nested scalar sequence with explicit order" do
@@ -213,9 +213,9 @@ module Document
 
       document.sort("tags", order: ["rust", "ruby", "go"])
 
-      assert_equal "rust", document.get("tags[0]")
-      assert_equal "ruby", document.get("tags[1]")
-      assert_equal "go", document.get("tags[2]")
+      assert_equal "rust", document.value_at("tags[0]")
+      assert_equal "ruby", document.value_at("tags[1]")
+      assert_equal "go", document.value_at("tags[2]")
     end
 
     test "document.sort root scalar sequence with explicit order" do
@@ -227,9 +227,9 @@ module Document
 
       document.sort(order: ["rust", "ruby", "go"])
 
-      assert_equal "rust", document.get("[0]")
-      assert_equal "ruby", document.get("[1]")
-      assert_equal "go", document.get("[2]")
+      assert_equal "rust", document.value_at("[0]")
+      assert_equal "ruby", document.value_at("[1]")
+      assert_equal "go", document.value_at("[2]")
     end
 
     test "document.sort with path sorts nested sequence" do
@@ -241,8 +241,8 @@ module Document
 
       document.sort("items", by: "name")
 
-      assert_equal "Alice", document.get("items[0].name")
-      assert_equal "Charlie", document.get("items[1].name")
+      assert_equal "Alice", document.value_at("items[0].name")
+      assert_equal "Charlie", document.value_at("items[1].name")
     end
   end
 end

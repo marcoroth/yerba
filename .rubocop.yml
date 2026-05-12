@@ -31,6 +31,10 @@ Style/BlockDelimiters:
 Style/TrailingCommaInHashLiteral:
   EnforcedStyleForMultiline: diff_comma
 
+Style/SingleArgumentDig:
+  Exclude:
+    - test/**/*
+
 Metrics/PerceivedComplexity:
   Enabled: false
 

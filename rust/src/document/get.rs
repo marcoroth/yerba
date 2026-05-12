@@ -1,6 +1,37 @@
 use super::*;
 
 impl Document {
+  pub fn is_valid_selector(&self, dot_path: &str) -> bool {
+    if dot_path.is_empty() {
+      return true;
+    }
+
+    let selectors = self.selectors();
+
+    if selectors.contains(&dot_path.to_string()) {
+      return true;
+    }
+
+    let wildcard_version = dot_path.replace(|c: char| c.is_ascii_digit(), "").replace("[.", "[");
+
+    let mut normalized = String::new();
+    let mut chars = dot_path.chars().peekable();
+
+    while let Some(char) = chars.next() {
+      if char == '[' {
+        normalized.push('[');
+
+        while chars.peek().map(|char| char.is_ascii_digit()).unwrap_or(false) {
+          chars.next();
+        }
+      } else {
+        normalized.push(char);
+      }
+    }
+
+    selectors.contains(&normalized) || selectors.contains(&wildcard_version)
+  }
+
   pub fn get(&self, dot_path: &str) -> Option<String> {
     if dot_path.contains('[') {
       return self.get_all(dot_path).into_iter().next();
@@ -12,7 +43,7 @@ impl Document {
   }
 
   pub fn get_all(&self, dot_path: &str) -> Vec<String> {
-    self.navigate_all(dot_path).iter().filter_map(extract_scalar_text).collect()
+    self.navigate_all_compact(dot_path).iter().filter_map(extract_scalar_text).collect()
   }
 
   pub fn get_typed(&self, dot_path: &str) -> Option<ScalarValue> {
@@ -34,7 +65,7 @@ impl Document {
 
   pub fn get_all_typed(&self, dot_path: &str) -> Vec<ScalarValue> {
     self
-      .navigate_all(dot_path)
+      .navigate_all_compact(dot_path)
       .iter()
       .filter(|node| {
         !node
@@ -46,7 +77,7 @@ impl Document {
   }
 
   pub fn resolve_selectors(&self, dot_path: &str) -> Vec<String> {
-    self.navigate_all(dot_path).iter().map(node_selector).collect()
+    self.navigate_all_compact(dot_path).iter().map(node_selector).collect()
   }
 
   pub fn get_all_located(&self, dot_path: &str) -> Vec<LocatedNode> {
@@ -54,7 +85,7 @@ impl Document {
     let file_path = self.path.as_ref().map(|p| p.to_string_lossy().to_string());
 
     self
-      .navigate_all(dot_path)
+      .navigate_all_compact(dot_path)
       .iter()
       .map(|node| {
         let offset: usize = node.text_range().start().into();
@@ -224,23 +255,56 @@ impl Document {
       return Some(node_to_yaml_value(&self.root));
     }
 
-    let nodes = self.navigate_all(dot_path);
+    let parsed = crate::selector::Selector::parse(dot_path);
 
-    if nodes.is_empty() {
-      return None;
+    if parsed.has_wildcard() {
+      let padded = self.navigate_all(dot_path);
+
+      if padded.is_empty() {
+        return None;
+      }
+
+      let values: Vec<serde_yaml::Value> = padded
+        .iter()
+        .map(|maybe_node| match maybe_node {
+          Some(node) => node_to_yaml_value(node),
+          None => serde_yaml::Value::Null,
+        })
+        .collect();
+
+      Some(serde_yaml::Value::Sequence(values))
+    } else {
+      let nodes = self.navigate_all_compact(dot_path);
+
+      if nodes.is_empty() {
+        return None;
+      }
+
+      if nodes.len() == 1 {
+        return Some(node_to_yaml_value(&nodes[0]));
+      }
+
+      let values: Vec<serde_yaml::Value> = nodes.iter().map(node_to_yaml_value).collect();
+
+      Some(serde_yaml::Value::Sequence(values))
     }
-
-    if nodes.len() == 1 {
-      return Some(node_to_yaml_value(&nodes[0]));
-    }
-
-    let values: Vec<serde_yaml::Value> = nodes.iter().map(node_to_yaml_value).collect();
-
-    Some(serde_yaml::Value::Sequence(values))
   }
 
   pub fn get_values(&self, dot_path: &str) -> Vec<serde_yaml::Value> {
-    self.navigate_all(dot_path).iter().map(node_to_yaml_value).collect()
+    let parsed = crate::selector::Selector::parse(dot_path);
+
+    if parsed.has_wildcard() {
+      self
+        .navigate_all(dot_path)
+        .iter()
+        .map(|maybe_node| match maybe_node {
+          Some(node) => node_to_yaml_value(node),
+          None => serde_yaml::Value::Null,
+        })
+        .collect()
+    } else {
+      self.navigate_all_compact(dot_path).iter().map(node_to_yaml_value).collect()
+    }
   }
 
   pub fn selectors(&self) -> Vec<String> {
@@ -259,7 +323,7 @@ impl Document {
 
   pub fn exists(&self, dot_path: &str) -> bool {
     if dot_path.contains('[') {
-      return !self.navigate_all(dot_path).is_empty();
+      return !self.navigate_all_compact(dot_path).is_empty();
     }
 
     self.get(dot_path).is_some()

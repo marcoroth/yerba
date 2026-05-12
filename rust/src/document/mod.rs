@@ -170,7 +170,7 @@ impl Document {
       return Ok(document.syntax().clone());
     }
 
-    let nodes = self.navigate_all(dot_path);
+    let nodes = self.navigate_all_compact(dot_path);
 
     match nodes.len() {
       0 => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
@@ -179,7 +179,11 @@ impl Document {
     }
   }
 
-  pub fn navigate_all(&self, dot_path: &str) -> Vec<SyntaxNode> {
+  pub fn navigate_all_compact(&self, dot_path: &str) -> Vec<SyntaxNode> {
+    self.navigate_all(dot_path).into_iter().flatten().collect()
+  }
+
+  pub fn navigate_all(&self, dot_path: &str) -> Vec<Option<SyntaxNode>> {
     if Document::validate_path(dot_path).is_err() {
       return Vec::new();
     }
@@ -196,26 +200,63 @@ impl Document {
       None => return Vec::new(),
     };
 
-    let mut current_nodes = vec![document.syntax().clone()];
+    let mut current_nodes: Vec<Option<SyntaxNode>> = vec![Some(document.syntax().clone())];
 
     if parsed.is_empty() {
       if let Some(sequence) = document.syntax().descendants().find_map(BlockSeq::cast) {
-        current_nodes = sequence.entries().map(|entry| entry.syntax().clone()).collect();
+        current_nodes = sequence.entries().map(|entry| Some(entry.syntax().clone())).collect();
       }
 
       return current_nodes;
     }
 
-    for segment in parsed.segments() {
-      let mut next_nodes = Vec::new();
+    let segments = parsed.segments();
 
-      for node in &current_nodes {
-        next_nodes.extend(resolve_segment(node, segment));
+    for (i, segment) in segments.iter().enumerate() {
+      let is_wildcard = matches!(segment, crate::selector::SelectorSegment::AllItems);
+      let has_remaining = i + 1 < segments.len();
+      let mut next_nodes: Vec<Option<SyntaxNode>> = Vec::new();
+
+      for maybe_node in &current_nodes {
+        match maybe_node {
+          None => next_nodes.push(None),
+          Some(node) => {
+            let resolved = resolve_segment(node, segment);
+
+            if is_wildcard && has_remaining {
+              let remaining = &segments[i + 1..];
+
+              for item in &resolved {
+                let results = navigate_remaining(item, remaining);
+
+                if results.is_empty() {
+                  next_nodes.push(None);
+                } else {
+                  for result in results {
+                    next_nodes.push(Some(result));
+                  }
+                }
+              }
+
+              return next_nodes;
+            } else if is_wildcard {
+              for item in resolved {
+                next_nodes.push(Some(item));
+              }
+            } else if resolved.is_empty() {
+              return Vec::new();
+            } else {
+              for item in resolved {
+                next_nodes.push(Some(item));
+              }
+            }
+          }
+        }
       }
 
       current_nodes = next_nodes;
 
-      if current_nodes.is_empty() {
+      if current_nodes.iter().all(|n| n.is_none()) {
         break;
       }
     }
@@ -531,6 +572,26 @@ pub(crate) fn parse_condition(condition: &str) -> Option<(String, &str, String)>
     .trim_end_matches('\'');
 
   Some((left.to_string(), operator, right.to_string()))
+}
+
+fn navigate_remaining(node: &SyntaxNode, segments: &[crate::selector::SelectorSegment]) -> Vec<SyntaxNode> {
+  let mut current_nodes = vec![node.clone()];
+
+  for segment in segments {
+    let mut next_nodes = Vec::new();
+
+    for current in &current_nodes {
+      next_nodes.extend(resolve_segment(current, segment));
+    }
+
+    if next_nodes.is_empty() {
+      return Vec::new();
+    }
+
+    current_nodes = next_nodes;
+  }
+
+  current_nodes
 }
 
 fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment) -> Vec<SyntaxNode> {

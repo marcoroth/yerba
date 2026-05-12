@@ -208,7 +208,7 @@ impl Document {
         Err(_) => return Ok(()),
       }
     } else {
-      let found = self.navigate_all(dot_path);
+      let found = self.navigate_all_compact(dot_path);
       if found.is_empty() {
         return Ok(());
       }
@@ -313,7 +313,7 @@ impl Document {
         Err(_) => return Ok(()),
       }
     } else {
-      let found = self.navigate_all(dot_path);
+      let found = self.navigate_all_compact(dot_path);
       if found.is_empty() {
         return Ok(());
       }
@@ -444,7 +444,7 @@ impl Document {
       (dot_path, "")
     };
 
-    let parent_nodes = self.navigate_all(parent_path);
+    let parent_nodes = self.navigate_all_compact(parent_path);
     let source = self.root.text().to_string();
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 

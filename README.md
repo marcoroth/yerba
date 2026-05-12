@@ -90,24 +90,24 @@ Selectors use dot-notation for nested keys, brackets for array access, and suppo
 
 Selectors let you address any node in a YAML document:
 
-| Pattern | Meaning | Example |
-|---------|---------|---------|
-| `key` | A single key | `"database.host"` |
-| `key.nested` | Nested key path | `"database.settings.pool"` |
-| `[]` | All items in array | `"[].title"` |
-| `[N]` | Item at index | `"[0].title"` |
-| `[].key[].nested` | Nested array access | `"[].speakers[].name"` |
+| Pattern           | Meaning             | Example                    |
+|-------------------|---------------------|----------------------------|
+| `key`             | A single key        | `"database.host"`          |
+| `key.nested`      | Nested key path     | `"database.settings.pool"` |
+| `[]`              | All items in array  | `"[].title"`               |
+| `[N]`             | Item at index       | `"[0].title"`              |
+| `[].key[].nested` | Nested array access | `"[].speakers[].name"`     |
 
 ### Conditions
 
 Conditions filter which items a command operates on:
 
-| Syntax | Meaning | Example |
-|--------|---------|---------|
-| `.key == value` | Equality | `".kind == keynote"` |
-| `.key != value` | Inequality | `".status != draft"` |
-| `.key contains val` | Substring or member | `".title contains Ruby"` |
-| `.key not_contains val` | Negated contains | `".title not_contains test"` |
+| Syntax                  | Meaning             | Example                      |
+|-------------------------|---------------------|------------------------------|
+| `.key == value`         | Equality            | `".kind == keynote"`         |
+| `.key != value`         | Inequality          | `".status != draft"`         |
+| `.key contains val`     | Substring or member | `".title contains Ruby"`     |
+| `.key not_contains val` | Negated contains    | `".title not_contains test"` |
 
 ---
 
@@ -311,25 +311,25 @@ yerba quote-style videos.yml "[].description" --values literal
 
 **Key styles** (`--keys`):
 
-| Style | Symbol | Example |
-|-------|--------|---------|
-| `plain` | — | `host: value` |
-| `single` | `'` | `'host': value` |
-| `double` | `"` | `"host": value` |
+| Style    | Symbol | Example         |
+|----------|--------|-----------------|
+| `plain`  | —      | `host: value`   |
+| `single` | `'`    | `'host': value` |
+| `double` | `"`    | `"host": value` |
 
 **Value styles** (`--values`):
 
-| Style | Symbol | Example | Behavior |
-|-------|--------|---------|----------|
-| `plain` | — | `host: localhost` | Unquoted |
-| `single` | `'` | `host: 'localhost'` | Single-quoted |
-| `double` | `"` | `host: "localhost"` | Double-quoted, supports `\n` escapes |
-| `literal` | `\|-` | Preserves newlines | Strip trailing newline |
-| `literal-clip` | `\|` | Preserves newlines | Keep one trailing newline |
-| `literal-keep` | `\|+` | Preserves newlines | Keep all trailing newlines |
-| `folded` | `>-` | Folds newlines to spaces | Strip trailing newline |
-| `folded-clip` | `>` | Folds newlines to spaces | Keep one trailing newline |
-| `folded-keep` | `>+` | Folds newlines to spaces | Keep all trailing newlines |
+| Style          | Symbol | Example                  | Behavior                             |                            |
+|----------------|--------|--------------------------|--------------------------------------|----------------------------|
+| `plain`        | —      | `host: localhost`        | Unquoted                             |                            |
+| `single`       | `'`    | `host: 'localhost'`      | Single-quoted                        |                            |
+| `double`       | `"`    | `host: "localhost"`      | Double-quoted, supports `\n` escapes |                            |
+| `literal`      | `\     | -`                       | Preserves newlines                   | Strip trailing newline     |
+| `literal-clip` | `\     | `                        | Preserves newlines                   | Keep one trailing newline  |
+| `literal-keep` | `\     | +`                       | Preserves newlines                   | Keep all trailing newlines |
+| `folded`       | `>-`   | Folds newlines to spaces | Strip trailing newline               |                            |
+| `folded-clip`  | `>`    | Folds newlines to spaces | Keep one trailing newline            |                            |
+| `folded-keep`  | `>+`   | Folds newlines to spaces | Keep all trailing newlines           |                            |
 
 Block scalars are only converted when scoped to a specific selector. An unscoped `--values double` will not touch existing block scalars.
 
@@ -550,46 +550,73 @@ Create a document from a file path or from a string:
 require "yerba"
 
 document = Yerba.parse_file("config.yml")
-document = Yerba.parse("database:\n  host: localhost\n  port: 5432\n")
+
+document = Yerba.parse(<<~YAML)
+  database:
+    host: localhost
+    port: 5432
+YAML
 ```
 
 ### Reading Values
 
-Use `get` to retrieve the raw value at a path. Values are returned with their YAML types, strings, integers, booleans, and nil are all mapped to their Ruby equivalents:
+Use bracket notation (`[]`) to navigate the document. Returns typed node objects (`Scalar`, `Map`, or `Sequence`) that are live references — mutations flow back to the document.
+
+All access methods (`[]`, `fetch`, `dig`, `value_at`) accept full selector strings like `"database.host"`, `"[0].title"`, or `"[].speakers[].name"`. In the examples below we prefer the more idiomatic chained bracket style, but the two forms are equivalent:
 
 ```ruby
-document.get("database.host")   # => "localhost"
-document.get("database.port")   # => 5432
-document.get("database.ssl")    # => false
-```
-
-### Structured Navigation
-
-Use bracket notation to get typed wrapper objects (`Scalar`, `Map`, or `Sequence`) representing nodes in the document. These are live references, mutations flow back to the document.
-
-You can use a full dot-path in a single bracket call, or chain brackets to navigate one level at a time:
-
-```ruby
-document["database.host"].value          # => "localhost"
-document["database"]["host"].value       # => "localhost"
-document["database"]["port"].value       # => 5432
+document["database"]["host"].value  # => "localhost"
+document["database.host"].value     # => "localhost" (same thing)
 ```
 
 The returned object type depends on what's at the path:
 
 ```ruby
-document["database"]       # => Yerba::Map
-document["database.host"]  # => Yerba::Scalar
-document["tags"]           # => Yerba::Sequence
+document["database"]          # => Yerba::Map
+document["database"]["host"]  # => Yerba::Scalar
+document["tags"]              # => Yerba::Sequence
 ```
 
 Scalars expose their value and quote style:
 
 ```ruby
-scalar = document["database.host"]
-scalar.value         # => "localhost"
-scalar.quote_style   # => :double
+scalar = document["database"]["host"]
+scalar.value        # => "localhost"
+scalar.quote_style  # => :double
 ```
+
+Use `fetch` for strict access, it raises `Yerba::SelectorNotFoundError` with "did you mean?" suggestions if the selector doesn't exist:
+
+```ruby
+document.fetch("database.host")  # => Yerba::Scalar
+document.fetch("databse.host")   # => raises SelectorNotFoundError: ... Did you mean: database.host?
+```
+
+Use `dig` to traverse multiple levels, returning `nil` for missing paths:
+
+```ruby
+document.dig("database", "host")     # => Yerba::Scalar
+document.dig("items", 0, "name")     # => Yerba::Scalar
+document.dig("database", "missing")  # => nil
+```
+
+Use `value_at` to get the plain Ruby value (String, Integer, Hash, Array, etc.) instead of a node object:
+
+```ruby
+document.value_at("database.host")  # => "localhost"
+document.value_at("database.port")  # => 5432
+document.value_at("database")       # => {"host" => "localhost", "port" => 5432}
+document.value_at("[].title")       # => ["First Talk", "Second Talk"]
+```
+
+Summary of access methods:
+
+| Method     | Not found                      | Returns                            |
+|------------|--------------------------------|------------------------------------|
+| `[]`       | `nil`                          | `Scalar` / `Map` / `Sequence` node |
+| `fetch`    | raises `SelectorNotFoundError` | `Scalar` / `Map` / `Sequence` node |
+| `dig`      | `nil`                          | `Scalar` / `Map` / `Sequence` node |
+| `value_at` | `nil`                          | plain Ruby value                   |
 
 ### Mutations
 
@@ -670,10 +697,11 @@ schema = {
   required: ["name", "slug"]
 }
 
-document.valid?(schema)                     # => true/false
-document.valid?(schema, selector: "[]")     # validate each array item
+document.valid?(schema)                 # => true/false
+document.valid?(schema, selector: "[]") # validate each array item
 
 errors = document.validate(schema, selector: "[]")
+
 errors.each do |error|
   puts "#{error["message"]} at #{error["path"]} (line #{error["line"]})"
 end
@@ -690,7 +718,7 @@ document.valid?('{"type":"object","required":["name"]}')
 Read and set the quote style on individual scalars:
 
 ```ruby
-scalar = document["database.host"]
+scalar = document["database"]["host"]
 scalar.quote_style # => :double
 scalar.quote_style = :single
 ```
@@ -700,7 +728,7 @@ scalar.quote_style = :single
 Get the precise location (line, column, byte offset) of any selector in a document:
 
 ```ruby
-loc = document.location("[0].title")
+loc = document[0]["title"].location
 loc.start_line    # => 2
 loc.start_column  # => 9
 loc.end_line      # => 2
@@ -709,10 +737,23 @@ loc.start_offset  # => 22
 loc.end_offset    # => 32
 ```
 
+You can also get a location by selector string:
+
+```ruby
+document.location("[0].title")
+```
+
+The above is the same as:
+
+```ruby
+document[0]["title"].location
+document["[0].title"].location
+```
+
 Omit the selector to get the whole document's location:
 
 ```ruby
-document.location  # => #<Yerba::Location start_line=1, ...>
+document.location # => #<Yerba::Location start_line=1, ...>
 ```
 
 Returns `nil` for non-existent selectors. Use `locations` for wildcard selectors that match multiple nodes:
@@ -729,11 +770,15 @@ document.locations("[].speakers[]")
 
 ### Wildcard Access
 
-Use `at_path` to access all items matching a wildcard selector:
+When `[]` receives a wildcard selector (containing `[]`), it returns an array of nodes instead of a single node:
 
 ```ruby
-titles = document.at_path("[].title")
-titles.each { |scalar| puts scalar.value }
+document["[].title"]       # => [Yerba::Scalar, Yerba::Scalar, ...]
+document["[].speakers[]"]  # => [Yerba::Scalar, Yerba::Scalar, ...]
+document["items[].name"]   # => [Yerba::Scalar, Yerba::Scalar, ...]
+
+document["[].title"].each { |scalar| puts scalar.value }
+document["[].title"].each { |scalar| scalar.value = "Updated" }
 ```
 
 ### Collections
@@ -744,7 +789,7 @@ Operate on multiple files matching a glob pattern:
 collection = Yerba.files("data/**/videos.yml")
 
 collection.each do |document|
-  puts document.get("[0].title")
+  puts document[0]["title"].value
 end
 
 collection.find_by(name: "Alice")

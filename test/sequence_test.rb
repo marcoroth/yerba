@@ -187,7 +187,7 @@ class SequenceTest < Minitest::Spec
     YAML
     document["items"][0]["name"] = "Go"
 
-    assert_equal "Go", document.dig("items", 0, "name")
+    assert_equal "Go", document.dig("items", 0, "name").value
   end
 
   test "each yields bound nodes for sequence of maps" do
@@ -220,7 +220,7 @@ class SequenceTest < Minitest::Spec
     YAML
     document["items"].first["name"] = "Go"
 
-    assert_equal "Go", document.get("items[0].name")
+    assert_equal "Go", document.value_at("items[0].name")
   end
 
   test "remove deletes item by value" do
@@ -261,8 +261,8 @@ class SequenceTest < Minitest::Spec
     YAML
     document["items"].sort(by: "name")
 
-    assert_equal "Go", document.get("items[0].name")
-    assert_equal "Rust", document.get("items[1].name")
+    assert_equal "Go", document.value_at("items[0].name")
+    assert_equal "Rust", document.value_at("items[1].name")
   end
 
   test "delete_at removes item by index" do
@@ -274,8 +274,8 @@ class SequenceTest < Minitest::Spec
     YAML
     document["items"].delete_at(1)
 
-    assert_equal "Ruby", document.get("items[0].name")
-    assert_equal "Go", document.get("items[1].name")
+    assert_equal "Ruby", document.value_at("items[0].name")
+    assert_equal "Go", document.value_at("items[1].name")
   end
 
   test "delete_if removes items matching block" do
@@ -291,7 +291,7 @@ class SequenceTest < Minitest::Spec
     document["items"].delete_if { |item| item["year"].value > 2000 }
 
     assert_equal 1, document["items"].length
-    assert_equal "Ruby", document.get("items[0].name")
+    assert_equal "Ruby", document.value_at("items[0].name")
   end
 
   test "standalone sequence from array" do
@@ -1034,5 +1034,112 @@ class SequenceTest < Minitest::Spec
   ensure
     file&.unlink
     Yerba::Document.clear_cache!
+  end
+
+  test "fetch returns node for valid index" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+        - go
+    YAML
+
+    result = document["tags"].fetch(0)
+
+    assert_instance_of Yerba::Scalar, result
+    assert_equal "ruby", result.value
+  end
+
+  test "fetch raises for out-of-bounds index" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+    YAML
+
+    error = assert_raises(IndexError) { document["tags"].fetch(99) }
+
+    assert_includes error.message, "index 99 outside of sequence bounds"
+  end
+
+  test "fetch returns Map for sequence of maps" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: Ruby
+          year: 1995
+        - name: Rust
+          year: 2015
+    YAML
+
+    result = document["items"].fetch(0)
+
+    assert_instance_of Yerba::Map, result
+  end
+
+  test "dig returns node through sequence and map" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: Ruby
+          year: 1995
+        - name: Rust
+          year: 2015
+    YAML
+
+    result = document["items"].dig(1, "name")
+
+    assert_instance_of Yerba::Scalar, result
+    assert_equal "Rust", result.value
+  end
+
+  test "dig returns nil for missing path" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: Ruby
+    YAML
+
+    assert_nil document["items"].dig(5, "name")
+  end
+
+  test "dig returns node for single index" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+    YAML
+
+    result = document["tags"].dig(0)
+
+    assert_instance_of Yerba::Scalar, result
+    assert_equal "ruby", result.value
+  end
+
+  test "value_at returns plain value for index" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+    YAML
+
+    assert_equal "ruby", document["tags"].value_at(0)
+    assert_equal "rust", document["tags"].value_at(1)
+  end
+
+  test "value_at returns hash for map item" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: Ruby
+          year: 1995
+    YAML
+
+    assert_equal({ "name" => "Ruby", "year" => 1995 }, document["items"].value_at(0))
+  end
+
+  test "value_at returns nil for out-of-bounds index" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+    YAML
+
+    assert_nil document["tags"].value_at(99)
   end
 end

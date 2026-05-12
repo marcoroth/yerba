@@ -48,6 +48,7 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
       yerba sort-keys config.yml "database" "id,host,port,name"
       yerba quote-style "data/**/*.yml" --values double
       yerba sort videos.yml "[]" --by ".id" --order "talk-3,talk-1,talk-2"
+      yerba schema "data/**/*.yml" --schema schema.json
       yerba selectors videos.yml
   "#})
 });

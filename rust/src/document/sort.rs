@@ -113,12 +113,15 @@ impl Document {
       return self.validate_each_sort_keys(sequence_path, key_order);
     }
 
-    let current_node = self.navigate(dot_path)?;
+    let current_node = match self.navigate(dot_path) {
+      Ok(node) => node,
+      Err(_) => return Ok(()),
+    };
 
-    let map = current_node
-      .descendants()
-      .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let map = match current_node.descendants().find_map(BlockMap::cast) {
+      Some(map) => map,
+      None => return Ok(()),
+    };
 
     let unknown_keys: Vec<String> = map
       .entries()
@@ -138,12 +141,15 @@ impl Document {
       return self.sort_each_keys(sequence_path, key_order);
     }
 
-    let current_node = self.navigate(dot_path)?;
+    let current_node = match self.navigate(dot_path) {
+      Ok(node) => node,
+      Err(_) => return Ok(()),
+    };
 
-    let map = current_node
-      .descendants()
-      .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let map = match current_node.descendants().find_map(BlockMap::cast) {
+      Some(map) => map,
+      None => return Ok(()),
+    };
 
     let entries: Vec<_> = map.entries().collect();
 

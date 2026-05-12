@@ -724,6 +724,24 @@ static VALUE document_apply_yerbafile(int argc, VALUE *argv, VALUE self) {
   return self;
 }
 
+/* document.validate_schema(schema_json, selector = nil) */
+static VALUE document_validate_schema(int argc, VALUE *argv, VALUE self) {
+  VALUE schema_json, selector;
+  rb_scan_args(argc, argv, "11", &schema_json, &selector);
+
+  struct Document *document = get_document(self);
+  const char *selector_str = NIL_P(selector) ? NULL : StringValueCStr(selector);
+
+  char *result = yerba_document_validate_schema(document, StringValueCStr(schema_json), selector_str);
+
+  if (!result) return rb_ary_new();
+
+  VALUE json_string = make_utf8_string(result);
+  yerba_string_free(result);
+
+  return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+}
+
 /* document.to_s */
 static VALUE document_to_s(VALUE self) {
   struct Document *document = get_document(self);
@@ -904,6 +922,7 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "quote_style", document_quote_style, -1);
   rb_define_method(rb_cDocument, "blank_lines", document_blank_lines, 2);
   rb_define_method(rb_cDocument, "apply_yerbafile", document_apply_yerbafile, -1);
+  rb_define_method(rb_cDocument, "validate_schema", document_validate_schema, -1);
   rb_define_method(rb_cDocument, "to_s", document_to_s, 0);
   rb_define_method(rb_cDocument, "write!", document_save, 0);
   rb_define_method(rb_cDocument, "changed?", document_changed_p, 0);

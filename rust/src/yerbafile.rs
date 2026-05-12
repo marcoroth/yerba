@@ -9,6 +9,8 @@ use crate::{Document, QuoteStyle, YerbaError};
 pub struct Yerbafile {
   #[serde(default)]
   pub rules: Vec<Rule>,
+  #[serde(skip)]
+  pub directory: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -32,6 +34,7 @@ pub enum PipelineStep {
   Sort(SortConfig),
   Directives(DirectivesConfig),
   Unique(UniqueConfig),
+  Schema(SchemaConfig),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -73,6 +76,15 @@ pub struct UniqueConfig {
 
 fn default_dot() -> String {
   ".".to_string()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SchemaConfig {
+  pub file: String,
+  #[serde(default)]
+  pub path: Option<String>,
+  #[serde(default)]
+  pub items: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -153,8 +165,13 @@ impl<'de> Deserialize<'de> for PipelineStep {
       return Ok(PipelineStep::Unique(config));
     }
 
+    if let Some(value) = mapping.get(serde_yaml::Value::String("schema".to_string())) {
+      let config: SchemaConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      return Ok(PipelineStep::Schema(config));
+    }
+
     Err(serde::de::Error::custom(
-      "unknown pipeline step: expected sort_keys, quote_style, set, insert, delete, rename, remove, blank_lines, sort, directives, or unique",
+      "unknown pipeline step: expected sort_keys, quote_style, set, insert, delete, rename, remove, blank_lines, sort, directives, unique, or schema",
     ))
   }
 }
@@ -212,8 +229,16 @@ pub struct RuleResult {
 impl Yerbafile {
   pub fn load(path: impl AsRef<Path>) -> Result<Self, YerbaError> {
     let content = fs::read_to_string(path.as_ref())?;
-    let yerbafile: Yerbafile = serde_yaml::from_str(&content).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
+    let mut yerbafile: Yerbafile = serde_yaml::from_str(&content).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
+    yerbafile.directory = path.as_ref().parent().map(|p| p.to_path_buf());
     Ok(yerbafile)
+  }
+
+  pub fn resolve_path(&self, relative: &str) -> PathBuf {
+    match &self.directory {
+      Some(directory) => directory.join(relative),
+      None => PathBuf::from(relative),
+    }
   }
 
   pub fn find() -> Option<PathBuf> {
@@ -354,7 +379,7 @@ impl Yerbafile {
     let base_path = rule.path.as_deref();
 
     for step in &rule.pipeline {
-      if let Err(error) = execute_step(&mut document, step, base_path, file) {
+      if let Err(error) = execute_step(&mut document, step, base_path, file, self) {
         return RuleResult {
           file: file.to_string(),
           changed: false,
@@ -418,7 +443,7 @@ impl Yerbafile {
       let base_path = rule.path.as_deref();
 
       for step in &rule.pipeline {
-        execute_step(document, step, base_path, file_path)?;
+        execute_step(document, step, base_path, file_path, self)?;
       }
     }
 
@@ -426,7 +451,7 @@ impl Yerbafile {
   }
 }
 
-fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<&str>, _file: &str) -> Result<(), YerbaError> {
+fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<&str>, _file: &str, yerbafile: &Yerbafile) -> Result<(), YerbaError> {
   match step {
     PipelineStep::QuoteStyle(config) => {
       let dot_path = config.path.as_deref();
@@ -546,6 +571,19 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         document.remove_directives()
       } else {
         Ok(())
+      }
+    }
+
+    PipelineStep::Schema(config) => {
+      let schema_path = yerbafile.resolve_path(&config.file);
+      let schema = crate::schema::load_schema(&schema_path)?;
+      let selector = resolve_step_path(base_path, config.path.as_deref());
+      let errors = document.validate_schema(&schema, config.items, if selector.is_empty() { None } else { Some(&selector) });
+
+      if errors.is_empty() {
+        Ok(())
+      } else {
+        Err(YerbaError::SchemaValidation(errors))
       }
     }
 

@@ -639,6 +639,44 @@ pub unsafe extern "C" fn yerba_document_blank_lines(document: *mut Document, pat
 
 /// Caller must free with yerba_string_free.
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_validate_schema(document: *const Document, schema_json: *const c_char, selector: *const c_char) -> *mut c_char {
+  let document = &*document;
+  let schema_string = CStr::from_ptr(schema_json).to_str().unwrap_or("");
+  let selector_string = if selector.is_null() { None } else { CStr::from_ptr(selector).to_str().ok() };
+
+  let schema: serde_json::Value = match serde_json::from_str(schema_string) {
+    Ok(schema) => schema,
+    Err(e) => {
+      let error = serde_json::json!([{"message": format!("invalid schema: {}", e), "path": "", "line": null}]);
+      return CString::new(error.to_string()).unwrap_or_default().into_raw();
+    }
+  };
+
+  let errors = document.validate_schema(&schema, false, selector_string);
+
+  if errors.is_empty() {
+    return ptr::null_mut();
+  }
+
+  let json_errors: Vec<serde_json::Value> = errors
+    .iter()
+    .map(|error| {
+      serde_json::json!({
+        "message": error.message,
+        "path": error.path,
+        "line": error.line,
+        "item_label": error.item_label,
+      })
+    })
+    .collect();
+
+  CString::new(serde_json::to_string(&json_errors).unwrap_or_else(|_| "[]".to_string()))
+    .unwrap_or_default()
+    .into_raw()
+}
+
+/// Caller must free with yerba_string_free.
+#[no_mangle]
 pub unsafe extern "C" fn yerba_yerbafile_find(directory: *const c_char) -> *mut c_char {
   let start = if directory.is_null() {
     std::env::current_dir().ok()

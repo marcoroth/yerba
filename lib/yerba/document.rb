@@ -92,6 +92,17 @@ module Yerba
       self
     end
 
+    def valid?(schema, selector: nil)
+      errors = validate(schema, selector: selector)
+      errors.empty?
+    end
+
+    def validate(schema, selector: nil)
+      schema_json = schema.is_a?(String) ? schema : JSON.generate(schema)
+
+      validate_schema(schema_json, selector)
+    end
+
     def inspect
       if path
         "#<Yerba::Document path=#{path.inspect}>"

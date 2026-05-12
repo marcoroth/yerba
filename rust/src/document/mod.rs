@@ -2,6 +2,7 @@ mod condition;
 mod delete;
 mod get;
 mod insert;
+mod schema;
 mod set;
 mod sort;
 mod style;

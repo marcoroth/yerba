@@ -12,6 +12,7 @@ pub mod move_key;
 pub mod quote_style;
 pub mod remove;
 pub mod rename;
+pub mod schema;
 pub mod selectors;
 pub mod set;
 pub mod sort;
@@ -159,6 +160,7 @@ pub enum Command {
   BlankLines(blank_lines::Args),
   Directives(directives::Args),
   Unique(unique::Args),
+  Schema(schema::Args),
   Selectors(selectors::Args),
   #[command(about = "Create a new Yerbafile in the current directory")]
   Init,
@@ -187,6 +189,7 @@ impl Command {
       Command::BlankLines(args) => args.run(),
       Command::Directives(args) => args.run(),
       Command::Unique(args) => args.run(),
+      Command::Schema(args) => args.run(),
       Command::Selectors(args) => args.run(),
       Command::Init => init::run(),
       Command::Apply(args) => args.run(),

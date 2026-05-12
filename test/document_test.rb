@@ -1073,4 +1073,101 @@ class DocumentTest < Minitest::Spec
 
     assert_equal [], results
   end
+
+  test "document.valid? returns true for valid document" do
+    schema = {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+    }
+
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    assert document.valid?(schema)
+  end
+
+  test "document.valid? returns false for invalid document" do
+    schema = {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+    }
+
+    document = Yerba::Document.parse(<<~YAML)
+      slug: alice
+    YAML
+
+    refute document.valid?(schema)
+  end
+
+  test "document.validate returns errors with details" do
+    schema = {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+      },
+      required: ["name", "slug"],
+    }
+
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        slug: alice
+      - name: Bob
+    YAML
+
+    errors = document.validate(schema, selector: "[]")
+
+    assert_equal 1, errors.length
+    assert_equal "Bob", errors[0]["item_label"]
+    assert_includes errors[0]["message"], "slug"
+    assert_equal "/1", errors[0]["path"]
+    assert_equal 3, errors[0]["line"]
+  end
+
+  test "document.validate accepts JSON string schema" do
+    schema_json = '{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}'
+
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    assert_equal [], document.validate(schema_json)
+  end
+
+  test "document.validate with selector validates each item" do
+    schema = {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+      additionalProperties: false,
+    }
+
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        extra: bad
+    YAML
+
+    errors = document.validate(schema, selector: "[]")
+
+    assert_equal 1, errors.length
+    assert_includes errors[0]["message"], "extra"
+  end
+
+  test "document.valid? with empty array returns true" do
+    schema = {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+    }
+
+    document = Yerba::Document.parse(<<~YAML)
+      ---
+      []
+    YAML
+
+    assert document.valid?(schema, selector: "[]")
+  end
 end

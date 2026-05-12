@@ -429,7 +429,7 @@ impl Document {
   }
 }
 
-fn node_selector(node: &SyntaxNode) -> String {
+pub(crate) fn node_selector(node: &SyntaxNode) -> String {
   let mut parts: Vec<String> = Vec::new();
   let mut current = node.clone();
 

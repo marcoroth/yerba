@@ -993,6 +993,63 @@ fn test_resolve_selectors_missing_field_skipped() {
 }
 
 #[test]
+fn test_filter_with_selectors() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      kind: keynote
+      title: Opening
+    - id: talk-2
+      kind: talk
+      title: Regular Talk
+    - id: talk-3
+      kind: keynote
+      title: Closing
+  "});
+
+  let results = document.filter_with_selectors("[]", ".kind == keynote");
+
+  assert_eq!(results.len(), 2);
+  assert_eq!(results[0].1, "[0]");
+  assert_eq!(results[1].1, "[2]");
+
+  if let serde_yaml::Value::Mapping(m) = &results[0].0 {
+    assert_eq!(m.get("title"), Some(&serde_yaml::Value::String("Opening".to_string())));
+  } else {
+    panic!("Expected Mapping");
+  }
+}
+
+#[test]
+fn test_filter_with_selectors_no_matches() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      kind: talk
+    - id: talk-2
+      kind: talk
+  "});
+
+  let results = document.filter_with_selectors("[]", ".kind == keynote");
+
+  assert!(results.is_empty());
+}
+
+#[test]
+fn test_filter_with_selectors_all_match() {
+  let document = parse(indoc! {"
+    - id: talk-1
+      kind: keynote
+    - id: talk-2
+      kind: keynote
+  "});
+
+  let results = document.filter_with_selectors("[]", ".kind == keynote");
+
+  assert_eq!(results.len(), 2);
+  assert_eq!(results[0].1, "[0]");
+  assert_eq!(results[1].1, "[1]");
+}
+
+#[test]
 fn test_get_all_located_returns_values_with_lines() {
   let document = parse(indoc! {"
     - id: a

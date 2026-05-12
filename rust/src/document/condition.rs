@@ -10,6 +10,15 @@ impl Document {
       .collect()
   }
 
+  pub fn filter_with_selectors(&self, dot_path: &str, condition: &str) -> Vec<(serde_yaml::Value, String)> {
+    self
+      .navigate_all_compact(dot_path)
+      .iter()
+      .filter(|node| self.evaluate_condition_on_node(node, condition))
+      .map(|node| (node_to_yaml_value(node), super::get::node_selector(node)))
+      .collect()
+  }
+
   pub(super) fn evaluate_condition_on_node(&self, node: &SyntaxNode, condition: &str) -> bool {
     let condition = condition.trim();
 

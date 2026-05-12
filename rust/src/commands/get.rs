@@ -112,16 +112,27 @@ impl Args {
         }
       }
 
-      let values: Vec<serde_yaml::Value> = if let Some(condition) = &normalized_condition {
-        document.filter(&search_path_string, condition)
+      let (values, selectors): (Vec<serde_yaml::Value>, Vec<String>) = if select_fields.is_some() {
+        if let Some(condition) = &normalized_condition {
+          let pairs = document.filter_with_selectors(&search_path_string, condition);
+          pairs.into_iter().unzip()
+        } else {
+          let selectors = document.resolve_selectors(&search_path_string);
+          let values = document.get_values(&search_path_string);
+          let values: Vec<_> = values.into_iter().filter(|v| !v.is_null()).collect();
+
+          (values, selectors)
+        }
+      } else if let Some(condition) = &normalized_condition {
+        (document.filter(&search_path_string, condition), Vec::new())
       } else {
-        document.get_values(&search_path_string)
+        (document.get_values(&search_path_string), Vec::new())
       };
 
-      for value in values {
+      for (index, value) in values.iter().enumerate() {
         if let Some(field) = &extract_field {
           let field_string = field.to_selector_string();
-          let json_value = yerba::json::resolve_select_field(&value, &field_string);
+          let json_value = yerba::json::resolve_select_field(value, &field_string);
 
           if field.ends_with_bracket() {
             if let serde_json::Value::Array(items) = json_value {
@@ -139,8 +150,12 @@ impl Args {
 
           result.insert("__file".to_string(), serde_json::Value::String(resolved_file.clone()));
 
+          if let Some(selector) = selectors.get(index) {
+            result.insert("__selector".to_string(), serde_json::Value::String(selector.clone()));
+          }
+
           for field in fields {
-            let json_value = yerba::json::resolve_select_field(&value, field);
+            let json_value = yerba::json::resolve_select_field(value, field);
             let json_key = yerba::json::select_field_key(field);
 
             result.insert(json_key, json_value);
@@ -151,7 +166,7 @@ impl Args {
           continue;
         }
 
-        all_results.push(yerba::json::yaml_to_json(&value));
+        all_results.push(yerba::json::yaml_to_json(value));
       }
     }
 

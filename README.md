@@ -756,6 +756,32 @@ collection.apply! do |document|
 end
 ```
 
+Use `Collection.get` to retrieve nodes across all matching files in parallel. Returns `Scalar`, `Map`, or `Sequence` objects with `file_path`, `line`, and `selector`:
+
+```ruby
+speakers = Yerba::Collection.get("data/**/videos.yml", "[].speakers[]")
+
+speakers.each do |scalar|
+  puts "#{scalar.value} in #{scalar.file_path}:#{scalar.line}"
+end
+
+maps = Yerba::Collection.get("data/**/videos.yml", "[]")
+maps.first.class
+# => Yerba::Map
+
+sequences = Yerba::Collection.get("data/**/videos.yml", "[].speakers")
+sequences.first.class
+# => Yerba::Sequence
+```
+
+Nodes returned by `Collection.get` lazily load their `Document` on first mutation, so reads are fast and writes work transparently:
+
+```ruby
+scalars = Yerba::Collection.get("data/**/videos.yml", "[].title")
+scalars.first.value = "New Title"
+scalars.first.document.save!
+```
+
 ### Saving
 
 Write changes back to the original file:

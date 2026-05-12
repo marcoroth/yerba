@@ -261,4 +261,109 @@ class MapTest < Minitest::Spec
     assert_includes document.to_s, '"Rust"'
     assert_includes document.to_s, "2015"
   end
+
+  test "Map.new standalone with kwargs" do
+    map = Yerba::Map.new(name: "Alice", age: 30)
+
+    assert_equal "Alice", map[:name]
+    assert_equal 30, map[:age]
+    assert_nil map.selector
+    assert_nil map.file_path
+    refute map.connected?
+  end
+
+  test "Map.new standalone with hash" do
+    map = Yerba::Map.new({ "name" => "Alice" })
+
+    assert_equal "Alice", map["name"]
+    refute map.connected?
+  end
+
+  test "Map.from creates map with metadata" do
+    map = Yerba::Map.from(
+      file_path: "/tmp/test.yml",
+      selector: "[0]",
+      line: 1
+    )
+
+    assert_equal "/tmp/test.yml", map.file_path
+    assert_equal "[0]", map.selector
+    assert_equal 1, map.line
+    assert map.connected?
+  end
+
+  test "Map.from_document creates connected map" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
+
+    map = document["database"]
+
+    assert_instance_of Yerba::Map, map
+    assert_equal "database", map.selector
+    assert_equal "localhost", map["host"].value
+    assert map.connected?
+  end
+
+  test "Map.from_document has location" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
+
+    map = document["database"]
+
+    assert map.location
+    assert map.line
+  end
+
+  test "Map.from lazily loads document on read" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("- id: talk-1\n  title: First\n")
+    file.close
+
+    map = Yerba::Map.from(file_path: file.path, selector: "[0]")
+
+    assert_nil map.instance_variable_get(:@document)
+    assert_equal "talk-1", map["id"].value
+    refute_nil map.document
+  ensure
+    file&.unlink
+    Yerba::Document.clear_cache!
+  end
+
+  test "Map.from lazily loads document on mutation" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("- id: talk-1\n  title: First\n")
+    file.close
+
+    map = Yerba::Map.from(file_path: file.path, selector: "[0]")
+    map["title"] = "Updated"
+
+    assert_equal <<~YAML, map.document.to_s
+      - id: talk-1
+        title: Updated
+    YAML
+  ensure
+    file&.unlink
+    Yerba::Document.clear_cache!
+  end
+
+  test "Map.from shares document with scalars from same file" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("- id: talk-1\n  title: First\n")
+    file.close
+
+    map = Yerba::Map.from(file_path: file.path, selector: "[0]")
+    scalar = Yerba::Scalar.from(file_path: file.path, selector: "[0].title")
+
+    map["id"]
+    scalar.value
+
+    assert_same map.document, scalar.document
+  ensure
+    file&.unlink
+    Yerba::Document.clear_cache!
+  end
 end

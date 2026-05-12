@@ -23,18 +23,176 @@ class CollectionTest < Minitest::Spec
     assert_equal 3, paths.length
   end
 
-  test "get with non-array path returns array of values from each file" do
+  test "get returns Scalar objects with value, file_path, line, and selector" do
     collection = Yerba.files(File.join(@dir, "[ab].yml"))
     result = collection.get("name")
 
-    assert_equal ["Alpha", "Beta"], result
+    assert_equal 2, result.length
+    assert_instance_of Yerba::Scalar, result.first
+
+    values = result.map(&:value).sort
+    assert_equal ["Alpha", "Beta"], values
+
+    result.each do |scalar|
+      assert scalar.file_path
+      assert scalar.line
+      assert_equal "name", scalar.selector
+    end
   end
 
-  test "get with array path returns flat array from all files" do
+  test "get with wildcard returns Scalars with resolved selectors" do
     collection = Yerba.files(File.join(@dir, "c.yml"))
     result = collection.get("items[].name")
 
-    assert_equal ["One", "Two"], result
+    values = result.map(&:value)
+    assert_equal ["One", "Two"], values
+
+    selectors = result.map(&:selector)
+    assert_equal ["items[0].name", "items[1].name"], selectors
+  end
+
+  test "get with nested wildcards returns correct selectors" do
+    File.write(File.join(@dir, "nested.yml"), <<~YAML)
+      - id: video-1
+        speakers:
+          - Alice
+          - Bob
+      - id: video-2
+        speakers:
+          - Charlie
+    YAML
+
+    result = Yerba::Collection.get(File.join(@dir, "nested.yml"), "[].speakers[]")
+
+    assert_equal 3, result.length
+
+    assert_equal "Alice", result[0].value
+    assert_equal "[0].speakers[0]", result[0].selector
+
+    assert_equal "Bob", result[1].value
+    assert_equal "[0].speakers[1]", result[1].selector
+
+    assert_equal "Charlie", result[2].value
+    assert_equal "[1].speakers[0]", result[2].selector
+  end
+
+  test "get includes file_path for each result" do
+    result = Yerba::Collection.get(File.join(@dir, "[ab].yml"), "name")
+
+    file_paths = result.map(&:file_path).sort
+    assert_equal [File.join(@dir, "a.yml"), File.join(@dir, "b.yml")], file_paths
+  end
+
+  test "get includes line numbers" do
+    File.write(File.join(@dir, "lines.yml"), <<~YAML)
+      host: localhost
+      port: 5432
+    YAML
+
+    result = Yerba::Collection.get(File.join(@dir, "lines.yml"), "port")
+
+    assert_equal 1, result.length
+    assert_equal 5432, result[0].value
+    assert_equal 2, result[0].line
+  end
+
+  test "get returns Map objects for map selectors" do
+    collection = Yerba.files(File.join(@dir, "c.yml"))
+    result = collection.get("items[]")
+
+    assert_equal 2, result.length
+    assert_instance_of Yerba::Map, result.first
+    assert_equal "One", result[0]["name"].value
+    assert_equal "Two", result[1]["name"].value
+  end
+
+  test "get returns Map objects with file_path, line, and selector" do
+    collection = Yerba.files(File.join(@dir, "c.yml"))
+    result = collection.get("items[]")
+
+    assert_equal File.join(@dir, "c.yml"), result[0].file_path
+    assert_equal "items[0]", result[0].selector
+    assert result[0].line
+  end
+
+  test "get returns Sequence objects for sequence selectors" do
+    File.write(File.join(@dir, "talks.yml"), <<~YAML)
+      - id: talk-1
+        speakers:
+          - Alice
+          - Bob
+      - id: talk-2
+        speakers:
+          - Charlie
+    YAML
+
+    result = Yerba::Collection.get(File.join(@dir, "talks.yml"), "[].speakers")
+
+    assert_equal 2, result.length
+    assert_instance_of Yerba::Sequence, result.first
+    assert_equal "[0].speakers", result[0].selector
+    assert_equal "[1].speakers", result[1].selector
+  end
+
+  test "get returns consistent types across glob" do
+    File.write(File.join(@dir, "d.yml"), <<~YAML)
+      - id: talk-1
+        title: First
+      - id: talk-2
+        title: Second
+    YAML
+    File.write(File.join(@dir, "e.yml"), <<~YAML)
+      - id: talk-3
+        title: Third
+    YAML
+
+    maps = Yerba::Collection.get(File.join(@dir, "[de].yml"), "[]")
+    assert(maps.all?(Yerba::Map))
+    assert_equal 3, maps.length
+
+    scalars = Yerba::Collection.get(File.join(@dir, "[de].yml"), "[].title")
+    assert(scalars.all?(Yerba::Scalar))
+    assert_equal ["First", "Second", "Third"], scalars.map(&:value)
+  end
+
+  test "get maps have correct file_path across glob" do
+    File.write(File.join(@dir, "d.yml"), "- id: d1\n")
+    File.write(File.join(@dir, "e.yml"), "- id: e1\n")
+
+    result = Yerba::Collection.get(File.join(@dir, "[de].yml"), "[]")
+
+    file_paths = result.map(&:file_path).sort
+    assert_equal [File.join(@dir, "d.yml"), File.join(@dir, "e.yml")], file_paths
+  end
+
+  test "get on non-array root returns scalar" do
+    result = Yerba::Collection.get(File.join(@dir, "[ab].yml"), "port")
+
+    assert_equal 2, result.length
+    assert(result.all?(Yerba::Scalar))
+
+    values = result.map(&:value).sort
+    assert_equal [1000, 2000], values
+  end
+
+  test "get returns empty array for non-matching selector" do
+    result = Yerba::Collection.get(File.join(@dir, "a.yml"), "nonexistent")
+
+    assert_equal [], result
+  end
+
+  test "get returns empty array for non-matching glob" do
+    result = Yerba::Collection.get(File.join(@dir, "zzz*.yml"), "name")
+
+    assert_equal [], result
+  end
+
+  test "get with wildcard returns flat results from all files" do
+    collection = Yerba.files(File.join(@dir, "c.yml"))
+    result = collection.get("items[].name")
+
+    values = result.map(&:value)
+    assert_equal ["One", "Two"], values
   end
 
   test "find returns items across files" do

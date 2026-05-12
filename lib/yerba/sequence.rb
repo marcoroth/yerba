@@ -3,50 +3,35 @@
 module Yerba
   class Sequence
     include Enumerable
+    include Node
 
-    attr_reader :selector, :location, :key
+    def initialize(array = nil)
+      init_node(nil, nil, nil, nil, nil, nil)
 
-    def initialize(document_or_array = nil, selector = nil, location = nil, key = nil)
-      if document_or_array.is_a?(Document)
-        @document = document_or_array
-        @selector = selector
-        @location = location
-        @key = key
-        @data = nil
-      elsif document_or_array.is_a?(Array)
-        @document = nil
-        @selector = nil
-        @location = nil
-        @data = document_or_array
-      else
-        @document = nil
-        @selector = nil
-        @location = nil
-        @data = []
-      end
+      @data = array.is_a?(Array) ? array : []
     end
 
     def [](index)
-      if @document
+      if connected?
         new_path = "#{@selector}[#{index}]"
-        @document[new_path]
+        document[new_path]
       else
         @data[index]
       end
     end
 
     def <<(item)
-      if @document
+      if connected?
         case item
         when Map
-          @document.insert_object(@selector, item.to_hash)
+          document.insert_object(@selector, item.to_hash)
         when Hash
-          @document.insert_object(@selector, item)
+          document.insert_object(@selector, item)
         when Scalar
-          @document.insert(@selector, item.to_yaml)
+          document.insert(@selector, item.to_yaml)
         else
           formatted = format_for_insert(item.to_s)
-          @document.insert(@selector, formatted)
+          document.insert(@selector, formatted)
         end
       else
         @data << item
@@ -56,7 +41,7 @@ module Yerba
     end
 
     def concat(items)
-      if @document
+      if connected?
         hashes = items.map do |item|
           case item
           when Map then item.to_hash
@@ -65,7 +50,7 @@ module Yerba
           end
         end
 
-        @document.insert_objects(@selector, hashes)
+        document.insert_objects(@selector, hashes)
       else
         @data.concat(items)
       end
@@ -90,9 +75,9 @@ module Yerba
     end
 
     def pluck(*fields)
-      return [] unless @document
+      return [] unless connected?
 
-      all_values = @document.get_value(@selector)
+      all_values = document.get_value(@selector)
       return [] unless all_values.is_a?(Array)
 
       if fields.length == 1
@@ -106,11 +91,11 @@ module Yerba
 
     def index_of(selector = nil, value = nil, **criteria)
       if selector && value.nil? && criteria.empty?
-        values = @document&.get("#{@selector}[]")
+        all_values = document&.get_value(@selector)
 
-        return values.index(selector) if values.is_a?(Array)
+        return nil unless all_values.is_a?(Array)
 
-        return nil
+        return all_values.index(selector.to_s)
       end
 
       criteria[selector] = value if selector && value
@@ -124,11 +109,16 @@ module Yerba
         if field_string.include?("[]")
           matching = nested_indices_for(field_string, expected)
         else
-          values = @document&.get("#{@selector}[].#{field_string}")
+          all_values = document&.get_value(@selector)
 
-          next unless values.is_a?(Array)
+          next unless all_values.is_a?(Array)
 
-          matching = values.each_with_index.filter_map { |actual, index| index if actual == expected }
+          matching = all_values.each_with_index.filter_map do |item, index|
+            next unless item.is_a?(Hash)
+
+            actual = dig_into(item, field_string)
+            index if actual.to_s == expected.to_s
+          end
         end
 
         indices = indices ? indices & matching : matching
@@ -139,10 +129,10 @@ module Yerba
 
     def indices_of(selector = nil, value = nil, **criteria)
       if selector && value.nil? && criteria.empty?
-        values = @document&.get("#{@selector}[]")
+        all_values = document&.get_value(@selector)
 
-        if values.is_a?(Array)
-          return values.each_with_index.filter_map { |actual, index| index if actual == selector }
+        if all_values.is_a?(Array)
+          return all_values.each_with_index.filter_map { |actual, index| index if actual.to_s == selector.to_s }
         end
 
         return []
@@ -159,11 +149,16 @@ module Yerba
         if field_string.include?("[]")
           matching = nested_indices_for(field_string, expected)
         else
-          values = @document&.get("#{@selector}[].#{field_string}")
+          all_values = document&.get_value(@selector)
 
-          next unless values.is_a?(Array)
+          next unless all_values.is_a?(Array)
 
-          matching = values.each_with_index.filter_map { |actual, index| index if actual == expected }
+          matching = all_values.each_with_index.filter_map do |item, index|
+            next unless item.is_a?(Hash)
+
+            actual = dig_into(item, field_string)
+            index if actual.to_s == expected.to_s
+          end
         end
 
         indices = indices ? indices & matching : matching
@@ -173,13 +168,13 @@ module Yerba
     end
 
     def length
-      if @document
-        scalar_items = @document.get("#{@selector}[]")
+      if connected?
+        scalar_items = document.get("#{@selector}[]")
 
         if scalar_items.is_a?(Array) && !scalar_items.empty?
           scalar_items.length
         else
-          data = @document.get_value(@selector)
+          data = document.get_value(@selector)
 
           data.is_a?(Array) ? data.length : 0
         end
@@ -198,13 +193,13 @@ module Yerba
     end
 
     def remove(value)
-      @document&.remove(@selector, value.to_s)
+      document&.remove(@selector, value.to_s)
 
       self
     end
 
     def delete_at(index)
-      @document&.remove_at(@selector, index)
+      document&.remove_at(@selector, index)
 
       self
     end
@@ -219,20 +214,20 @@ module Yerba
       end
 
       indices_to_remove.reverse_each do |index|
-        @document&.remove_at(@selector, index)
+        document&.remove_at(@selector, index)
       end
 
       self
     end
 
     def sort(by: nil, case_sensitive: false)
-      @document&.sort(@selector, by: by, case_sensitive: case_sensitive)
+      document&.sort(@selector, by: by, case_sensitive: case_sensitive)
 
       self
     end
 
     def delete
-      @document&.delete(@selector)
+      document&.delete(@selector)
     end
 
     def value
@@ -267,6 +262,12 @@ module Yerba
     end
 
     private
+
+    def dig_into(hash, path)
+      keys = path.split(".")
+
+      keys.reduce(hash) { |current, key| current.is_a?(Hash) ? current[key] : nil }
+    end
 
     def expand_nested_criteria(criteria)
       expanded = []
@@ -305,7 +306,7 @@ module Yerba
     end
 
     def nested_indices_for(field, expected)
-      all_values = @document&.get_value(@selector)
+      all_values = document&.get_value(@selector)
       return [] unless all_values.is_a?(Array)
 
       all_values.each_with_index.filter_map do |item, index|
@@ -346,17 +347,17 @@ module Yerba
     end
 
     def detect_quote_style
-      @document.get_quote_style("#{@selector}[0]")
+      document.get_quote_style("#{@selector}[0]")
     end
 
     def items
-      if @document
-        result = @document.get("#{@selector}[]")
+      if connected?
+        result = document.get("#{@selector}[]")
 
         if result.is_a?(Array) && !result.empty?
           result
         else
-          data = @document.get_value(@selector)
+          data = document.get_value(@selector)
 
           data.is_a?(Array) ? data : []
         end

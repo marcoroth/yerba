@@ -2,42 +2,32 @@
 
 module Yerba
   class Scalar
-    attr_reader :selector, :location, :key
+    include Node
 
-    def initialize(document_or_value, selector_or_opts = nil, value = nil, location = nil, key = nil, quote_style: nil)
-      if document_or_value.is_a?(Document) || document_or_value.nil?
-        @document = document_or_value
-        @selector = selector_or_opts
-        @value = value
-        @location = location
-        @key = key
-        @quote_style = quote_style
-      else
-        @document = nil
-        @selector = nil
-        @value = document_or_value
-        @location = nil
-        @key = nil
-        @quote_style = selector_or_opts.is_a?(Hash) ? selector_or_opts[:quote_style] : quote_style
-      end
+    def initialize(value = nil, quote_style: nil)
+      init_node(nil, nil, nil, nil, nil, nil)
+
+      @value = value
+      @quote_style = quote_style
     end
 
     def value
-      @value ||= @document&.get(@selector)
+      @value ||= document&.get(@selector)
     end
 
     def quote_style
-      @quote_style || @document&.get_quote_style(@selector)
+      @quote_style || document&.get_quote_style(@selector)
     end
 
     def quote_style=(style)
-      @document&.set_quote_style(@selector, style)
+      document&.set_quote_style(@selector, style)
 
       @quote_style = style
     end
 
     def value=(new_value)
-      @document&.set(@selector, new_value)
+      document&.set(@selector, new_value)
+
       @value = new_value
     end
     alias set value=
@@ -71,7 +61,7 @@ module Yerba
     end
 
     def delete
-      @document&.delete(@selector)
+      document&.delete(@selector)
     end
 
     def inspect
@@ -80,6 +70,13 @@ module Yerba
       else
         "#<Yerba::Scalar value=#{value.inspect} quote_style=#{quote_style.inspect}>"
       end
+    end
+
+    private
+
+    def init_from(value: nil, quote_style: nil, **)
+      @value = value
+      @quote_style = quote_style
     end
   end
 end

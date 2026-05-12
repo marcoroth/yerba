@@ -310,6 +310,17 @@ pub unsafe extern "C" fn yerba_document_get_values(document: *const Document, pa
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_resolve_selectors(document: *const Document, path: *const c_char) -> *mut c_char {
+  let document = &*document;
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  let selectors = document.resolve_selectors(selector_string);
+  let json_string = serde_json::to_string(&selectors).unwrap_or_else(|_| "[]".to_string());
+
+  CString::new(json_string).unwrap_or_default().into_raw()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_get_quote_style(document: *const Document, path: *const c_char) -> *mut c_char {
   let document = &*document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
@@ -716,11 +727,31 @@ pub unsafe extern "C" fn yerba_get_result_free(result: YerbaGetResult) {
 pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *const c_char) -> YerbaTypedList {
   let pattern = CStr::from_ptr(glob_pattern).to_str().unwrap_or("");
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
-  let scalars = crate::glob_get(pattern, selector_string);
+  let nodes = crate::glob_get(pattern, selector_string);
 
-  let results: Vec<serde_json::Value> = scalars
+  let results: Vec<serde_json::Value> = nodes
     .iter()
-    .map(|scalar| serde_json::json!({"text": scalar.text, "type": detect_yaml_type(scalar) as u8}))
+    .map(|node| {
+      let mut value = serde_json::json!({
+        "node_type": node.node_type,
+        "selector": node.selector,
+        "line": node.line,
+      });
+
+      if let Some(file_path) = &node.file_path {
+        value["file_path"] = serde_json::json!(file_path);
+      }
+
+      if let Some(text) = &node.text {
+        value["text"] = serde_json::json!(text);
+      }
+
+      if let Some(vt) = node.value_type {
+        value["type"] = serde_json::json!(vt as u8);
+      }
+
+      value
+    })
     .collect();
 
   let length = results.len();

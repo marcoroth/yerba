@@ -3,51 +3,41 @@
 module Yerba
   class Map
     include Enumerable
+    include Node
 
-    attr_reader :selector, :location, :key
+    def initialize(hash = nil, **data)
+      init_node(nil, nil, nil, nil, nil, nil)
 
-    def initialize(document_or_hash = nil, selector = nil, location = nil, key = nil)
-      if document_or_hash.is_a?(Document)
-        @document = document_or_hash
-        @selector = selector
-        @location = location
-        @key = key
-        @data = nil
-      elsif document_or_hash.is_a?(Hash)
-        @document = nil
-        @selector = nil
-        @location = nil
-        @data = document_or_hash
-      else
-        @document = nil
-        @selector = nil
-        @location = nil
-        @data = {}
-      end
+      @data = if hash.is_a?(Hash)
+                hash
+              else
+                (data.empty? ? {} : data)
+              end
     end
 
     def [](key)
-      if @document
+      if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
-        @document[new_path]
+        document[new_path]
       else
         @data[key]
       end
     end
 
     def []=(key, value)
-      if @document
+      if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
-        @document.set(new_path, value)
+        document.set(new_path, value)
       else
         @data[key] = value
       end
     end
 
     def insert(key, value, before: nil, after: nil)
-      if @document
+      if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
-        @document.insert(new_path, value.to_s, before: before, after: after)
+
+        document.insert(new_path, value.to_s, before: before, after: after)
       else
         @data[key] = value
       end
@@ -56,14 +46,14 @@ module Yerba
     end
 
     def sort_keys(order)
-      @document&.sort_keys(@selector, order)
+      document&.sort_keys(@selector, order)
 
       self
     end
 
     def keys
-      if @document
-        results = @document.find(@selector)
+      if connected?
+        results = document.find(@selector)
         return [] unless results.is_a?(Array) && results.first.is_a?(Hash)
 
         results.first.keys
@@ -75,7 +65,7 @@ module Yerba
     def each(&)
       return enum_for(:each) unless block_given?
 
-      if @document
+      if connected?
         keys.each { |key| yield key, self[key] }
       else
         @data.each(&)
@@ -83,7 +73,7 @@ module Yerba
     end
 
     def dig(*keys)
-      if @document
+      if connected?
         result = keys.reduce(self) { |node, key| node.nil? ? nil : node[key] }
         result&.value
       else
@@ -92,11 +82,11 @@ module Yerba
     end
 
     def delete(key = nil)
-      if key && @document
+      if key && connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
-        @document.delete(new_path)
-      elsif @document
-        @document.delete(@selector)
+        document.delete(new_path)
+      elsif connected?
+        document.delete(@selector)
       else
         @data.delete(key)
       end
@@ -105,9 +95,9 @@ module Yerba
     end
 
     def key?(key)
-      if @document
+      if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
-        @document.exists?(new_path)
+        document.exists?(new_path)
       else
         @data.key?(key)
       end
@@ -120,8 +110,8 @@ module Yerba
     end
 
     def to_h
-      if @document
-        results = @document.find(@selector)
+      if connected?
+        results = document.find(@selector)
         results&.first || {}
       else
         @data
@@ -137,8 +127,8 @@ module Yerba
     end
 
     def inspect
-      if @document
-        results = @document.find(@selector)
+      if connected?
+        results = document.find(@selector)
 
         if results.is_a?(Array) && !results.empty? && results.first.is_a?(Hash)
           map_keys = results.first.keys.first(5)

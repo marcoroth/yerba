@@ -45,6 +45,59 @@ impl Document {
       .collect()
   }
 
+  pub fn resolve_selectors(&self, dot_path: &str) -> Vec<String> {
+    self.navigate_all(dot_path).iter().map(node_selector).collect()
+  }
+
+  pub fn get_all_located(&self, dot_path: &str) -> Vec<LocatedNode> {
+    let source = self.root.text().to_string();
+    let file_path = self.path.as_ref().map(|p| p.to_string_lossy().to_string());
+
+    self
+      .navigate_all(dot_path)
+      .iter()
+      .map(|node| {
+        let offset: usize = node.text_range().start().into();
+        let line = source[..offset].matches('\n').count() + 1;
+        let selector = node_selector(node);
+        let is_scalar = !node
+          .descendants()
+          .any(|child| child.kind() == SyntaxKind::BLOCK_MAP || child.kind() == SyntaxKind::BLOCK_SEQ);
+
+        let (text, value_type) = if is_scalar {
+          extract_scalar(node)
+            .map(|s| (Some(s.text.clone()), Some(crate::syntax::detect_yaml_type(&s))))
+            .unwrap_or((None, None))
+        } else {
+          (None, None)
+        };
+
+        let node_type = if is_scalar {
+          "scalar"
+        } else {
+          let map_pos = node.descendants().find_map(BlockMap::cast).map(|m| m.syntax().text_range().start());
+          let seq_pos = node.descendants().find_map(BlockSeq::cast).map(|s| s.syntax().text_range().start());
+
+          match (map_pos, seq_pos) {
+            (Some(m), Some(s)) if s < m => "sequence",
+            (Some(_), _) => "map",
+            (None, Some(_)) => "sequence",
+            _ => "map",
+          }
+        };
+
+        LocatedNode {
+          node_type: node_type.to_string(),
+          text,
+          value_type,
+          file_path: file_path.clone(),
+          selector,
+          line,
+        }
+      })
+      .collect()
+  }
+
   pub fn node_type(&self, dot_path: &str) -> NodeType {
     match self.navigate(dot_path) {
       Ok(node) => {
@@ -259,4 +312,67 @@ impl Document {
 
     None
   }
+}
+
+fn node_selector(node: &SyntaxNode) -> String {
+  let mut parts: Vec<String> = Vec::new();
+  let mut current = node.clone();
+
+  if current.kind() == SyntaxKind::BLOCK_SEQ_ENTRY {
+    if let Some(parent) = current.parent() {
+      let index = parent
+        .children()
+        .filter(|child| child.kind() == SyntaxKind::BLOCK_SEQ_ENTRY)
+        .position(|child| child == current)
+        .unwrap_or(0);
+
+      parts.push(format!("[{}]", index));
+    }
+  }
+
+  loop {
+    let parent = match current.parent() {
+      Some(parent) => parent,
+      None => break,
+    };
+
+    match parent.kind() {
+      SyntaxKind::BLOCK_SEQ_ENTRY => {
+        if let Some(grandparent) = parent.parent() {
+          let index = grandparent
+            .children()
+            .filter(|child| child.kind() == SyntaxKind::BLOCK_SEQ_ENTRY)
+            .position(|child| child == parent)
+            .unwrap_or(0);
+
+          parts.push(format!("[{}]", index));
+        }
+      }
+
+      SyntaxKind::BLOCK_MAP_ENTRY => {
+        if let Some(key_node) = parent.children().find(|child| child.kind() == SyntaxKind::BLOCK_MAP_KEY) {
+          if let Some(key_text) = extract_scalar_text(&key_node) {
+            parts.push(key_text);
+          }
+        }
+      }
+
+      _ => {}
+    }
+
+    current = parent;
+  }
+
+  parts.reverse();
+  let mut result = String::new();
+
+  for part in &parts {
+    if !part.starts_with('[') && !result.is_empty() {
+      result.push('.');
+    }
+
+    result.push_str(part);
+  }
+
+  result
 }

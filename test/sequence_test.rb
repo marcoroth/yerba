@@ -805,6 +805,83 @@ class SequenceTest < Minitest::Spec
     assert_equal "talk-2", result["id"].value
   end
 
+  test "find_by skips items missing the field" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+      - name: Bob
+        twitter: bob_dev
+      - name: Charlie
+        twitter: charlie_dev
+    YAML
+
+    result = document.root.find_by(twitter: "charlie_dev")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "Charlie", result["name"].value
+    assert_equal "[2]", result.selector
+  end
+
+  test "find_by returns correct index when most items lack the field" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+      - name: Bob
+      - name: Charlie
+      - name: Diana
+        github: diana
+      - name: Eve
+    YAML
+
+    result = document.root.find_by(github: "diana")
+
+    assert_instance_of Yerba::Map, result
+    assert_equal "Diana", result["name"].value
+    assert_equal "[3]", result.selector
+  end
+
+  test "find_by returns nil when no items have the field value" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+      - name: Bob
+        twitter: bob_dev
+    YAML
+
+    result = document.root.find_by(twitter: "nonexistent")
+
+    assert_nil result
+  end
+
+  test "where skips items missing the field" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        role: admin
+      - name: Bob
+      - name: Charlie
+        role: admin
+      - name: Diana
+        role: user
+    YAML
+
+    results = document.root.where(role: "admin")
+
+    assert_equal 2, results.length
+    assert_equal "Alice", results[0]["name"].value
+    assert_equal "Charlie", results[1]["name"].value
+    assert_equal "[0]", results[0].selector
+    assert_equal "[2]", results[1].selector
+  end
+
+  test "index_of with missing fields returns correct index" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+      - name: Bob
+        github: bob
+      - name: Charlie
+        github: charlie
+    YAML
+
+    assert_equal 2, document.root.index_of(:github, "charlie")
+  end
+
   test "sequence entry with nested sequence returns Map" do
     document = Yerba::Document.parse(<<~YAML)
       - id: talk-1
@@ -855,5 +932,107 @@ class SequenceTest < Minitest::Spec
     assert_equal 0, document["tags"].index_of("ruby")
     assert_equal 2, document["tags"].index_of("go")
     assert_nil document["tags"].index_of("python")
+  end
+
+  test "Sequence.new standalone with array" do
+    seq = Yerba::Sequence.new(["a", "b", "c"])
+
+    assert_equal "a", seq[0]
+    assert_equal 3, seq.length
+    assert_nil seq.selector
+    assert_nil seq.file_path
+    refute seq.connected?
+  end
+
+  test "Sequence.new standalone empty" do
+    seq = Yerba::Sequence.new
+
+    assert_equal 0, seq.length
+    refute seq.connected?
+  end
+
+  test "Sequence.from creates sequence with metadata" do
+    seq = Yerba::Sequence.from(
+      file_path: "/tmp/test.yml",
+      selector: "[0].speakers",
+      line: 3
+    )
+
+    assert_equal "/tmp/test.yml", seq.file_path
+    assert_equal "[0].speakers", seq.selector
+    assert_equal 3, seq.line
+    assert seq.connected?
+  end
+
+  test "Sequence.from_document creates connected sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+    YAML
+
+    seq = document["tags"]
+
+    assert_instance_of Yerba::Sequence, seq
+    assert_equal "tags", seq.selector
+    assert_equal 2, seq.length
+    assert seq.connected?
+  end
+
+  test "Sequence.from_document has location" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+    YAML
+
+    seq = document["tags"]
+
+    assert seq.location
+    assert seq.line
+  end
+
+  test "Sequence.from lazily loads document on read" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("tags:\n  - ruby\n  - rust\n")
+    file.close
+
+    seq = Yerba::Sequence.from(file_path: file.path, selector: "tags")
+
+    assert_nil seq.instance_variable_get(:@document)
+    assert_equal 2, seq.length
+    refute_nil seq.document
+  ensure
+    file&.unlink
+    Yerba::Document.clear_cache!
+  end
+
+  test "Sequence.from lazily loads document on mutation" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("tags:\n  - ruby\n  - rust\n")
+    file.close
+
+    seq = Yerba::Sequence.from(file_path: file.path, selector: "tags")
+    seq << "go"
+
+    assert_includes seq.document.to_s, "- go"
+  ensure
+    file&.unlink
+    Yerba::Document.clear_cache!
+  end
+
+  test "Sequence.from remove lazily loads document" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("tags:\n  - ruby\n  - rust\n  - go\n")
+    file.close
+
+    seq = Yerba::Sequence.from(file_path: file.path, selector: "tags")
+    seq.remove("rust")
+
+    refute_includes seq.document.to_s, "rust"
+    assert_includes seq.document.to_s, "ruby"
+    assert_includes seq.document.to_s, "go"
+  ensure
+    file&.unlink
+    Yerba::Document.clear_cache!
   end
 end

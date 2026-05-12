@@ -70,7 +70,7 @@ impl Args {
     for resolved_file in &files {
       let document = parse_file(resolved_file);
 
-      if normalized_condition.is_none() && !document.exists(&self.selector) {
+      if !document.exists(&self.selector) {
         if is_glob {
           continue;
         }
@@ -84,6 +84,8 @@ impl Args {
       }
 
       if let Some(fields) = &select_fields {
+        let mut missing_field = false;
+
         for field in fields {
           let field_trimmed = field.trim().trim_start_matches('.');
           let full_selector = if search_path_string.is_empty() {
@@ -93,11 +95,20 @@ impl Args {
           };
 
           if !document.exists(&full_selector) {
+            if is_glob {
+              missing_field = true;
+              break;
+            }
+
             use super::color::*;
             eprintln!("{RED}Error:{RESET} select field \"{}\" not found in {}", field.trim(), self.file);
             show_similar_selectors(&self.file, &document, &full_selector);
             process::exit(1);
           }
+        }
+
+        if missing_field {
+          continue;
         }
       }
 

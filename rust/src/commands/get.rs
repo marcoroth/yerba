@@ -112,21 +112,26 @@ impl Args {
         }
       }
 
-      let (values, selectors): (Vec<serde_yaml::Value>, Vec<String>) = if select_fields.is_some() {
+      let (values, selectors, lines): (Vec<serde_yaml::Value>, Vec<String>, Vec<usize>) = if select_fields.is_some() {
         if let Some(condition) = &normalized_condition {
-          let pairs = document.filter_with_selectors(&search_path_string, condition);
-          pairs.into_iter().unzip()
+          let triples = document.filter_with_selectors(&search_path_string, condition);
+          let (values, rest): (Vec<_>, Vec<_>) = triples.into_iter().map(|(v, s, l)| (v, (s, l))).unzip();
+          let (selectors, lines): (Vec<_>, Vec<_>) = rest.into_iter().unzip();
+
+          (values, selectors, lines)
         } else {
-          let selectors = document.resolve_selectors(&search_path_string);
+          let located = document.get_all_located(&search_path_string);
+          let selectors = located.iter().map(|n| n.selector.clone()).collect();
+          let lines = located.iter().map(|n| n.line).collect();
           let values = document.get_values(&search_path_string);
           let values: Vec<_> = values.into_iter().filter(|v| !v.is_null()).collect();
 
-          (values, selectors)
+          (values, selectors, lines)
         }
       } else if let Some(condition) = &normalized_condition {
-        (document.filter(&search_path_string, condition), Vec::new())
+        (document.filter(&search_path_string, condition), Vec::new(), Vec::new())
       } else {
-        (document.get_values(&search_path_string), Vec::new())
+        (document.get_values(&search_path_string), Vec::new(), Vec::new())
       };
 
       for (index, value) in values.iter().enumerate() {
@@ -152,6 +157,10 @@ impl Args {
 
           if let Some(selector) = selectors.get(index) {
             result.insert("__selector".to_string(), serde_json::Value::String(selector.clone()));
+          }
+
+          if let Some(&line) = lines.get(index) {
+            result.insert("__line".to_string(), serde_json::Value::Number(line.into()));
           }
 
           for field in fields {

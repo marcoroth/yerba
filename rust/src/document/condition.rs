@@ -10,12 +10,19 @@ impl Document {
       .collect()
   }
 
-  pub fn filter_with_selectors(&self, dot_path: &str, condition: &str) -> Vec<(serde_yaml::Value, String)> {
+  pub fn filter_with_selectors(&self, dot_path: &str, condition: &str) -> Vec<(serde_yaml::Value, String, usize)> {
+    let source = self.root.text().to_string();
+
     self
       .navigate_all_compact(dot_path)
       .iter()
       .filter(|node| self.evaluate_condition_on_node(node, condition))
-      .map(|node| (node_to_yaml_value(node), super::get::node_selector(node)))
+      .map(|node| {
+        let offset: usize = node.text_range().start().into();
+        let line = source[..offset].matches('\n').count() + 1;
+
+        (node_to_yaml_value(node), super::get::node_selector(node), line)
+      })
       .collect()
   }
 

@@ -1010,7 +1010,9 @@ fn test_filter_with_selectors() {
 
   assert_eq!(results.len(), 2);
   assert_eq!(results[0].1, "[0]");
+  assert_eq!(results[0].2, 1);
   assert_eq!(results[1].1, "[2]");
+  assert_eq!(results[1].2, 7);
 
   if let serde_yaml::Value::Mapping(m) = &results[0].0 {
     assert_eq!(m.get("title"), Some(&serde_yaml::Value::String("Opening".to_string())));
@@ -1046,7 +1048,9 @@ fn test_filter_with_selectors_all_match() {
 
   assert_eq!(results.len(), 2);
   assert_eq!(results[0].1, "[0]");
+  assert_eq!(results[0].2, 1);
   assert_eq!(results[1].1, "[1]");
+  assert_eq!(results[1].2, 3);
 }
 
 #[test]

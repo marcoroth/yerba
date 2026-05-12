@@ -27,7 +27,12 @@ module Yerba
     def []=(key, value)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
-        document.set(new_path, value)
+
+        if document.exists?(new_path)
+          document.set(new_path, value)
+        else
+          document.insert(new_path, value)
+        end
       else
         @data[key] = value
       end
@@ -37,7 +42,7 @@ module Yerba
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
 
-        document.insert(new_path, value.to_s, before: before, after: after)
+        document.insert(new_path, value, before: before, after: after)
       else
         @data[key] = value
       end

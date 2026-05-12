@@ -111,6 +111,14 @@ pub fn format_scalar_value(value: &str, kind: SyntaxKind) -> String {
   }
 }
 
+pub fn quote_if_needed(value: &str) -> String {
+  if is_yaml_non_string(value) {
+    format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR)
+  } else {
+    value.to_string()
+  }
+}
+
 pub fn extract_scalar_text(node: &SyntaxNode) -> Option<String> {
   if let Some(token) = find_scalar_token(node) {
     return match token.kind() {

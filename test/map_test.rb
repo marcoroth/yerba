@@ -89,13 +89,79 @@ class MapTest < Minitest::Spec
     assert_equal "changed", document.value_at("database.host")
   end
 
+  test "[]= updates existing key" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
+    document["database"]["host"] = "0.0.0.0"
+
+    assert_equal "0.0.0.0", document.value_at("database.host")
+  end
+
+  test "[]= inserts new string key when not present" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
+    document["database"]["name"] = "mydb"
+
+    assert_equal "mydb", document.value_at("database.name")
+    assert_includes document.to_s, "name: mydb"
+  end
+
+  test "[]= inserts new key on root map" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root["age"] = 30
+
+    assert_equal 30, document.value_at("age")
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      age: 30
+    YAML
+  end
+
+  test "[]= preserves type distinction between string and integer" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root["age_string"] = "30"
+    document.root["age_int"] = 30
+
+    assert_instance_of String, document.value_at("age_string")
+    assert_instance_of Integer, document.value_at("age_int")
+    assert_equal "30", document.value_at("age_string")
+    assert_equal 30, document.value_at("age_int")
+  end
+
+  test "[]= inserts with non-string types" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root["age"] = 30
+    document.root["active"] = true
+    document.root["score"] = 9.5
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      age: 30
+      active: true
+      score: 9.5
+    YAML
+  end
+
   test "map.insert adds new key at end" do
     document = Yerba::Document.parse(<<~YAML)
       database:
         host: localhost
         port: 5432
     YAML
-    document["database"].insert("ssl", "true")
+    document["database"].insert("ssl", true)
 
     expected = <<~YAML
       database:
@@ -113,7 +179,7 @@ class MapTest < Minitest::Spec
         host: localhost
         port: 5432
     YAML
-    document["database"].insert("ssl", "true", after: "host")
+    document["database"].insert("ssl", true, after: "host")
 
     expected = <<~YAML
       database:
@@ -131,7 +197,7 @@ class MapTest < Minitest::Spec
         host: localhost
         port: 5432
     YAML
-    document["database"].insert("ssl", "true", before: "port")
+    document["database"].insert("ssl", true, before: "port")
 
     expected = <<~YAML
       database:

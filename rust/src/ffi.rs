@@ -420,13 +420,19 @@ pub unsafe extern "C" fn yerba_document_insert(
   document: *mut Document,
   path: *const c_char,
   value: *const c_char,
+  value_type: YerbaValueType,
   before: *const c_char,
   after: *const c_char,
   at: i64,
 ) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
-  let value_string = CStr::from_ptr(value).to_str().unwrap_or("");
+  let raw_value = CStr::from_ptr(value).to_str().unwrap_or("");
+
+  let value_string = match value_type {
+    YerbaValueType::String => crate::syntax::quote_if_needed(raw_value),
+    _ => raw_value.to_string(),
+  };
 
   let position = if at >= 0 {
     InsertPosition::At(at as usize)
@@ -440,7 +446,7 @@ pub unsafe extern "C" fn yerba_document_insert(
     InsertPosition::Last
   };
 
-  match document.insert_into(selector_string, value_string, position) {
+  match document.insert_into(selector_string, &value_string, position) {
     Ok(()) => YerbaResult::ok(),
     Err(e) => YerbaResult::err(&e.to_string()),
   }

@@ -408,6 +408,38 @@ class DocumentTest < Minitest::Spec
     assert_equal "Ruby", nodes.first.value
   end
 
+  test "[]= updates existing key" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      port: 5432
+    YAML
+    document["name"] = "Bob"
+
+    assert_equal "Bob", document.value_at("name")
+  end
+
+  test "[]= inserts new key" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document["age"] = 30
+
+    assert_equal 30, document.value_at("age")
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      age: 30
+    YAML
+  end
+
+  test "[]= preserves string type" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document["count"] = "42"
+
+    assert_instance_of String, document.value_at("count")
+  end
+
   test "[] raises on invalid path with trailing dot" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice

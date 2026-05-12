@@ -20,6 +20,10 @@ module Yerba
       self[ROOT_SELECTOR]
     end
 
+    def []=(key, value)
+      root[key] = value
+    end
+
     def map?
       root.is_a?(Map)
     end

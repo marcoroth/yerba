@@ -420,6 +420,41 @@ static VALUE document_find(int argc, VALUE *argv, VALUE self) {
   return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
 }
 
+/* Convert a Ruby VALUE to a C string + YerbaValueType pair.
+   The caller must provide a number_buffer of at least 64 bytes. */
+struct TypedValue {
+  const char *text;
+  YerbaValueType type;
+};
+
+static struct TypedValue ruby_to_typed_value(VALUE value, char *number_buffer) {
+  struct TypedValue result;
+
+  if (value == Qnil) {
+    result.text = "null";
+    result.type = YERBA_VALUE_TYPE_NULL;
+  } else if (value == Qtrue) {
+    result.text = "true";
+    result.type = YERBA_VALUE_TYPE_BOOLEAN;
+  } else if (value == Qfalse) {
+    result.text = "false";
+    result.type = YERBA_VALUE_TYPE_BOOLEAN;
+  } else if (RB_INTEGER_TYPE_P(value)) {
+    snprintf(number_buffer, 64, "%ld", NUM2LONG(value));
+    result.text = number_buffer;
+    result.type = YERBA_VALUE_TYPE_INTEGER;
+  } else if (RB_FLOAT_TYPE_P(value)) {
+    snprintf(number_buffer, 64, "%g", NUM2DBL(value));
+    result.text = number_buffer;
+    result.type = YERBA_VALUE_TYPE_FLOAT;
+  } else {
+    result.text = StringValueCStr(value);
+    result.type = YERBA_VALUE_TYPE_STRING;
+  }
+
+  return result;
+}
+
 /* document.set(path, value, condition: nil, if_exists: false, if_missing: false) */
 static VALUE document_set(int argc, VALUE *argv, VALUE self) {
   VALUE path, value, opts;
@@ -437,32 +472,9 @@ static VALUE document_set(int argc, VALUE *argv, VALUE self) {
     if (RTEST(v_if_missing) && yerba_document_exists(document, StringValueCStr(path))) return self;
   }
 
-  const char *c_value;
-  YerbaValueType value_type;
   char number_buffer[64];
+  struct TypedValue typed_value = ruby_to_typed_value(value, number_buffer);
   bool all = false;
-
-  if (value == Qnil) {
-    c_value = "null";
-    value_type = YERBA_VALUE_TYPE_NULL;
-  } else if (value == Qtrue) {
-    c_value = "true";
-    value_type = YERBA_VALUE_TYPE_BOOLEAN;
-  } else if (value == Qfalse) {
-    c_value = "false";
-    value_type = YERBA_VALUE_TYPE_BOOLEAN;
-  } else if (RB_INTEGER_TYPE_P(value)) {
-    snprintf(number_buffer, sizeof(number_buffer), "%ld", NUM2LONG(value));
-    c_value = number_buffer;
-    value_type = YERBA_VALUE_TYPE_INTEGER;
-  } else if (RB_FLOAT_TYPE_P(value)) {
-    snprintf(number_buffer, sizeof(number_buffer), "%g", NUM2DBL(value));
-    c_value = number_buffer;
-    value_type = YERBA_VALUE_TYPE_FLOAT;
-  } else {
-    c_value = StringValueCStr(value);
-    value_type = YERBA_VALUE_TYPE_STRING;
-  }
 
   if (!NIL_P(opts)) {
     VALUE v_all = rb_hash_aref(opts, ID2SYM(rb_intern("all")));
@@ -470,7 +482,7 @@ static VALUE document_set(int argc, VALUE *argv, VALUE self) {
     if (RTEST(v_all)) all = true;
   }
 
-  YerbaResult result = yerba_document_set(document, StringValueCStr(path), c_value, value_type, all);
+  YerbaResult result = yerba_document_set(document, StringValueCStr(path), typed_value.text, typed_value.type, all);
   check_result(result);
 
   return self;
@@ -495,8 +507,11 @@ static VALUE document_insert(int argc, VALUE *argv, VALUE self) {
     if (!NIL_P(v_at)) at = NUM2LL(v_at);
   }
 
+  char number_buffer[64];
+  struct TypedValue typed_value = ruby_to_typed_value(value, number_buffer);
+
   struct Document *document = get_document(self);
-  YerbaResult result = yerba_document_insert(document, StringValueCStr(path), StringValueCStr(value), before, after, at);
+  YerbaResult result = yerba_document_insert(document, StringValueCStr(path), typed_value.text, typed_value.type, before, after, at);
   check_result(result);
 
   return self;

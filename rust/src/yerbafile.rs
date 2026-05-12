@@ -508,15 +508,33 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     PipelineStep::Delete(config) => {
       let full_path = resolve_step_path(base_path, Some(&config.path));
 
-      if let Some(condition) = &config.condition {
-        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+      if full_path.contains("[]") {
+        let concrete_selectors = document.resolve_selectors(&full_path);
 
-        if !document.evaluate_condition(parent_path, condition) {
-          return Ok(());
+        for selector in concrete_selectors.into_iter().rev() {
+          if let Some(condition) = &config.condition {
+            let parent_path = selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+
+            if !document.evaluate_condition(parent_path, condition) {
+              continue;
+            }
+          }
+
+          document.delete(&selector)?;
         }
-      }
 
-      document.delete(&full_path)
+        Ok(())
+      } else {
+        if let Some(condition) = &config.condition {
+          let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+
+          if !document.evaluate_condition(parent_path, condition) {
+            return Ok(());
+          }
+        }
+
+        document.delete(&full_path)
+      }
     }
 
     PipelineStep::Rename(config) => {

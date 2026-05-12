@@ -735,3 +735,121 @@ fn test_schema_validation_additional_properties_false() {
   assert_eq!(errors.len(), 1);
   assert!(errors[0].message.contains("extra"), "error was: {}", errors[0].message);
 }
+
+#[test]
+fn test_delete_with_wildcard_and_condition() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - delete:
+              path: "[].website"
+              condition: '.website == ""'
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {r#"
+    - name: "Speaker 1"
+      website: "https://speaker1.com"
+      slug: "speaker-1"
+    - name: "Speaker 2"
+      website: ""
+      slug: "speaker-2"
+    - name: "Speaker 3"
+      website: ""
+      slug: "speaker-3"
+  "#})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - name: "Speaker 1"
+      website: "https://speaker1.com"
+      slug: "speaker-1"
+    - name: "Speaker 2"
+      slug: "speaker-2"
+    - name: "Speaker 3"
+      slug: "speaker-3"
+  "#}
+  );
+}
+
+#[test]
+fn test_delete_with_wildcard_without_condition() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - delete:
+              path: "[].website"
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {r#"
+    - name: "Speaker 1"
+      website: "https://speaker1.com"
+    - name: "Speaker 2"
+    - name: "Speaker 3"
+      website: ""
+  "#})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - name: "Speaker 1"
+    - name: "Speaker 2"
+    - name: "Speaker 3"
+  "#}
+  );
+}
+
+#[test]
+fn test_delete_with_wildcard_no_matches() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - delete:
+              path: "[].website"
+              condition: '.website == ""'
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {r#"
+    - name: "Speaker 1"
+      website: "https://speaker1.com"
+    - name: "Speaker 2"
+      website: "https://speaker2.com"
+  "#})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap();
+
+  assert!(!changed);
+}

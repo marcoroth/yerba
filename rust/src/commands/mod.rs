@@ -361,18 +361,18 @@ pub(crate) fn parse_file(file: &str) -> yerba::Document {
   })
 }
 
-pub(crate) fn run_op(file: &str, document: &yerba::Document, result: Result<(), yerba::YerbaError>) {
-  run_op_with_hint(file, document, result, None);
+pub(crate) fn run_op(display_file: &str, document: &yerba::Document, result: Result<(), yerba::YerbaError>) {
+  run_op_with_hint(display_file, document, result, None);
 }
 
-pub(crate) fn run_op_with_hint(file: &str, document: &yerba::Document, result: Result<(), yerba::YerbaError>, hint: Option<&str>) {
+pub(crate) fn run_op_with_hint(display_file: &str, document: &yerba::Document, result: Result<(), yerba::YerbaError>, hint: Option<&str>) {
   use color::*;
 
   if let Err(error) = result {
     if let yerba::YerbaError::SelectorNotFound(selector) = &error {
-      eprintln!("{RED}Error:{RESET} selector \"{selector}\" not found in {file}");
+      eprintln!("{RED}Error:{RESET} selector \"{selector}\" not found in {display_file}");
 
-      show_similar_selectors(file, document, selector);
+      show_similar_selectors(display_file, document, selector);
     } else {
       eprintln!("{RED}Error:{RESET} {}", error);
     }

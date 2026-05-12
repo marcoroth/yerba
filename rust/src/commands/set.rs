@@ -63,7 +63,7 @@ impl Args {
         };
 
         run_op_with_hint(
-          &resolved_file,
+          &self.file,
           &document,
           result,
           Some("Use --if-exists to skip files where the selector is missing"),

@@ -103,7 +103,7 @@ impl Args {
       let mut document = parse_file(&resolved_file);
       let result = document.insert_into(&self.selector, &resolved_value, position.clone());
 
-      run_op(&resolved_file, &document, result);
+      run_op(&self.file, &document, result);
       output(&resolved_file, &document, self.dry_run);
     }
   }

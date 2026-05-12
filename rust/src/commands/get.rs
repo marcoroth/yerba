@@ -77,9 +77,9 @@ impl Args {
 
         use super::color::*;
 
-        eprintln!("{RED}Error:{RESET} selector \"{}\" not found in {}", self.selector, resolved_file);
+        eprintln!("{RED}Error:{RESET} selector \"{}\" not found in {}", self.selector, self.file);
 
-        show_similar_selectors(resolved_file, &document, &self.selector);
+        show_similar_selectors(&self.file, &document, &self.selector);
         process::exit(1);
       }
 
@@ -94,8 +94,8 @@ impl Args {
 
           if !document.exists(&full_selector) {
             use super::color::*;
-            eprintln!("{RED}Error:{RESET} select field \"{}\" not found in {}", field.trim(), resolved_file);
-            show_similar_selectors(resolved_file, &document, &full_selector);
+            eprintln!("{RED}Error:{RESET} select field \"{}\" not found in {}", field.trim(), self.file);
+            show_similar_selectors(&self.file, &document, &full_selector);
             process::exit(1);
           }
         }

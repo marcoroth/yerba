@@ -34,7 +34,7 @@ impl Args {
       let mut document = parse_file(&resolved_file);
       let result = document.rename(&self.source, &self.destination);
 
-      run_op(&resolved_file, &document, result);
+      run_op(&self.file, &document, result);
       output(&resolved_file, &document, self.dry_run);
     }
   }

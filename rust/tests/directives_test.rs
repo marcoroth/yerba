@@ -34,6 +34,21 @@ fn test_ensure_directives_noop_when_present() {
 }
 
 #[test]
+fn test_ensure_directives_noop_when_present_with_comments() {
+  let mut document = parse(indoc! {"
+    # Comment that I would like to keep
+    ---
+    name: Alice
+  "});
+
+  let original = document.to_string();
+
+  document.ensure_directives().unwrap();
+
+  assert_eq!(document.to_string(), "");
+}
+
+#[test]
 fn test_remove_directives() {
   let mut document = parse(indoc! {"
     ---

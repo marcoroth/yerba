@@ -258,6 +258,28 @@ class MapTest < Minitest::Spec
     assert_equal expected, document.to_s
   end
 
+  test "map.delete removes a map" do
+    document = Yerba::Document.parse(<<~YAML)
+      speaker:
+        name: "Rachael"
+        slug: "rachael-wright-munn"
+        github: "chaelcodes"
+        aliases:
+          name: "Chael"
+          slug: "chaelcodes"
+    YAML
+    document["speaker.aliases"].delete
+
+    expected = <<~YAML
+      speaker:
+        name: "Rachael"
+        slug: "rachael-wright-munn"
+        github: "chaelcodes"
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
   test "map.key? returns true for existing key" do
     document = Yerba::Document.parse(<<~YAML)
       database:

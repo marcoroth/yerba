@@ -237,6 +237,20 @@ class SequenceTest < Minitest::Spec
     assert_includes document.to_s, "go"
   end
 
+  test "remove deletes item by index" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+        - go
+    YAML
+    document["tags"].remove("1")
+
+    refute_includes document.to_s, "rust"
+    assert_includes document.to_s, "ruby"
+    assert_includes document.to_s, "go"
+  end
+
   test "sort orders scalar items" do
     document = Yerba::Document.parse(<<~YAML)
       tags:

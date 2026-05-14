@@ -326,6 +326,20 @@ class DocumentTest < Minitest::Spec
     assert_includes document.to_s, "name: Alice"
   end
 
+  test "delete removes an array entry" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Entry 1"
+      - name: "Entry 2"
+    YAML
+    document.delete("[1]")
+
+    expected = <<~YAML
+      - name: "Entry 1"
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
   test "sort_keys orders map keys" do
     document = Yerba::Document.parse(<<~YAML)
       port: 5432

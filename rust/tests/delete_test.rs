@@ -172,3 +172,71 @@ fn test_delete_nested_sequence_item_by_index() {
     "}
   );
 }
+
+#[test]
+fn test_delete_wildcard_removes_key_from_all_entries() {
+  let mut document = parse(indoc! {r#"
+    - name: "Alice"
+      github: "aalice"
+      slug: "alice"
+    - name: "Bob"
+      github: "bob123"
+      slug: "bob"
+  "#});
+
+  document.delete("[].github").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - name: "Alice"
+        slug: "alice"
+      - name: "Bob"
+        slug: "bob"
+    "#}
+  );
+}
+
+#[test]
+fn test_delete_wildcard_skips_entries_without_key() {
+  let mut document = parse(indoc! {r#"
+    - name: "Alice"
+      github: "aalice"
+    - name: "Bob"
+    - name: "Charlie"
+      github: "charlie"
+  "#});
+
+  document.delete("[].github").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - name: "Alice"
+      - name: "Bob"
+      - name: "Charlie"
+    "#}
+  );
+}
+
+#[test]
+fn test_delete_wildcard_nested_path() {
+  let mut document = parse(indoc! {r#"
+    items:
+      - name: "A"
+        extra: "remove"
+      - name: "B"
+        extra: "also remove"
+  "#});
+
+  document.delete("items[].extra").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      items:
+        - name: "A"
+        - name: "B"
+    "#}
+  );
+}

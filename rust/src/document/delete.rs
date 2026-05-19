@@ -37,25 +37,52 @@ impl Document {
 
     let selector = crate::selector::Selector::parse(dot_path);
     let segments = selector.segments();
-    let (last_segment, parent_segments) = segments.split_last().ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
-    let parent_path = crate::selector::Selector::Absolute(parent_segments.to_vec()).to_selector_string();
+    let last_segment = segments.last().ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let parent_path = selector.parent_path();
 
     match last_segment {
       crate::selector::SelectorSegment::Key(last_key) => {
-        let parent_node = self.navigate(&parent_path)?;
+        let parent_nodes = self.navigate_all_compact(&parent_path);
 
-        let map = parent_node
-          .descendants()
-          .find_map(BlockMap::cast)
-          .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+        if parent_nodes.is_empty() {
+          return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+        }
 
-        let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+        if parent_nodes.len() == 1 {
+          let map = parent_nodes[0]
+            .descendants()
+            .find_map(BlockMap::cast)
+            .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
-        self.remove_node(entry.syntax())
+          let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+          return self.remove_node(entry.syntax());
+        }
+
+        let mut ranges: Vec<TextRange> = Vec::new();
+
+        for parent_node in &parent_nodes {
+          if let Some(map) = parent_node.descendants().find_map(BlockMap::cast) {
+            if let Some(entry) = find_entry_by_key(&map, last_key) {
+              ranges.push(removal_range(entry.syntax()));
+            }
+          }
+        }
+
+        if ranges.is_empty() {
+          return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+        }
+
+        ranges.reverse();
+
+        for range in ranges {
+          self.apply_edit(range, "")?;
+        }
+
+        Ok(())
       }
 
       crate::selector::SelectorSegment::Index(index) => self.remove_at(&parent_path, *index),
-
       crate::selector::SelectorSegment::AllItems => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
     }
   }

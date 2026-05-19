@@ -171,6 +171,22 @@ impl Selector {
 
     result
   }
+
+  pub fn parent_path(&self) -> String {
+    let segments = self.segments();
+
+    if segments.len() <= 1 {
+      return String::new();
+    }
+
+    let parent_segments = &segments[..segments.len() - 1];
+    let parent = match self {
+      Selector::Relative(_) => Selector::Relative(parent_segments.to_vec()),
+      Selector::Absolute(_) => Selector::Absolute(parent_segments.to_vec()),
+    };
+
+    parent.to_selector_string()
+  }
 }
 
 fn parse_segments(input: &str) -> Vec<SelectorSegment> {

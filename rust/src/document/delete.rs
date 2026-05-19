@@ -35,17 +35,31 @@ impl Document {
   pub fn delete(&mut self, dot_path: &str) -> Result<(), YerbaError> {
     Self::validate_path(dot_path)?;
 
-    let (parent_path, last_key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
-    let parent_node = self.navigate(parent_path)?;
-
-    let map = parent_node
-      .descendants()
-      .find_map(BlockMap::cast)
+    let selector = crate::selector::Selector::parse(dot_path);
+    let segments = selector.segments();
+    let (last_segment, parent_segments) = segments
+      .split_last()
       .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let parent_path = crate::selector::Selector::Absolute(parent_segments.to_vec()).to_selector_string();
 
-    let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    match last_segment {
+      crate::selector::SelectorSegment::Key(last_key) => {
+        let parent_node = self.navigate(&parent_path)?;
 
-    self.remove_node(entry.syntax())
+        let map = parent_node
+          .descendants()
+          .find_map(BlockMap::cast)
+          .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+        let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+        self.remove_node(entry.syntax())
+      }
+
+      crate::selector::SelectorSegment::Index(index) => self.remove_at(&parent_path, *index),
+
+      crate::selector::SelectorSegment::AllItems => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
+    }
   }
 
   pub fn remove(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {

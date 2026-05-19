@@ -577,10 +577,10 @@ impl Document {
     };
 
     let labels: Vec<String> = match self.get_value(&items_selector) {
-      Some(serde_yaml::Value::Sequence(sequence)) => sequence
+      Some(yaml_serde::Value::Sequence(sequence)) => sequence
         .iter()
         .map(|value| match value {
-          serde_yaml::Value::String(string) => string.clone(),
+          yaml_serde::Value::String(string) => string.clone(),
           _ => String::new(),
         })
         .collect(),

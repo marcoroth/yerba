@@ -445,11 +445,11 @@ pub(crate) fn compute_location(source: &str, start_offset: usize, end_offset: us
   }
 }
 
-pub fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mut Vec<String>) {
+pub fn collect_selectors(value: &yaml_serde::Value, prefix: &str, selectors: &mut Vec<String>) {
   match value {
-    serde_yaml::Value::Mapping(map) => {
+    yaml_serde::Value::Mapping(map) => {
       for (key, child) in map {
-        if let serde_yaml::Value::String(key_string) = key {
+        if let yaml_serde::Value::String(key_string) = key {
           let selector = if prefix.is_empty() {
             key_string.clone()
           } else {
@@ -462,7 +462,7 @@ pub fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mu
       }
     }
 
-    serde_yaml::Value::Sequence(sequence) => {
+    yaml_serde::Value::Sequence(sequence) => {
       let bracket_prefix = format!("{}[]", prefix);
       selectors.push(bracket_prefix.clone());
 
@@ -475,21 +475,21 @@ pub fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mu
   }
 }
 
-pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> serde_yaml::Value {
+pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> yaml_serde::Value {
   if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
     let map_position = node.descendants().find_map(BlockMap::cast).map(|map| map.syntax().text_range().start());
 
     let sequence_position = sequence.syntax().text_range().start();
 
     if map_position.is_none() || sequence_position <= map_position.unwrap() {
-      let values: Vec<serde_yaml::Value> = sequence.entries().map(|entry| node_to_yaml_value(entry.syntax())).collect();
+      let values: Vec<yaml_serde::Value> = sequence.entries().map(|entry| node_to_yaml_value(entry.syntax())).collect();
 
-      return serde_yaml::Value::Sequence(values);
+      return yaml_serde::Value::Sequence(values);
     }
   }
 
   if let Some(map) = node.descendants().find_map(BlockMap::cast) {
-    let mut mapping = serde_yaml::Mapping::new();
+    let mut mapping = yaml_serde::Mapping::new();
 
     for entry in map.entries() {
       let key = entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())).unwrap_or_default();
@@ -497,18 +497,18 @@ pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> serde_yaml::Value {
       let value = entry
         .value()
         .map(|value_node| node_to_yaml_value(value_node.syntax()))
-        .unwrap_or(serde_yaml::Value::Null);
+        .unwrap_or(yaml_serde::Value::Null);
 
-      mapping.insert(serde_yaml::Value::String(key), value);
+      mapping.insert(yaml_serde::Value::String(key), value);
     }
 
-    return serde_yaml::Value::Mapping(mapping);
+    return yaml_serde::Value::Mapping(mapping);
   }
 
   if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
-    let values: Vec<serde_yaml::Value> = sequence.entries().map(|entry| node_to_yaml_value(entry.syntax())).collect();
+    let values: Vec<yaml_serde::Value> = sequence.entries().map(|entry| node_to_yaml_value(entry.syntax())).collect();
 
-    return serde_yaml::Value::Sequence(values);
+    return yaml_serde::Value::Sequence(values);
   }
 
   if let Some(block_scalar) = node.descendants().find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR) {
@@ -521,35 +521,35 @@ pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> serde_yaml::Value {
 
     let text = dedent_block_scalar(&text);
 
-    return serde_yaml::Value::String(text);
+    return yaml_serde::Value::String(text);
   }
 
   if let Some(scalar) = extract_scalar(node) {
     use crate::syntax::{detect_yaml_type, is_yaml_truthy, YerbaValueType};
 
     return match detect_yaml_type(&scalar) {
-      YerbaValueType::Null => serde_yaml::Value::Null,
-      YerbaValueType::Boolean => serde_yaml::Value::Bool(is_yaml_truthy(&scalar.text)),
+      YerbaValueType::Null => yaml_serde::Value::Null,
+      YerbaValueType::Boolean => yaml_serde::Value::Bool(is_yaml_truthy(&scalar.text)),
 
       YerbaValueType::Integer => scalar
         .text
         .parse::<i64>()
-        .map(|n| serde_yaml::Value::Number(serde_yaml::Number::from(n)))
-        .unwrap_or(serde_yaml::Value::String(scalar.text)),
+        .map(|n| yaml_serde::Value::Number(yaml_serde::Number::from(n)))
+        .unwrap_or(yaml_serde::Value::String(scalar.text)),
 
       YerbaValueType::Float => scalar
         .text
         .parse::<f64>()
-        .map(|n| serde_yaml::Value::Number(serde_yaml::Number::from(n)))
-        .unwrap_or(serde_yaml::Value::String(scalar.text)),
+        .map(|n| yaml_serde::Value::Number(yaml_serde::Number::from(n)))
+        .unwrap_or(yaml_serde::Value::String(scalar.text)),
 
-      YerbaValueType::String => serde_yaml::Value::String(scalar.text),
+      YerbaValueType::String => yaml_serde::Value::String(scalar.text),
     };
   }
 
   let text = node.text().to_string();
 
-  serde_yaml::from_str(&text).unwrap_or(serde_yaml::Value::String(text))
+  yaml_serde::from_str(&text).unwrap_or(yaml_serde::Value::String(text))
 }
 
 pub(crate) fn parse_condition(condition: &str) -> Option<(String, &str, String)> {

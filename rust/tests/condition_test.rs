@@ -287,10 +287,10 @@ fn test_filter_returns_structured_values() {
   let values = document.filter("[]", ".kind == keynote");
   assert_eq!(values.len(), 2);
 
-  if let serde_yaml::Value::Mapping(map) = &values[0] {
+  if let yaml_serde::Value::Mapping(map) = &values[0] {
     assert_eq!(
-      map.get(&serde_yaml::Value::String("title".to_string())),
-      Some(&serde_yaml::Value::String("Opening".to_string()))
+      map.get(&yaml_serde::Value::String("title".to_string())),
+      Some(&yaml_serde::Value::String("Opening".to_string()))
     );
   } else {
     panic!("Expected Mapping, got: {:?}", values[0]);

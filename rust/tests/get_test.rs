@@ -220,8 +220,8 @@ fn test_find_items_filters_by_field() {
 
   let matches = document.filter("[]", ".kind == keynote");
   assert_eq!(matches.len(), 2);
-  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("talk-1"));
-  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("talk-1"));
+  assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("talk-1"));
+  assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("talk-1"));
 }
 
 #[test]
@@ -268,7 +268,7 @@ fn test_find_items_not_contains_condition() {
 
   let matches = document.filter("[]", ".title not_contains Ruby");
   assert_eq!(matches.len(), 1);
-  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("Python"));
+  assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("Python"));
 }
 
 #[test]
@@ -282,7 +282,7 @@ fn test_find_items_inequality_condition() {
 
   let matches = document.filter("[]", ".status != draft");
   assert_eq!(matches.len(), 1);
-  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("published"));
+  assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("published"));
 }
 
 #[test]
@@ -364,7 +364,7 @@ fn test_find_items_speakers_contains_array_member() {
 
   let matches = document.filter("[]", ".speakers contains Alice");
   assert_eq!(matches.len(), 1);
-  assert!(serde_yaml::to_string(&matches[0]).unwrap().contains("talk-1"));
+  assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("talk-1"));
 }
 
 #[test]
@@ -467,7 +467,7 @@ fn test_get_value_returns_string_for_scalar() {
   "});
 
   let value = document.get_value("host").unwrap();
-  assert_eq!(value, serde_yaml::Value::String("localhost".to_string()));
+  assert_eq!(value, yaml_serde::Value::String("localhost".to_string()));
 }
 
 #[test]
@@ -478,7 +478,7 @@ fn test_get_value_returns_number_for_integer() {
   "});
 
   let value = document.get_value("port").unwrap();
-  assert_eq!(value, serde_yaml::Value::Number(serde_yaml::Number::from(5432)));
+  assert_eq!(value, yaml_serde::Value::Number(yaml_serde::Number::from(5432)));
 }
 
 #[test]
@@ -491,14 +491,14 @@ fn test_get_value_returns_mapping_for_object() {
 
   let value = document.get_value("database").unwrap();
 
-  if let serde_yaml::Value::Mapping(map) = value {
+  if let yaml_serde::Value::Mapping(map) = value {
     assert_eq!(
-      map.get(&serde_yaml::Value::String("host".to_string())),
-      Some(&serde_yaml::Value::String("localhost".to_string()))
+      map.get(&yaml_serde::Value::String("host".to_string())),
+      Some(&yaml_serde::Value::String("localhost".to_string()))
     );
     assert_eq!(
-      map.get(&serde_yaml::Value::String("port".to_string())),
-      Some(&serde_yaml::Value::Number(serde_yaml::Number::from(5432)))
+      map.get(&yaml_serde::Value::String("port".to_string())),
+      Some(&yaml_serde::Value::Number(yaml_serde::Number::from(5432)))
     );
   } else {
     panic!("Expected Mapping, got: {:?}", value);
@@ -516,11 +516,11 @@ fn test_get_value_returns_sequence_for_array() {
 
   let value = document.get_value("tags").unwrap();
 
-  if let serde_yaml::Value::Sequence(seq) = value {
+  if let yaml_serde::Value::Sequence(seq) = value {
     assert_eq!(seq.len(), 3);
-    assert_eq!(seq[0], serde_yaml::Value::String("ruby".to_string()));
-    assert_eq!(seq[1], serde_yaml::Value::String("rust".to_string()));
-    assert_eq!(seq[2], serde_yaml::Value::String("yaml".to_string()));
+    assert_eq!(seq[0], yaml_serde::Value::String("ruby".to_string()));
+    assert_eq!(seq[1], yaml_serde::Value::String("rust".to_string()));
+    assert_eq!(seq[2], yaml_serde::Value::String("yaml".to_string()));
   } else {
     panic!("Expected Sequence, got: {:?}", value);
   }
@@ -537,14 +537,14 @@ fn test_get_value_returns_full_object_at_index() {
 
   let value = document.get_value("[0]").unwrap();
 
-  if let serde_yaml::Value::Mapping(map) = value {
+  if let yaml_serde::Value::Mapping(map) = value {
     assert_eq!(
-      map.get(&serde_yaml::Value::String("id".to_string())),
-      Some(&serde_yaml::Value::String("talk-1".to_string()))
+      map.get(&yaml_serde::Value::String("id".to_string())),
+      Some(&yaml_serde::Value::String("talk-1".to_string()))
     );
     assert_eq!(
-      map.get(&serde_yaml::Value::String("title".to_string())),
-      Some(&serde_yaml::Value::String("First".to_string()))
+      map.get(&yaml_serde::Value::String("title".to_string())),
+      Some(&yaml_serde::Value::String("First".to_string()))
     );
   } else {
     panic!("Expected Mapping, got: {:?}", value);
@@ -570,13 +570,13 @@ fn test_get_values_returns_objects_for_speakers() {
 
   assert_eq!(values.len(), 2);
 
-  if let serde_yaml::Value::Sequence(speakers) = &values[0] {
+  if let yaml_serde::Value::Sequence(speakers) = &values[0] {
     assert_eq!(speakers.len(), 2);
 
-    if let serde_yaml::Value::Mapping(alice) = &speakers[0] {
+    if let yaml_serde::Value::Mapping(alice) = &speakers[0] {
       assert_eq!(
-        alice.get(&serde_yaml::Value::String("name".to_string())),
-        Some(&serde_yaml::Value::String("Alice".to_string()))
+        alice.get(&yaml_serde::Value::String("name".to_string())),
+        Some(&yaml_serde::Value::String("Alice".to_string()))
       );
     } else {
       panic!("Expected Mapping for speaker");
@@ -602,10 +602,10 @@ fn test_get_values_flattened_speakers() {
 
   assert_eq!(values.len(), 3);
 
-  if let serde_yaml::Value::Mapping(alice) = &values[0] {
+  if let yaml_serde::Value::Mapping(alice) = &values[0] {
     assert_eq!(
-      alice.get(&serde_yaml::Value::String("name".to_string())),
-      Some(&serde_yaml::Value::String("Alice".to_string()))
+      alice.get(&yaml_serde::Value::String("name".to_string())),
+      Some(&yaml_serde::Value::String("Alice".to_string()))
     );
   } else {
     panic!("Expected Mapping, got: {:?}", values[0]);
@@ -624,8 +624,8 @@ fn test_get_values_returns_scalars_for_field_path() {
   let values = document.get_values("[].title");
 
   assert_eq!(values.len(), 2);
-  assert_eq!(values[0], serde_yaml::Value::String("First".to_string()));
-  assert_eq!(values[1], serde_yaml::Value::String("Second".to_string()));
+  assert_eq!(values[0], yaml_serde::Value::String("First".to_string()));
+  assert_eq!(values[1], yaml_serde::Value::String("Second".to_string()));
 }
 
 #[test]
@@ -642,8 +642,8 @@ fn test_get_value_boolean() {
     disabled: false
   "});
 
-  assert_eq!(document.get_value("enabled"), Some(serde_yaml::Value::Bool(true)));
-  assert_eq!(document.get_value("disabled"), Some(serde_yaml::Value::Bool(false)));
+  assert_eq!(document.get_value("enabled"), Some(yaml_serde::Value::Bool(true)));
+  assert_eq!(document.get_value("disabled"), Some(yaml_serde::Value::Bool(false)));
 }
 
 #[test]
@@ -655,7 +655,7 @@ fn test_get_value_hex_like_string() {
     invalid_octal: 0o999
   "});
 
-  assert_eq!(document.get_value("twitter"), Some(serde_yaml::Value::String("0xabc_user".to_string())));
+  assert_eq!(document.get_value("twitter"), Some(yaml_serde::Value::String("0xabc_user".to_string())));
   assert_eq!(document.get("twitter"), Some("0xabc_user".to_string()));
   assert_eq!(document.get("color"), Some("0xff00aa".to_string()));
   assert_eq!(document.get("octal"), Some("0o777".to_string()));
@@ -668,7 +668,7 @@ fn test_get_value_null() {
     empty: null
   "});
 
-  assert_eq!(document.get_value("empty"), Some(serde_yaml::Value::Null));
+  assert_eq!(document.get_value("empty"), Some(yaml_serde::Value::Null));
 }
 
 #[test]
@@ -801,10 +801,10 @@ fn test_filter_extracts_full_objects() {
   let values = document.filter("[]", ".video_provider == youtube");
   assert_eq!(values.len(), 1);
 
-  if let serde_yaml::Value::Mapping(map) = &values[0] {
+  if let yaml_serde::Value::Mapping(map) = &values[0] {
     assert_eq!(
-      map.get(&serde_yaml::Value::String("video_id".to_string())),
-      Some(&serde_yaml::Value::String("abc".to_string()))
+      map.get(&yaml_serde::Value::String("video_id".to_string())),
+      Some(&yaml_serde::Value::String("abc".to_string()))
     );
   } else {
     panic!("Expected Mapping");
@@ -821,12 +821,12 @@ fn test_get_values_with_empty_path_returns_all_items() {
 
   let values = document.get_values("[]");
   assert_eq!(values.len(), 3);
-  assert_eq!(values[0], serde_yaml::Value::String("ruby".to_string()));
+  assert_eq!(values[0], yaml_serde::Value::String("ruby".to_string()));
 }
 
 #[test]
 fn test_select_field_simple_key() {
-  let yaml: serde_yaml::Value = serde_yaml::from_str("id: talk-1\ntitle: First\n").unwrap();
+  let yaml: yaml_serde::Value = yaml_serde::from_str("id: talk-1\ntitle: First\n").unwrap();
 
   assert_eq!(
     yerba::json::resolve_select_field(&yaml, "title"),
@@ -836,7 +836,7 @@ fn test_select_field_simple_key() {
 
 #[test]
 fn test_select_field_dot_prefix() {
-  let yaml: serde_yaml::Value = serde_yaml::from_str("id: talk-1\ntitle: First\n").unwrap();
+  let yaml: yaml_serde::Value = yaml_serde::from_str("id: talk-1\ntitle: First\n").unwrap();
 
   assert_eq!(
     yerba::json::resolve_select_field(&yaml, ".title"),
@@ -846,7 +846,7 @@ fn test_select_field_dot_prefix() {
 
 #[test]
 fn test_select_field_nested_array() {
-  let yaml: serde_yaml::Value = serde_yaml::from_str("speakers:\n  - name: Alice\n  - name: Bob\n").unwrap();
+  let yaml: yaml_serde::Value = yaml_serde::from_str("speakers:\n  - name: Alice\n  - name: Bob\n").unwrap();
 
   let result = yerba::json::resolve_select_field(&yaml, ".speakers[].name");
 
@@ -861,7 +861,7 @@ fn test_select_field_nested_array() {
 
 #[test]
 fn test_select_field_array_index() {
-  let yaml: serde_yaml::Value = serde_yaml::from_str("tags:\n  - ruby\n  - rust\n  - yaml\n").unwrap();
+  let yaml: yaml_serde::Value = yaml_serde::from_str("tags:\n  - ruby\n  - rust\n  - yaml\n").unwrap();
 
   assert_eq!(
     yerba::json::resolve_select_field(&yaml, ".tags[0]"),
@@ -876,7 +876,7 @@ fn test_select_field_array_index() {
 
 #[test]
 fn test_select_field_all_items() {
-  let yaml: serde_yaml::Value = serde_yaml::from_str("tags:\n  - ruby\n  - rust\n").unwrap();
+  let yaml: yaml_serde::Value = yaml_serde::from_str("tags:\n  - ruby\n  - rust\n").unwrap();
 
   assert_eq!(
     yerba::json::resolve_select_field(&yaml, ".tags[]"),
@@ -889,7 +889,7 @@ fn test_select_field_all_items() {
 
 #[test]
 fn test_select_field_missing_key() {
-  let yaml: serde_yaml::Value = serde_yaml::from_str("id: talk-1\n").unwrap();
+  let yaml: yaml_serde::Value = yaml_serde::from_str("id: talk-1\n").unwrap();
 
   assert_eq!(yerba::json::resolve_select_field(&yaml, ".missing"), serde_json::Value::Null);
 }
@@ -1014,8 +1014,8 @@ fn test_filter_with_selectors() {
   assert_eq!(results[1].1, "[2]");
   assert_eq!(results[1].2, 7);
 
-  if let serde_yaml::Value::Mapping(m) = &results[0].0 {
-    assert_eq!(m.get("title"), Some(&serde_yaml::Value::String("Opening".to_string())));
+  if let yaml_serde::Value::Mapping(m) = &results[0].0 {
+    assert_eq!(m.get("title"), Some(&yaml_serde::Value::String("Opening".to_string())));
   } else {
     panic!("Expected Mapping");
   }
@@ -1242,7 +1242,7 @@ fn test_get_value_block_scalar_no_leading_newline() {
 
   let value = document.get_value("description");
 
-  assert_eq!(value, Some(serde_yaml::Value::String("Hello World".to_string())));
+  assert_eq!(value, Some(yaml_serde::Value::String("Hello World".to_string())));
 }
 
 #[test]
@@ -1255,7 +1255,7 @@ fn test_get_value_block_scalar_multiline() {
 
   let value = document.get_value("description");
 
-  assert_eq!(value, Some(serde_yaml::Value::String("First line.\nSecond line.".to_string())));
+  assert_eq!(value, Some(yaml_serde::Value::String("First line.\nSecond line.".to_string())));
 }
 
 #[test]
@@ -1286,7 +1286,7 @@ fn test_get_value_preserves_null_for_missing_keys() {
 
   let value = document.get_value("[].speakers").unwrap();
 
-  if let serde_yaml::Value::Sequence(items) = value {
+  if let yaml_serde::Value::Sequence(items) = value {
     assert_eq!(items.len(), 3);
     assert!(items[0].is_sequence(), "First item should be a sequence");
     assert!(items[1].is_null(), "Second item should be null");
@@ -1309,9 +1309,9 @@ fn test_get_values_preserves_null_for_missing_keys() {
   let values = document.get_values("[].title");
 
   assert_eq!(values.len(), 3);
-  assert_eq!(values[0], serde_yaml::Value::String("First".to_string()));
-  assert_eq!(values[1], serde_yaml::Value::Null);
-  assert_eq!(values[2], serde_yaml::Value::String("Third".to_string()));
+  assert_eq!(values[0], yaml_serde::Value::String("First".to_string()));
+  assert_eq!(values[1], yaml_serde::Value::Null);
+  assert_eq!(values[2], yaml_serde::Value::String("Third".to_string()));
 }
 
 #[test]
@@ -1325,10 +1325,10 @@ fn test_get_value_all_items_have_key() {
 
   let value = document.get_value("[].title").unwrap();
 
-  if let serde_yaml::Value::Sequence(items) = value {
+  if let yaml_serde::Value::Sequence(items) = value {
     assert_eq!(items.len(), 2);
-    assert_eq!(items[0], serde_yaml::Value::String("First".to_string()));
-    assert_eq!(items[1], serde_yaml::Value::String("Second".to_string()));
+    assert_eq!(items[0], yaml_serde::Value::String("First".to_string()));
+    assert_eq!(items[1], yaml_serde::Value::String("Second".to_string()));
   } else {
     panic!("Expected Sequence, got: {:?}", value);
   }
@@ -1343,7 +1343,7 @@ fn test_get_value_no_items_have_key() {
 
   let value = document.get_value("[].missing").unwrap();
 
-  if let serde_yaml::Value::Sequence(items) = value {
+  if let yaml_serde::Value::Sequence(items) = value {
     assert_eq!(items.len(), 2);
     assert!(items[0].is_null());
     assert!(items[1].is_null());
@@ -1369,22 +1369,22 @@ fn test_get_values_nested_wildcard_with_missing() {
 
   assert_eq!(values.len(), 4);
 
-  if let serde_yaml::Value::Mapping(m) = &values[0] {
-    assert_eq!(m.get("name"), Some(&serde_yaml::Value::String("Alice".to_string())));
+  if let yaml_serde::Value::Mapping(m) = &values[0] {
+    assert_eq!(m.get("name"), Some(&yaml_serde::Value::String("Alice".to_string())));
   } else {
     panic!("Expected Mapping for Alice, got: {:?}", values[0]);
   }
 
-  if let serde_yaml::Value::Mapping(m) = &values[1] {
-    assert_eq!(m.get("name"), Some(&serde_yaml::Value::String("Bob".to_string())));
+  if let yaml_serde::Value::Mapping(m) = &values[1] {
+    assert_eq!(m.get("name"), Some(&yaml_serde::Value::String("Bob".to_string())));
   } else {
     panic!("Expected Mapping for Bob, got: {:?}", values[1]);
   }
 
   assert!(values[2].is_null(), "Item without speakers should be null");
 
-  if let serde_yaml::Value::Mapping(m) = &values[3] {
-    assert_eq!(m.get("name"), Some(&serde_yaml::Value::String("Charlie".to_string())));
+  if let yaml_serde::Value::Mapping(m) = &values[3] {
+    assert_eq!(m.get("name"), Some(&yaml_serde::Value::String("Charlie".to_string())));
   } else {
     panic!("Expected Mapping for Charlie, got: {:?}", values[3]);
   }

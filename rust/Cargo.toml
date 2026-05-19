@@ -24,7 +24,7 @@ yaml_parser = "0.3"
 rowan = "0.16"
 glob = "0.3"
 serde = { version = "1", features = ["derive"] }
-serde_yaml = "0.9"
+yaml_serde = "0.10"
 serde_json = { version = "1", features = ["preserve_order"] }
 clap = { version = "4", features = ["derive"] }
 indoc = "2"

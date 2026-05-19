@@ -116,11 +116,11 @@ impl Args {
   }
 }
 
-fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mut BTreeMap<String, SelectorInfo>, counter: &mut usize) {
+fn collect_selectors(value: &yaml_serde::Value, prefix: &str, selectors: &mut BTreeMap<String, SelectorInfo>, counter: &mut usize) {
   match value {
-    serde_yaml::Value::Mapping(map) => {
+    yaml_serde::Value::Mapping(map) => {
       for (key, child) in map {
-        if let serde_yaml::Value::String(key_string) = key {
+        if let yaml_serde::Value::String(key_string) = key {
           let selector = if prefix.is_empty() {
             key_string.clone()
           } else {
@@ -138,7 +138,7 @@ fn collect_selectors(value: &serde_yaml::Value, prefix: &str, selectors: &mut BT
       }
     }
 
-    serde_yaml::Value::Sequence(sequence) => {
+    yaml_serde::Value::Sequence(sequence) => {
       let bracket_prefix = format!("{}[]", prefix);
 
       let entry = selectors.entry(bracket_prefix.clone()).or_default();

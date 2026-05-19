@@ -329,7 +329,7 @@ impl Args {
       .map(|item| {
         if by_is_scalar {
           match item {
-            serde_yaml::Value::String(string) => string.clone(),
+            yaml_serde::Value::String(string) => string.clone(),
             _ => serde_json::to_string(&yerba::json::yaml_to_json(item)).unwrap_or_default(),
           }
         } else {

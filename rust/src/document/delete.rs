@@ -42,13 +42,18 @@ impl Document {
 
     match last_segment {
       crate::selector::SelectorSegment::Key(last_key) => {
+        let has_wildcard = selector.has_wildcard() || selector.has_brackets();
         let parent_nodes = self.navigate_all_compact(&parent_path);
 
         if parent_nodes.is_empty() {
+          if has_wildcard {
+            return Ok(());
+          }
+
           return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
         }
 
-        if parent_nodes.len() == 1 {
+        if parent_nodes.len() == 1 && !has_wildcard {
           let map = parent_nodes[0]
             .descendants()
             .find_map(BlockMap::cast)
@@ -70,7 +75,7 @@ impl Document {
         }
 
         if ranges.is_empty() {
-          return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+          return Ok(());
         }
 
         ranges.reverse();

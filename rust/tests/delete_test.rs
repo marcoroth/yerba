@@ -240,3 +240,56 @@ fn test_delete_wildcard_nested_path() {
     "#}
   );
 }
+
+#[test]
+fn test_delete_wildcard_no_matches_is_ok() {
+  let mut document = parse(indoc! {r#"
+    - name: "Alice"
+    - name: "Bob"
+  "#});
+
+  let result = document.delete("[].nonexistent");
+
+  assert!(result.is_ok());
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - name: "Alice"
+      - name: "Bob"
+    "#}
+  );
+}
+
+#[test]
+fn test_delete_wildcard_single_parent_no_match_is_ok() {
+  let mut document = parse(indoc! {r#"
+    - tiers:
+        - name: "Gold"
+          sponsors:
+            - name: "Sponsor A"
+  "#});
+
+  let result = document.delete("[].tiers[].sponsors[].description");
+
+  assert!(result.is_ok());
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - tiers:
+          - name: "Gold"
+            sponsors:
+              - name: "Sponsor A"
+    "#}
+  );
+}
+
+#[test]
+fn test_delete_non_wildcard_missing_key_errors() {
+  let mut document = parse(indoc! {"
+    name: Alice
+  "});
+
+  let result = document.delete("nonexistent");
+
+  assert!(result.is_err());
+}

@@ -37,9 +37,7 @@ impl Document {
 
     let selector = crate::selector::Selector::parse(dot_path);
     let segments = selector.segments();
-    let (last_segment, parent_segments) = segments
-      .split_last()
-      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let (last_segment, parent_segments) = segments.split_last().ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
     let parent_path = crate::selector::Selector::Absolute(parent_segments.to_vec()).to_selector_string();
 
     match last_segment {

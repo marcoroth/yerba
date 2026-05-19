@@ -47,7 +47,7 @@ Use `yerba` as a library in your Rust project:
 
 ```toml
 [dependencies]
-yerba = "0.4"
+yerba = "0.5"
 ```
 
 ```rust

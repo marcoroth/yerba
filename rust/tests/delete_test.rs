@@ -133,3 +133,42 @@ fn test_delete_with_bracket_index_path() {
     "}
   );
 }
+
+#[test]
+fn test_delete_root_sequence_item_by_index() {
+  let mut document = parse(indoc! {"
+    - name: Entry 1
+    - name: Entry 2
+      description: remove me too
+  "});
+
+  document.delete("[1]").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - name: Entry 1
+    "}
+  );
+}
+
+#[test]
+fn test_delete_nested_sequence_item_by_index() {
+  let mut document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+      - go
+  "});
+
+  document.delete("tags[1]").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tags:
+        - ruby
+        - go
+    "}
+  );
+}

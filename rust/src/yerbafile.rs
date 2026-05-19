@@ -311,50 +311,6 @@ impl Yerbafile {
 
       let file_strings: Vec<String> = files.iter().map(|path| path.to_string_lossy().to_string()).collect();
 
-      let mut has_validation_error = false;
-
-      for step in &rule.pipeline {
-        if let PipelineStep::SortKeys(config) = step {
-          let full_path = resolve_step_path(rule.path.as_deref(), config.path.as_deref());
-          let key_order: Vec<&str> = config.order.iter().map(|key| key.as_str()).collect();
-
-          let validation_results: Vec<RuleResult> = file_strings
-            .par_iter()
-            .filter_map(|file| {
-              let document = match Document::parse_file(file) {
-                Ok(document) => document,
-                Err(error) => {
-                  return Some(RuleResult {
-                    file: file.clone(),
-                    changed: false,
-                    error: Some(error),
-                  });
-                }
-              };
-
-              if let Err(error) = document.validate_sort_keys(&full_path, &key_order) {
-                Some(RuleResult {
-                  file: file.clone(),
-                  changed: false,
-                  error: Some(error),
-                })
-              } else {
-                None
-              }
-            })
-            .collect();
-
-          if !validation_results.is_empty() {
-            has_validation_error = true;
-            results.extend(validation_results);
-          }
-        }
-      }
-
-      if has_validation_error {
-        continue;
-      }
-
       let file_results: Vec<RuleResult> = file_strings.par_iter().map(|file| self.apply_pipeline_to_file(rule, file, write)).collect();
 
       results.extend(file_results);
@@ -474,6 +430,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
       let full_path = resolve_step_path(base_path, config.path.as_deref());
       let key_order: Vec<&str> = config.order.iter().map(|key| key.as_str()).collect();
 
+      document.validate_sort_keys(&full_path, &key_order)?;
       document.sort_keys(&full_path, &key_order)
     }
 

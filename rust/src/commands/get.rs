@@ -112,7 +112,7 @@ impl Args {
         }
       }
 
-      let (values, selectors, lines): (Vec<serde_yaml::Value>, Vec<String>, Vec<usize>) = if select_fields.is_some() {
+      let (values, selectors, lines): (Vec<yaml_serde::Value>, Vec<String>, Vec<usize>) = if select_fields.is_some() {
         if let Some(condition) = &normalized_condition {
           let triples = document.filter_with_selectors(&search_path_string, condition);
           let (values, rest): (Vec<_>, Vec<_>) = triples.into_iter().map(|(v, s, l)| (v, (s, l))).unzip();

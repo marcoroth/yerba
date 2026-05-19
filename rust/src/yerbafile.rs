@@ -108,65 +108,65 @@ impl<'de> Deserialize<'de> for PipelineStep {
   where
     D: serde::Deserializer<'de>,
   {
-    let mapping = serde_yaml::Mapping::deserialize(deserializer)?;
+    let mapping = yaml_serde::Mapping::deserialize(deserializer)?;
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("sort_keys".to_string())) {
-      let config: SortKeysConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("sort_keys".to_string())) {
+      let config: SortKeysConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::SortKeys(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("quote_style".to_string())) {
-      let config: QuoteStyleConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("quote_style".to_string())) {
+      let config: QuoteStyleConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::QuoteStyle(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("set".to_string())) {
-      let config: SetConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("set".to_string())) {
+      let config: SetConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Set(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("insert".to_string())) {
-      let config: InsertConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("insert".to_string())) {
+      let config: InsertConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Insert(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("delete".to_string())) {
-      let config: DeleteConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("delete".to_string())) {
+      let config: DeleteConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Delete(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("rename".to_string())) {
-      let config: RenameConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("rename".to_string())) {
+      let config: RenameConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Rename(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("remove".to_string())) {
-      let config: RemoveConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("remove".to_string())) {
+      let config: RemoveConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Remove(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("blank_lines".to_string())) {
-      let config: BlankLinesConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("blank_lines".to_string())) {
+      let config: BlankLinesConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::BlankLines(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("directives".to_string())) {
-      let config: DirectivesConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("directives".to_string())) {
+      let config: DirectivesConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Directives(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("sort".to_string())) {
-      let config: SortConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("sort".to_string())) {
+      let config: SortConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Sort(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("unique".to_string())) {
-      let config: UniqueConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("unique".to_string())) {
+      let config: UniqueConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Unique(config));
     }
 
-    if let Some(value) = mapping.get(serde_yaml::Value::String("schema".to_string())) {
-      let config: SchemaConfig = serde_yaml::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+    if let Some(value) = mapping.get(yaml_serde::Value::String("schema".to_string())) {
+      let config: SchemaConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Schema(config));
     }
 
@@ -229,7 +229,7 @@ pub struct RuleResult {
 impl Yerbafile {
   pub fn load(path: impl AsRef<Path>) -> Result<Self, YerbaError> {
     let content = fs::read_to_string(path.as_ref())?;
-    let mut yerbafile: Yerbafile = serde_yaml::from_str(&content).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
+    let mut yerbafile: Yerbafile = yaml_serde::from_str(&content).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
     yerbafile.directory = path.as_ref().parent().map(|p| p.to_path_buf());
     Ok(yerbafile)
   }

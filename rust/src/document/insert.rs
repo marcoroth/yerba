@@ -22,9 +22,9 @@ impl Document {
       }
     }
 
-    if let Some(serde_yaml::Value::Sequence(sequence)) = self.get_value(dot_path).as_ref() {
-      if let Some(serde_yaml::Value::Mapping(map)) = sequence.first() {
-        if let Some((serde_yaml::Value::String(key_name), _)) = map.iter().next() {
+    if let Some(yaml_serde::Value::Sequence(sequence)) = self.get_value(dot_path).as_ref() {
+      if let Some(yaml_serde::Value::Mapping(map)) = sequence.first() {
+        if let Some((yaml_serde::Value::String(key_name), _)) = map.iter().next() {
           let deep_path = if dot_path.is_empty() {
             format!("[].{}", key_name)
           } else {

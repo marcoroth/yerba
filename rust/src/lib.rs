@@ -88,10 +88,10 @@ pub fn glob_find(pattern: &str, selector: &str, condition: Option<&str>, select:
               }
             }
             None => {
-              if let serde_yaml::Value::Mapping(map) = value {
+              if let yaml_serde::Value::Mapping(map) = value {
                 for (key, yaml_value) in map {
                   let json_key = match key {
-                    serde_yaml::Value::String(string) => string.clone(),
+                    yaml_serde::Value::String(string) => string.clone(),
                     _ => format!("{:?}", key),
                   };
 

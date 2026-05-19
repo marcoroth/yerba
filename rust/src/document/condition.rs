@@ -1,7 +1,7 @@
 use super::*;
 
 impl Document {
-  pub fn filter(&self, dot_path: &str, condition: &str) -> Vec<serde_yaml::Value> {
+  pub fn filter(&self, dot_path: &str, condition: &str) -> Vec<yaml_serde::Value> {
     self
       .navigate_all_compact(dot_path)
       .iter()
@@ -10,7 +10,7 @@ impl Document {
       .collect()
   }
 
-  pub fn filter_with_selectors(&self, dot_path: &str, condition: &str) -> Vec<(serde_yaml::Value, String, usize)> {
+  pub fn filter_with_selectors(&self, dot_path: &str, condition: &str) -> Vec<(yaml_serde::Value, String, usize)> {
     let source = self.root.text().to_string();
 
     self

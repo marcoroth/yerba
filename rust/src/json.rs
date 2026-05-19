@@ -1,11 +1,11 @@
 use crate::selector::{Selector, SelectorSegment};
 
-pub fn yaml_to_json(value: &serde_yaml::Value) -> serde_json::Value {
+pub fn yaml_to_json(value: &yaml_serde::Value) -> serde_json::Value {
   match value {
-    serde_yaml::Value::Null => serde_json::Value::Null,
-    serde_yaml::Value::Bool(boolean) => serde_json::Value::Bool(*boolean),
+    yaml_serde::Value::Null => serde_json::Value::Null,
+    yaml_serde::Value::Bool(boolean) => serde_json::Value::Bool(*boolean),
 
-    serde_yaml::Value::Number(number) => {
+    yaml_serde::Value::Number(number) => {
       if let Some(integer) = number.as_i64() {
         serde_json::Value::Number(integer.into())
       } else if let Some(float) = number.as_f64() {
@@ -15,16 +15,16 @@ pub fn yaml_to_json(value: &serde_yaml::Value) -> serde_json::Value {
       }
     }
 
-    serde_yaml::Value::String(string) => serde_json::Value::String(string.clone()),
+    yaml_serde::Value::String(string) => serde_json::Value::String(string.clone()),
 
-    serde_yaml::Value::Sequence(sequence) => serde_json::Value::Array(sequence.iter().map(yaml_to_json).collect()),
+    yaml_serde::Value::Sequence(sequence) => serde_json::Value::Array(sequence.iter().map(yaml_to_json).collect()),
 
-    serde_yaml::Value::Mapping(mapping) => {
+    yaml_serde::Value::Mapping(mapping) => {
       let mut map = serde_json::Map::new();
 
       for (key, yaml_value) in mapping {
         let json_key = match key {
-          serde_yaml::Value::String(string) => string.clone(),
+          yaml_serde::Value::String(string) => string.clone(),
           _ => format!("{:?}", key),
         };
 
@@ -34,19 +34,19 @@ pub fn yaml_to_json(value: &serde_yaml::Value) -> serde_json::Value {
       serde_json::Value::Object(map)
     }
 
-    serde_yaml::Value::Tagged(tagged) => yaml_to_json(&tagged.value),
+    yaml_serde::Value::Tagged(tagged) => yaml_to_json(&tagged.value),
   }
 }
 
-pub fn resolve_select_field(value: &serde_yaml::Value, field: &str) -> serde_json::Value {
+pub fn resolve_select_field(value: &yaml_serde::Value, field: &str) -> serde_json::Value {
   let parsed = Selector::parse(field);
   let segments = parsed.segments();
 
   if segments.len() == 1 {
     if let SelectorSegment::Key(key) = &segments[0] {
-      if let serde_yaml::Value::Mapping(map) = value {
+      if let yaml_serde::Value::Mapping(map) = value {
         for (map_key, yaml_value) in map {
-          if let serde_yaml::Value::String(key_string) = map_key {
+          if let yaml_serde::Value::String(key_string) = map_key {
             if key_string == key {
               return yaml_to_json(yaml_value);
             }
@@ -66,13 +66,13 @@ pub fn resolve_select_field(value: &serde_yaml::Value, field: &str) -> serde_jso
     for current in &current_values {
       match segment {
         SelectorSegment::AllItems => {
-          if let serde_yaml::Value::Sequence(sequence) = current {
+          if let yaml_serde::Value::Sequence(sequence) = current {
             next_values.extend(sequence.iter().cloned());
           }
         }
 
         SelectorSegment::Index(index) => {
-          if let serde_yaml::Value::Sequence(sequence) = current {
+          if let yaml_serde::Value::Sequence(sequence) = current {
             if let Some(item) = sequence.get(*index) {
               next_values.push(item.clone());
             }
@@ -80,9 +80,9 @@ pub fn resolve_select_field(value: &serde_yaml::Value, field: &str) -> serde_jso
         }
 
         SelectorSegment::Key(key) => {
-          if let serde_yaml::Value::Mapping(map) = current {
+          if let yaml_serde::Value::Mapping(map) = current {
             for (map_key, yaml_value) in map {
-              if let serde_yaml::Value::String(key_string) = map_key {
+              if let yaml_serde::Value::String(key_string) = map_key {
                 if key_string == key {
                   next_values.push(yaml_value.clone());
                 }

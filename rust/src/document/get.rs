@@ -278,7 +278,7 @@ impl Document {
       .collect()
   }
 
-  pub fn get_value(&self, dot_path: &str) -> Option<serde_yaml::Value> {
+  pub fn get_value(&self, dot_path: &str) -> Option<yaml_serde::Value> {
     if dot_path.is_empty() {
       return Some(node_to_yaml_value(&self.root));
     }
@@ -292,15 +292,15 @@ impl Document {
         return None;
       }
 
-      let values: Vec<serde_yaml::Value> = padded
+      let values: Vec<yaml_serde::Value> = padded
         .iter()
         .map(|maybe_node| match maybe_node {
           Some(node) => node_to_yaml_value(node),
-          None => serde_yaml::Value::Null,
+          None => yaml_serde::Value::Null,
         })
         .collect();
 
-      Some(serde_yaml::Value::Sequence(values))
+      Some(yaml_serde::Value::Sequence(values))
     } else {
       let nodes = self.navigate_all_compact(dot_path);
 
@@ -312,13 +312,13 @@ impl Document {
         return Some(node_to_yaml_value(&nodes[0]));
       }
 
-      let values: Vec<serde_yaml::Value> = nodes.iter().map(node_to_yaml_value).collect();
+      let values: Vec<yaml_serde::Value> = nodes.iter().map(node_to_yaml_value).collect();
 
-      Some(serde_yaml::Value::Sequence(values))
+      Some(yaml_serde::Value::Sequence(values))
     }
   }
 
-  pub fn get_values(&self, dot_path: &str) -> Vec<serde_yaml::Value> {
+  pub fn get_values(&self, dot_path: &str) -> Vec<yaml_serde::Value> {
     let parsed = crate::selector::Selector::parse(dot_path);
 
     if parsed.has_wildcard() {
@@ -327,7 +327,7 @@ impl Document {
         .iter()
         .map(|maybe_node| match maybe_node {
           Some(node) => node_to_yaml_value(node),
-          None => serde_yaml::Value::Null,
+          None => yaml_serde::Value::Null,
         })
         .collect()
     } else {

@@ -326,18 +326,149 @@ class DocumentTest < Minitest::Spec
     assert_includes document.to_s, "name: Alice"
   end
 
+  test "delete removes a sequence entry by index selector" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Entry 1"
+      - name: "Entry 2"
+      - name: "Entry 3"
+    YAML
+
+    document.delete("[1]")
+
+    assert_equal <<~YAML, document.to_s
+      - name: "Entry 1"
+      - name: "Entry 3"
+    YAML
+  end
+
+  test "delete removes a sequence entry via bracket access" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Entry 1"
+      - name: "Entry 2"
+      - name: "Entry 3"
+    YAML
+
+    document[1].delete
+
+    assert_equal <<~YAML, document.to_s
+      - name: "Entry 1"
+      - name: "Entry 3"
+    YAML
+  end
+
+  test "delete removes a nested sequence entry" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: "A"
+        - name: "B"
+        - name: "C"
+    YAML
+
+    document.delete("items[1]")
+
+    assert_equal <<~YAML, document.to_s
+      items:
+        - name: "A"
+        - name: "C"
+    YAML
+  end
+
+  test "delete removes an array entry" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Entry 1"
+      - name: "Entry 2"
+    YAML
+    document.delete("[1]")
+
+    expected = <<~YAML
+      - name: "Entry 1"
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "delete removes a key from indexed entry keeping other keys" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Alice"
+        github: "aalice"
+        slug: "alice"
+      - name: "Bob"
+        github: "bob123"
+        slug: "bob"
+    YAML
+
+    document.delete("[1].github")
+
+    assert_equal <<~YAML, document.to_s
+      - name: "Alice"
+        github: "aalice"
+        slug: "alice"
+      - name: "Bob"
+        slug: "bob"
+    YAML
+  end
+
+  test "delete via bracket access removes a key keeping other keys" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Alice"
+        github: "aalice"
+        slug: "alice"
+      - name: "Bob"
+        github: "bob123"
+        slug: "bob"
+    YAML
+
+    document[1]["github"].delete
+
+    assert_equal <<~YAML, document.to_s
+      - name: "Alice"
+        github: "aalice"
+        slug: "alice"
+      - name: "Bob"
+        slug: "bob"
+    YAML
+  end
+
+  test "delete with wildcard removes key from all entries" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Alice"
+        github: "aalice"
+        slug: "alice"
+      - name: "Bob"
+        github: "bob123"
+        slug: "bob"
+      - name: "Charlie"
+        slug: "charlie"
+    YAML
+
+    document.delete("[].github")
+
+    assert_equal <<~YAML, document.to_s
+      - name: "Alice"
+        slug: "alice"
+      - name: "Bob"
+        slug: "bob"
+      - name: "Charlie"
+        slug: "charlie"
+    YAML
+  end
+
   test "sort_keys orders map keys" do
     document = Yerba::Document.parse(<<~YAML)
       port: 5432
       host: localhost
       name: mydb
     YAML
-    document.sort_keys("", ["host", "name", "port"])
-    lines = document.to_s.lines.map(&:chomp)
 
-    assert_match(/^host:/, lines[0])
-    assert_match(/^name:/, lines[1])
-    assert_match(/^port:/, lines[2])
+    document.sort_keys("", ["host", "name", "port"])
+
+    expected = <<~YAML
+      host: localhost
+      name: mydb
+      port: 5432
+    YAML
+
+    assert_equal expected, document.to_s
   end
 
   test "save! writes content to file" do

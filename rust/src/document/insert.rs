@@ -126,7 +126,9 @@ impl Document {
     Self::validate_path(dot_path)?;
 
     if let Ok(current_node) = self.navigate(dot_path) {
-      if current_node.descendants().find_map(BlockSeq::cast).is_some() {
+      if current_node.descendants().find_map(BlockSeq::cast).is_some()
+        || matches!(self.get_value(dot_path).as_ref(), Some(yaml_serde::Value::Sequence(sequence)) if sequence.is_empty())
+      {
         return self.insert_sequence_item(dot_path, value, position);
       }
     }
@@ -220,10 +222,13 @@ impl Document {
   fn insert_sequence_item(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
-    let sequence = current_node
-      .descendants()
-      .find_map(BlockSeq::cast)
-      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let Some(sequence) = current_node.descendants().find_map(BlockSeq::cast) else {
+      if matches!(self.get_value(dot_path).as_ref(), Some(yaml_serde::Value::Sequence(sequence)) if sequence.is_empty()) {
+        return self.replace_empty_inline_sequence(dot_path, value);
+      }
+
+      return Err(YerbaError::NotASequence(dot_path.to_string()));
+    };
 
     let entries: Vec<_> = sequence.entries().collect();
 
@@ -460,6 +465,63 @@ impl Document {
 
         self.insert_map_key(dot_path, key, value, resolved)
       }
+    }
+  }
+
+  fn replace_empty_inline_sequence(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
+    let (parent_path, key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
+    let parent_node = self.navigate(parent_path)?;
+    let map = parent_node
+      .descendants()
+      .find_map(BlockMap::cast)
+      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let entry = find_entry_by_key(&map, key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+    let item_indent = format!("{}  ", preceding_whitespace_indent(entry.syntax()));
+    let new_item = Self::format_sequence_item(value, &item_indent);
+    let current_node = self.navigate(dot_path)?;
+    let mut range = current_node.text_range();
+
+    if let Some(previous) = current_node.prev_sibling_or_token().and_then(|element| element.into_token()) {
+      if previous.kind() == SyntaxKind::WHITESPACE && !previous.text().contains('\n') {
+        range = TextRange::new(previous.text_range().start(), range.end());
+      }
+    }
+
+    self.apply_edit(range, &format!("\n{}{}", item_indent, new_item))
+  }
+
+  fn format_sequence_item(value: &str, indent: &str) -> String {
+    if value.contains('\n') {
+      let item_indent = format!("{}  ", indent);
+      let lines: Vec<&str> = value.split('\n').collect();
+
+      let min_indent = lines
+        .iter()
+        .skip(1)
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.len() - line.trim_start().len())
+        .min()
+        .unwrap_or(0);
+
+      let indented: Vec<String> = lines
+        .iter()
+        .enumerate()
+        .map(|(index, line)| {
+          if index == 0 {
+            line.to_string()
+          } else if line.trim().is_empty() {
+            String::new()
+          } else {
+            let relative = &line[min_indent..];
+            format!("{}{}", item_indent, relative)
+          }
+        })
+        .collect();
+
+      format!("- {}", indented.join("\n"))
+    } else {
+      format!("- {}", value)
     }
   }
 }

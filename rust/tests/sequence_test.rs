@@ -24,6 +24,23 @@ fn test_append_to_sequence() {
 }
 
 #[test]
+fn test_append_to_empty_sequence() {
+  let mut document = parse(indoc! {"
+    tags: []
+  "});
+
+  document.append("tags", "yaml").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tags:
+        - yaml
+    "}
+  );
+}
+
+#[test]
 fn test_append_to_nested_sequence() {
   let mut document = parse(indoc! {"
     app:
@@ -41,6 +58,25 @@ fn test_append_to_nested_sequence() {
         tags:
           - ruby
           - rust
+          - yaml
+    "}
+  );
+}
+
+#[test]
+fn test_append_to_nested_empty_sequence() {
+  let mut document = parse(indoc! {"
+    app:
+      tags: []
+  "});
+
+  document.append("app.tags", "yaml").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      app:
+        tags:
           - yaml
     "}
   );

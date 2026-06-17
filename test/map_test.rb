@@ -568,4 +568,79 @@ class MapTest < Minitest::Spec
 
     assert_equal({ "pool" => 5, "timeout" => 30 }, document["database"].value_at("settings"))
   end
+
+  test "[]= sets empty array" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root["tags"] = []
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      tags: []
+    YAML
+  end
+
+  test "[]= sets array with values" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root["tags"] = ["ruby", "rails"]
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      tags: [ruby, rails]
+    YAML
+  end
+
+  test "[]= sets empty hash" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root["settings"] = {}
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      settings: {}
+    YAML
+  end
+
+  test "[]= sets hash with values" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root["settings"] = { theme: "dark", lang: "en" }
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      settings: {theme: dark, lang: en}
+    YAML
+  end
+
+  test "insert with empty array" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      age: 30
+    YAML
+    document.root.insert("speakers", [], after: "name")
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      speakers: []
+      age: 30
+    YAML
+  end
+
+  test "[]= replaces existing value with array" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      tags: old
+    YAML
+    document.root["tags"] = ["new"]
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      tags: [new]
+    YAML
+  end
 end

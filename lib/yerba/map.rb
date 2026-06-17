@@ -27,11 +27,12 @@ module Yerba
     def []=(key, value)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
+        coerced = coerce_value(value)
 
         if document.exists?(new_path)
-          document.set(new_path, value)
+          document.set(new_path, coerced)
         else
-          document.insert(new_path, value)
+          document.insert(new_path, coerced)
         end
       else
         @data[key] = value
@@ -42,7 +43,7 @@ module Yerba
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
 
-        document.insert(new_path, value, before: before, after: after)
+        document.insert(new_path, coerce_value(value), before: before, after: after)
       else
         @data[key] = value
       end
@@ -172,6 +173,13 @@ module Yerba
       when Scalar then value.to_yaml
       when nil then "null"
       else value.to_s
+      end
+    end
+
+    def coerce_value(value)
+      case value
+      when Array, Hash then Formatting.to_yaml_value(value)
+      else value
       end
     end
   end

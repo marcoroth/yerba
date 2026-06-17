@@ -301,8 +301,14 @@ impl Document {
     let entry_node = entry.syntax();
     let entry_range = entry_node.text_range();
 
-    let has_block_value = entry.value()
-      .map(|v| v.syntax().descendants().any(|d| d.kind() == SyntaxKind::BLOCK_SEQ || d.kind() == SyntaxKind::BLOCK_MAP))
+    let has_block_value = entry
+      .value()
+      .map(|value| {
+        value
+          .syntax()
+          .descendants()
+          .any(|descendant| descendant.kind() == SyntaxKind::BLOCK_SEQ || descendant.kind() == SyntaxKind::BLOCK_MAP)
+      })
       .unwrap_or(false);
 
     if !has_block_value {
@@ -312,9 +318,7 @@ impl Document {
     let end = if let Some(next_sibling) = entry_node.next_sibling() {
       next_sibling.text_range().start()
     } else {
-      entry_node.parent()
-        .map(|p| p.text_range().end())
-        .unwrap_or(entry_range.end())
+      entry_node.parent().map(|parent| parent.text_range().end()).unwrap_or(entry_range.end())
     };
 
     let start = if let Some(whitespace_token) = preceding_whitespace_token(entry_node) {

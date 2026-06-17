@@ -218,12 +218,5 @@ module Yerba
       else value
       end
     end
-
-    def default_collection_style(value)
-      case value
-      when Array, Hash then :block
-      else :flow
-      end
-    end
   end
 end

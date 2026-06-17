@@ -323,3 +323,115 @@ fn test_insert_map_key_with_multiline_value() {
     "}
   );
 }
+
+#[test]
+fn test_enforce_styles_combined_collection_and_quote() {
+  use yerba::StyleEnforcement;
+
+  let mut document = parse(indoc! {"
+    tags: [ruby, rails]
+    name: localhost
+  "});
+
+  document
+    .enforce_styles(&StyleEnforcement {
+      collection_style: Some("block".to_string()),
+      sequence_indent: None,
+      key_style: None,
+      value_style: Some(yerba::QuoteStyle::Double),
+    })
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      tags:
+        - ruby
+        - rails
+      name: "localhost"
+    "#}
+  );
+}
+
+#[test]
+fn test_enforce_styles_combined_all() {
+  use yerba::StyleEnforcement;
+
+  let mut document = parse(indoc! {"
+    tags: [ruby, rails]
+    name: localhost
+  "});
+
+  document
+    .enforce_styles(&StyleEnforcement {
+      collection_style: Some("block".to_string()),
+      sequence_indent: Some("indented".to_string()),
+      key_style: Some(yerba::KeyStyle::Plain),
+      value_style: Some(yerba::QuoteStyle::Double),
+    })
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      tags:
+        - ruby
+        - rails
+      name: "localhost"
+    "#}
+  );
+}
+
+#[test]
+fn test_enforce_styles_noop_when_all_match() {
+  use yerba::StyleEnforcement;
+
+  let mut document = parse(indoc! {r#"
+    tags:
+      - "ruby"
+      - "rails"
+    name: "localhost"
+  "#});
+
+  let original = document.to_string();
+
+  document
+    .enforce_styles(&StyleEnforcement {
+      collection_style: Some("block".to_string()),
+      sequence_indent: Some("indented".to_string()),
+      key_style: Some(yerba::KeyStyle::Plain),
+      value_style: Some(yerba::QuoteStyle::Double),
+    })
+    .unwrap();
+
+  assert_eq!(document.to_string(), original);
+}
+
+#[test]
+fn test_enforce_styles_partial_only_collection() {
+  use yerba::StyleEnforcement;
+
+  let mut document = parse(indoc! {"
+    tags: [ruby, rails]
+    name: localhost
+  "});
+
+  document
+    .enforce_styles(&StyleEnforcement {
+      collection_style: Some("block".to_string()),
+      sequence_indent: None,
+      key_style: None,
+      value_style: None,
+    })
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tags:
+        - ruby
+        - rails
+      name: localhost
+    "}
+  );
+}

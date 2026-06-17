@@ -1,6 +1,292 @@
 use super::*;
 
+pub struct StyleEnforcement {
+  pub collection_style: Option<String>,
+  pub sequence_indent: Option<String>,
+  pub key_style: Option<crate::KeyStyle>,
+  pub value_style: Option<QuoteStyle>,
+}
+
 impl Document {
+  pub fn enforce_styles(&mut self, enforcement: &StyleEnforcement) -> Result<(), YerbaError> {
+    let source = self.root.text().to_string();
+    let mut edits: Vec<(TextRange, String)> = Vec::new();
+    let mut converted_ranges: Vec<TextRange> = Vec::new();
+
+    let want_block_collections = enforcement.collection_style.as_deref() == Some("block");
+    let want_indented = enforcement.sequence_indent.as_deref() == Some("indented");
+    let want_compact = enforcement.sequence_indent.as_deref() == Some("compact");
+
+    for element in self.root.descendants_with_tokens() {
+      match element {
+        rowan::NodeOrToken::Node(ref node) => {
+          if want_block_collections && (node.kind() == SyntaxKind::FLOW_SEQ || node.kind() == SyntaxKind::FLOW_MAP) {
+            if node
+              .ancestors()
+              .skip(1)
+              .any(|ancestor| ancestor.kind() == SyntaxKind::FLOW_SEQ || ancestor.kind() == SyntaxKind::FLOW_MAP)
+            {
+              continue;
+            }
+
+            let value = node_to_yaml_value(node);
+
+            match &value {
+              yaml_serde::Value::Sequence(sequence) if sequence.is_empty() => continue,
+              yaml_serde::Value::Mapping(mapping) if mapping.is_empty() => continue,
+              _ => {}
+            }
+
+            let entry_node = node.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY);
+
+            if let Some(ref entry) = entry_node {
+              let entry_start: usize = entry.text_range().start().into();
+              let entry_line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
+              let key_indent = entry_start - entry_line_start;
+              let entry_text = entry.text().to_string();
+
+              if let Some(colon_offset) = entry_text.find(':') {
+                let colon_position = entry_start + colon_offset;
+                let value_indent = key_indent + 2;
+                let block_text = crate::yaml_writer::yaml_value_to_block_text(&value, value_indent);
+                let replace_range = TextRange::new(rowan::TextSize::from((colon_position + 1) as u32), node.text_range().end());
+
+                converted_ranges.push(node.text_range());
+                edits.push((replace_range, format!("\n{}", block_text)));
+              }
+            }
+          }
+
+          if (want_indented || want_compact) && BlockSeq::can_cast(node.kind()) {
+            if node.ancestors().skip(1).any(|ancestor| BlockSeq::can_cast(ancestor.kind())) {
+              continue;
+            }
+
+            let parent_entry = match node.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY) {
+              Some(entry) => entry,
+              None => continue,
+            };
+
+            let sequence = match BlockSeq::cast(node.clone()) {
+              Some(sequence) => sequence,
+              None => continue,
+            };
+
+            let first_entry = match sequence.entries().next() {
+              Some(entry) => entry,
+              None => continue,
+            };
+
+            let entry_start: usize = parent_entry.text_range().start().into();
+            let line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
+            let key_indent_length = entry_start - line_start;
+            let entry_indent_length = preceding_whitespace_indent(first_entry.syntax()).len();
+            let is_indented = entry_indent_length > key_indent_length;
+            let needs_change = (want_indented && !is_indented) || (want_compact && is_indented);
+
+            if needs_change {
+              let target_style = enforcement.sequence_indent.as_deref().unwrap();
+
+              let indent_diff: i32 = match target_style {
+                "indented" => (key_indent_length as i32 + 2) - entry_indent_length as i32,
+                "compact" => key_indent_length as i32 - entry_indent_length as i32,
+                _ => continue,
+              };
+
+              if indent_diff == 0 {
+                continue;
+              }
+
+              let sequence_range = node.text_range();
+              let sequence_start: usize = sequence_range.start().into();
+              let sequence_end: usize = sequence_range.end().into();
+
+              let before_sequence = &source[..sequence_start];
+              let line_start_of_first_entry = before_sequence.rfind('\n').map(|position| position + 1).unwrap_or(0);
+              let full_text = &source[line_start_of_first_entry..sequence_end];
+
+              let reindented: String = full_text
+                .lines()
+                .map(|line| {
+                  if line.trim().is_empty() {
+                    String::new()
+                  } else {
+                    let current_line_indent = line.len() - line.trim_start().len();
+                    let new_indent = (current_line_indent as i32 + indent_diff).max(0) as usize;
+                    format!("{}{}", " ".repeat(new_indent), line.trim_start())
+                  }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+
+              let replace_range = TextRange::new(rowan::TextSize::from(line_start_of_first_entry as u32), sequence_range.end());
+
+              edits.push((replace_range, reindented));
+            }
+          }
+        }
+
+        rowan::NodeOrToken::Token(ref token) => {
+          if converted_ranges.iter().any(|range| range.contains_range(token.text_range())) {
+            continue;
+          }
+
+          let current_kind = token.kind();
+
+          if let Some(ref key_style) = enforcement.key_style {
+            if is_map_key(token)
+              && matches!(
+                current_kind,
+                SyntaxKind::PLAIN_SCALAR | SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR
+              )
+            {
+              let target_kind = key_style.to_syntax_kind();
+
+              if current_kind != target_kind {
+                let raw_value = match current_kind {
+                  SyntaxKind::DOUBLE_QUOTED_SCALAR => {
+                    let text = token.text();
+
+                    unescape_double_quoted(&text[1..text.len() - 1])
+                  }
+
+                  SyntaxKind::SINGLE_QUOTED_SCALAR => {
+                    let text = token.text();
+
+                    unescape_single_quoted(&text[1..text.len() - 1])
+                  }
+
+                  SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
+
+                  _ => continue,
+                };
+
+                let new_text = match key_style {
+                  crate::KeyStyle::Double => {
+                    let escaped = raw_value.replace('\\', "\\\\").replace('"', "\\\"");
+
+                    format!("\"{}\"", escaped)
+                  }
+
+                  crate::KeyStyle::Single => {
+                    let escaped = raw_value.replace('\'', "''");
+
+                    format!("'{}'", escaped)
+                  }
+
+                  crate::KeyStyle::Plain => raw_value,
+                };
+
+                if new_text != token.text() {
+                  edits.push((token.text_range(), new_text));
+                }
+              }
+
+              continue;
+            }
+          }
+
+          if let Some(ref value_style) = enforcement.value_style {
+            if is_map_key(token) {
+              continue;
+            }
+
+            let is_inline_scalar = matches!(
+              current_kind,
+              SyntaxKind::PLAIN_SCALAR | SyntaxKind::DOUBLE_QUOTED_SCALAR | SyntaxKind::SINGLE_QUOTED_SCALAR
+            );
+
+            if !is_inline_scalar {
+              continue;
+            }
+
+            if value_style.is_block_scalar() {
+              continue;
+            }
+
+            let target_kind = value_style.to_syntax_kind();
+
+            if current_kind == target_kind {
+              continue;
+            }
+
+            let raw_value = match current_kind {
+              SyntaxKind::DOUBLE_QUOTED_SCALAR => {
+                let text = token.text();
+                unescape_double_quoted(&text[1..text.len() - 1])
+              }
+
+              SyntaxKind::SINGLE_QUOTED_SCALAR => {
+                let text = token.text();
+                unescape_single_quoted(&text[1..text.len() - 1])
+              }
+
+              SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
+
+              _ => continue,
+            };
+
+            if is_yaml_non_string(&raw_value) {
+              continue;
+            }
+
+            let new_text = match value_style {
+              QuoteStyle::Double => {
+                if raw_value.contains('"') && current_kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
+                  continue;
+                }
+
+                let escaped = raw_value.replace('\\', "\\\\").replace('"', "\\\"");
+
+                format!("\"{}\"", escaped)
+              }
+
+              QuoteStyle::Single => {
+                let escaped = raw_value.replace('\'', "''");
+                format!("'{}'", escaped)
+              }
+
+              QuoteStyle::Plain => {
+                if raw_value.contains('"') || raw_value.contains('\'') || raw_value.contains(':') || raw_value.contains('#') {
+                  continue;
+                }
+
+                raw_value
+              }
+
+              _ => continue,
+            };
+
+            if new_text != token.text() {
+              edits.push((token.text_range(), new_text));
+            }
+          }
+        }
+      }
+    }
+
+    if edits.is_empty() {
+      return Ok(());
+    }
+
+    edits.sort_by_key(|edit| std::cmp::Reverse(edit.0.start()));
+
+    let mut new_source = source;
+
+    for (range, replacement) in edits {
+      let start: usize = range.start().into();
+      let end: usize = range.end().into();
+
+      new_source.replace_range(start..end, &replacement);
+    }
+
+    let path = self.path.take();
+    *self = Self::parse(&new_source)?;
+    self.path = path;
+
+    Ok(())
+  }
+
   pub fn enforce_collection_style(&mut self, style: &str, dot_path: Option<&str>) -> Result<(), YerbaError> {
     let scope_path = dot_path.unwrap_or("");
 

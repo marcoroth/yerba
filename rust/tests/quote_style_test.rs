@@ -1270,6 +1270,70 @@ fn test_double_to_literal_nested() {
 }
 
 #[test]
+fn test_enforce_quotes_number_in_single_to_double() {
+  let mut document = parse(indoc! {"
+    postal_code: '37027'
+  "});
+
+  document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      postal_code: "37027"
+    "#}
+  );
+}
+
+#[test]
+fn test_enforce_quotes_boolean_in_single_to_double() {
+  let mut document = parse(indoc! {"
+    enabled: 'true'
+  "});
+
+  document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      enabled: "true"
+    "#}
+  );
+}
+
+#[test]
+fn test_enforce_quotes_plain_number_stays_plain() {
+  let mut document = parse(indoc! {"
+    port: 5432
+  "});
+
+  document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      port: 5432
+    "}
+  );
+}
+
+#[test]
+fn test_enforce_quotes_plain_boolean_stays_plain() {
+  let mut document = parse(indoc! {"
+    enabled: true
+  "});
+
+  document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      enabled: true
+    "}
+  );
+}
+
+#[test]
 fn test_enforce_quotes_empty_single_to_double() {
   let mut document = parse(indoc! {"
     name: ''

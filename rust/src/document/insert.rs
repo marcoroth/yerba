@@ -513,10 +513,7 @@ impl Document {
       return None;
     }
 
-    Some((
-      trailing[comment_start..].to_string(),
-      rowan::TextSize::from((start + line_end) as u32),
-    ))
+    Some((trailing[comment_start..].to_string(), rowan::TextSize::from((start + line_end) as u32)))
   }
 
   fn format_sequence_item(value: &str, indent: &str) -> String {

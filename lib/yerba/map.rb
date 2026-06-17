@@ -25,11 +25,30 @@ module Yerba
     end
 
     def []=(key, value)
+      set(key, value)
+    end
+
+    def set(key, value, style: nil)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
-        coerced = coerce_value(value)
+        coerced = coerce_value(value, style: style)
+        is_block_value = coerced.is_a?(String) && (coerced.include?("\n") || coerced.start_with?("- "))
 
-        if document.exists?(new_path)
+        if document.exists?(new_path) && is_block_value
+          # Block-style collections can't replace a scalar via set().
+          # Delete the key and re-insert at the same position.
+          all_keys = keys
+          key_index = all_keys.index(key.to_s)
+          after_key = key_index && key_index > 0 ? all_keys[key_index - 1] : nil
+
+          document.delete(new_path)
+
+          if after_key
+            document.insert(new_path, coerced, after: after_key)
+          else
+            document.insert(new_path, coerced)
+          end
+        elsif document.exists?(new_path)
           document.set(new_path, coerced)
         else
           document.insert(new_path, coerced)
@@ -39,11 +58,11 @@ module Yerba
       end
     end
 
-    def insert(key, value, before: nil, after: nil)
+    def insert(key, value, before: nil, after: nil, style: nil)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
 
-        document.insert(new_path, coerce_value(value), before: before, after: after)
+        document.insert(new_path, coerce_value(value, style: style), before: before, after: after)
       else
         @data[key] = value
       end
@@ -166,6 +185,16 @@ module Yerba
       end
     end
 
+    def collection_style
+      @collection_style || document&.get_collection_style(@selector)
+    end
+
+    def collection_style=(style)
+      document&.set_collection_style(@selector, style)
+
+      @collection_style = style
+    end
+
     private
 
     def format_value(value)
@@ -176,10 +205,24 @@ module Yerba
       end
     end
 
-    def coerce_value(value)
+    def coerce_value(value, style: nil)
       case value
-      when Array, Hash then Formatting.to_yaml_value(value)
+      when Array, Hash
+        resolved_style = style || default_collection_style(value)
+
+        case resolved_style
+        when :block then Formatting.to_block_yaml_value(value)
+        when :flow then Formatting.to_yaml_value(value)
+        else Formatting.to_block_yaml_value(value)
+        end
       else value
+      end
+    end
+
+    def default_collection_style(value)
+      case value
+      when Array, Hash then :block
+      else :flow
       end
     end
   end

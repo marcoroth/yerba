@@ -35,5 +35,46 @@ module Yerba
       else value.to_s
       end
     end
+
+    def self.to_block_yaml_value(value, indent = 0)
+      prefix = "  " * indent
+
+      case value
+      when Array
+        return "[]" if value.empty?
+
+        value.map { |item|
+          if item.is_a?(Hash)
+            inner = to_block_yaml_value(item, indent + 1)
+            "#{prefix}- #{inner.lstrip}"
+          else
+            "#{prefix}- #{to_scalar_value(item)}"
+          end
+        }.join("\n")
+      when Hash
+        return "{}" if value.empty?
+
+        value.map { |key, value|
+          if value.is_a?(Hash) || value.is_a?(Array)
+            inner = to_block_yaml_value(value, indent + 1)
+            "#{prefix}#{key}:\n#{inner}"
+          else
+            "#{prefix}#{key}: #{to_scalar_value(value)}"
+          end
+        }.join("\n")
+      else
+        to_scalar_value(value)
+      end
+    end
+
+    def self.to_scalar_value(value)
+      case value
+      when true then "true"
+      when false then "false"
+      when nil then "null"
+      when Numeric then value.to_s
+      else value.to_s
+      end
+    end
   end
 end

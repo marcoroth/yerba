@@ -53,10 +53,12 @@ impl Document {
 
     let current_node = self.navigate(dot_path).ok()?;
 
-    if current_node
-      .descendants()
-      .any(|child| child.kind() == SyntaxKind::BLOCK_MAP || child.kind() == SyntaxKind::BLOCK_SEQ)
-    {
+    if current_node.descendants().any(|child| {
+      matches!(
+        child.kind(),
+        SyntaxKind::BLOCK_MAP | SyntaxKind::BLOCK_SEQ | SyntaxKind::FLOW_SEQ | SyntaxKind::FLOW_MAP
+      )
+    }) {
       return None;
     }
 
@@ -382,6 +384,20 @@ impl Document {
       .entries()
       .filter_map(|entry| entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())))
       .collect()
+  }
+
+  pub fn get_collection_style(&self, dot_path: &str) -> Option<&'static str> {
+    let current_node = self.navigate(dot_path).ok()?;
+
+    for descendant in current_node.descendants() {
+      match descendant.kind() {
+        SyntaxKind::FLOW_SEQ | SyntaxKind::FLOW_MAP => return Some("flow"),
+        SyntaxKind::BLOCK_SEQ | SyntaxKind::BLOCK_MAP => return Some("block"),
+        _ => {}
+      }
+    }
+
+    None
   }
 
   pub fn get_quote_style(&self, dot_path: &str) -> Option<&'static str> {

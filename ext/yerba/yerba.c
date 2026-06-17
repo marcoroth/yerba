@@ -374,6 +374,41 @@ static VALUE document_set_quote_style(VALUE self, VALUE path, VALUE style) {
   return self;
 }
 
+/* document.get_collection_style(path) → :flow, :block, or nil */
+static VALUE document_get_collection_style(VALUE self, VALUE path) {
+  struct Document *document = get_document(self);
+  char *style = yerba_document_get_collection_style(document, StringValueCStr(path));
+
+  if (style == NULL) return Qnil;
+
+  VALUE symbol = ID2SYM(rb_intern(style));
+
+  yerba_string_free(style);
+
+  return symbol;
+}
+
+/* document.set_collection_style(path, style) */
+static VALUE document_set_collection_style(VALUE self, VALUE path, VALUE style) {
+  struct Document *document = get_document(self);
+
+  const char *style_string;
+
+  if (RB_TYPE_P(style, T_SYMBOL)) {
+    style_string = rb_id2name(SYM2ID(style));
+  } else if (RB_TYPE_P(style, T_STRING)) {
+    style_string = StringValueCStr(style);
+  } else {
+    rb_raise(rb_eError, "Invalid collection style (expected Symbol or String)");
+  }
+
+  YerbaResult result = yerba_document_set_collection_style(document, StringValueCStr(path), style_string);
+
+  check_result(result);
+
+  return self;
+}
+
 /* document.condition?(condition, path: "") */
 static VALUE document_condition_p(int argc, VALUE *argv, VALUE self) {
   VALUE condition, opts;
@@ -965,6 +1000,8 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "resolve_selectors", document_resolve_selectors, 1);
   rb_define_method(rb_cDocument, "get_quote_style", document_get_quote_style, 1);
   rb_define_method(rb_cDocument, "set_quote_style", document_set_quote_style, 2);
+  rb_define_method(rb_cDocument, "get_collection_style", document_get_collection_style, 1);
+  rb_define_method(rb_cDocument, "set_collection_style", document_set_collection_style, 2);
   rb_define_method(rb_cDocument, "exists?", document_exists_p, 1);
   rb_define_method(rb_cDocument, "valid_selector?", document_valid_selector_p, 1);
   rb_define_method(rb_cDocument, "condition?", document_condition_p, -1);

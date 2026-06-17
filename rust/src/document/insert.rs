@@ -394,7 +394,24 @@ impl Document {
       .map(|entry| preceding_whitespace_indent(entry.syntax()))
       .unwrap_or_default();
 
-    let new_entry_text = format!("{}: {}", key, value);
+    let is_block_value = value.contains('\n') || value.starts_with("- ");
+    let new_entry_text = if is_block_value {
+      let value_indent = format!("{}  ", indent);
+      let indented_lines: Vec<String> = value
+        .lines()
+        .map(|line| {
+          if line.trim().is_empty() {
+            String::new()
+          } else {
+            format!("{}{}", value_indent, line.trim_start())
+          }
+        })
+        .collect();
+
+      format!("{}:\n{}", key, indented_lines.join("\n"))
+    } else {
+      format!("{}: {}", key, value)
+    };
 
     match position {
       InsertPosition::Last => {

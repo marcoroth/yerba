@@ -1,6 +1,84 @@
 use super::*;
 
 impl Document {
+  pub fn set_collection_style(&mut self, dot_path: &str, style: &str) -> Result<(), YerbaError> {
+    let current_style = self
+      .get_collection_style(dot_path)
+      .ok_or_else(|| YerbaError::ParseError(format!("'{}' is not a collection (sequence or map)", dot_path)))?;
+
+    if current_style == style {
+      return Ok(());
+    }
+
+    let current_node = self.navigate(dot_path)?;
+    let value = node_to_yaml_value(&current_node);
+    let source = self.to_string();
+
+    let entry_node = current_node.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY);
+
+    let (key_indent, colon_in_line) = if let Some(ref entry) = entry_node {
+      let entry_start: usize = entry.text_range().start().into();
+      let entry_line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
+      let indent = entry_start - entry_line_start;
+
+      let entry_text = entry.text().to_string();
+      let colon_offset = entry_text.find(':').map(|offset| entry_start + offset);
+
+      (indent, colon_offset)
+    } else {
+      (0, None)
+    };
+
+    match style {
+      "flow" => {
+        let flow_text = crate::yaml_writer::yaml_value_to_flow_text(&value);
+
+        let collection_node = current_node
+          .descendants()
+          .find(|descendant| descendant.kind() == SyntaxKind::BLOCK_SEQ || descendant.kind() == SyntaxKind::BLOCK_MAP)
+          .ok_or_else(|| YerbaError::ParseError("could not find block collection node".to_string()))?;
+
+        let block_end: usize = collection_node.text_range().end().into();
+
+        if let Some(colon_position) = colon_in_line {
+          let replace_range = TextRange::new(rowan::TextSize::from((colon_position + 1) as u32), rowan::TextSize::from(block_end as u32));
+
+          self.apply_edit(replace_range, &format!(" {}", flow_text))
+        } else {
+          let replace_range = collection_node.text_range();
+
+          self.apply_edit(replace_range, &flow_text)
+        }
+      }
+
+      "block" => {
+        let flow_node = current_node
+          .descendants()
+          .find(|descendant| descendant.kind() == SyntaxKind::FLOW_SEQ || descendant.kind() == SyntaxKind::FLOW_MAP)
+          .ok_or_else(|| YerbaError::ParseError("could not find flow collection node".to_string()))?;
+
+        let flow_end: usize = flow_node.text_range().end().into();
+        let value_indent = key_indent + 2;
+        let block_text = crate::yaml_writer::yaml_value_to_block_text(&value, value_indent);
+
+        if let Some(colon_position) = colon_in_line {
+          let replace_range = TextRange::new(rowan::TextSize::from((colon_position + 1) as u32), rowan::TextSize::from(flow_end as u32));
+
+          self.apply_edit(replace_range, &format!("\n{}", block_text))
+        } else {
+          let replace_range = flow_node.text_range();
+
+          self.apply_edit(replace_range, &format!("\n{}", block_text))
+        }
+      }
+
+      _ => Err(YerbaError::ParseError(format!(
+        "unknown collection style '{}'. Valid options: flow, block",
+        style
+      ))),
+    }
+  }
+
   pub fn enforce_blank_lines(&mut self, dot_path: &str, blank_lines: usize) -> Result<(), YerbaError> {
     let nodes = if dot_path.contains('[') {
       self.navigate_all_compact(dot_path)

@@ -5,7 +5,7 @@ mod insert;
 mod schema;
 mod set;
 mod sort;
-mod style;
+pub mod style;
 mod unique;
 pub use unique::DuplicateInfo;
 

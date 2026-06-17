@@ -8,6 +8,8 @@ use crate::{Document, QuoteStyle, YerbaError};
 #[derive(Debug, Deserialize)]
 pub struct Yerbafile {
   #[serde(default)]
+  pub files: Option<String>,
+  #[serde(default)]
   pub pipeline: Vec<PipelineStep>,
   #[serde(default)]
   pub rules: Vec<Rule>,
@@ -343,7 +345,7 @@ impl Yerbafile {
       let file_results: Vec<RuleResult> = file_strings
         .par_iter()
         .map(|file| {
-          let run_global = !self.pipeline.is_empty() && !globally_processed.contains(file.as_str());
+          let run_global = !globally_processed.contains(file.as_str()) && self.should_run_global_pipeline(file);
           self.apply_pipeline_to_file(rule, file, write, run_global)
         })
         .collect();
@@ -373,14 +375,12 @@ impl Yerbafile {
     let original = document.to_string();
 
     if run_global {
-      for step in &self.pipeline {
-        if let Err(error) = execute_step(&mut document, step, None, file, self) {
-          return RuleResult {
-            file: file.to_string(),
-            changed: false,
-            error: Some(error),
-          };
-        }
+      if let Err(error) = execute_pipeline(&mut document, &self.pipeline, None, file, self) {
+        return RuleResult {
+          file: file.to_string(),
+          changed: false,
+          error: Some(error),
+        };
       }
     }
 
@@ -429,7 +429,7 @@ impl Yerbafile {
         continue;
       }
 
-      let run_global = !self.pipeline.is_empty() && !ran_global;
+      let run_global = !ran_global && self.should_run_global_pipeline(file);
       results.push(self.apply_pipeline_to_file(rule, file, write, run_global));
       ran_global = true;
     }
@@ -437,11 +437,24 @@ impl Yerbafile {
     results
   }
 
+  fn should_run_global_pipeline(&self, file_path: &str) -> bool {
+    if self.pipeline.is_empty() {
+      return false;
+    }
+
+    match &self.files {
+      Some(glob_pattern) => glob::Pattern::new(glob_pattern)
+        .map(|pattern| pattern.matches(file_path) || pattern.matches_path(Path::new(file_path)))
+        .unwrap_or(false),
+      None => true,
+    }
+  }
+
   pub fn apply_to_document(&self, document: &mut Document, file_path: &str) -> Result<bool, YerbaError> {
     let original = document.to_string();
 
-    for step in &self.pipeline {
-      execute_step(document, step, None, file_path, self)?;
+    if self.should_run_global_pipeline(file_path) {
+      execute_pipeline(document, &self.pipeline, None, file_path, self)?;
     }
 
     for rule in &self.rules {
@@ -464,6 +477,55 @@ impl Yerbafile {
 
     Ok(document.to_string() != original)
   }
+}
+
+fn execute_pipeline(document: &mut Document, steps: &[PipelineStep], base_path: Option<&str>, file: &str, yerbafile: &Yerbafile) -> Result<(), YerbaError> {
+  use crate::document::style::StyleEnforcement;
+
+  let mut enforcement = StyleEnforcement {
+    collection_style: None,
+    sequence_indent: None,
+    key_style: None,
+    value_style: None,
+  };
+
+  let mut has_enforcement = false;
+  let mut remaining_steps: Vec<&PipelineStep> = Vec::new();
+
+  for step in steps {
+    match step {
+      PipelineStep::CollectionStyle(config) if config.path.is_none() && base_path.is_none() => {
+        enforcement.collection_style = Some(config.style.clone());
+        has_enforcement = true;
+      }
+
+      PipelineStep::SequenceIndent(config) if config.path.is_none() && base_path.is_none() => {
+        enforcement.sequence_indent = Some(config.style.clone());
+        has_enforcement = true;
+      }
+
+      PipelineStep::QuoteStyle(config) if config.path.is_none() && base_path.is_none() => {
+        let key_style = config.key_style.parse::<crate::KeyStyle>().ok();
+        let value_style = config.value_style.parse::<QuoteStyle>().ok();
+
+        enforcement.key_style = key_style;
+        enforcement.value_style = value_style;
+        has_enforcement = true;
+      }
+
+      _ => remaining_steps.push(step),
+    }
+  }
+
+  if has_enforcement {
+    document.enforce_styles(&enforcement)?;
+  }
+
+  for step in remaining_steps {
+    execute_step(document, step, base_path, file, yerbafile)?;
+  }
+
+  Ok(())
 }
 
 fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<&str>, _file: &str, yerbafile: &Yerbafile) -> Result<(), YerbaError> {

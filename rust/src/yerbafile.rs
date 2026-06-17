@@ -8,6 +8,8 @@ use crate::{Document, QuoteStyle, YerbaError};
 #[derive(Debug, Deserialize)]
 pub struct Yerbafile {
   #[serde(default)]
+  pub pipeline: Vec<PipelineStep>,
+  #[serde(default)]
   pub rules: Vec<Rule>,
   #[serde(skip)]
   pub directory: Option<PathBuf>,
@@ -319,6 +321,7 @@ impl Yerbafile {
 
   pub fn apply(&self, write: bool) -> Vec<RuleResult> {
     let mut results = Vec::new();
+    let mut globally_processed: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for rule in &self.rules {
       let files = match glob::glob(&rule.files) {
@@ -337,7 +340,17 @@ impl Yerbafile {
 
       let file_strings: Vec<String> = files.iter().map(|path| path.to_string_lossy().to_string()).collect();
 
-      let file_results: Vec<RuleResult> = file_strings.par_iter().map(|file| self.apply_pipeline_to_file(rule, file, write)).collect();
+      let file_results: Vec<RuleResult> = file_strings
+        .par_iter()
+        .map(|file| {
+          let run_global = !self.pipeline.is_empty() && !globally_processed.contains(file.as_str());
+          self.apply_pipeline_to_file(rule, file, write, run_global)
+        })
+        .collect();
+
+      for result in &file_results {
+        globally_processed.insert(result.file.clone());
+      }
 
       results.extend(file_results);
     }
@@ -345,7 +358,7 @@ impl Yerbafile {
     results
   }
 
-  fn apply_pipeline_to_file(&self, rule: &Rule, file: &str, write: bool) -> RuleResult {
+  fn apply_pipeline_to_file(&self, rule: &Rule, file: &str, write: bool, run_global: bool) -> RuleResult {
     let mut document = match Document::parse_file(file) {
       Ok(document) => document,
       Err(error) => {
@@ -358,6 +371,19 @@ impl Yerbafile {
     };
 
     let original = document.to_string();
+
+    if run_global {
+      for step in &self.pipeline {
+        if let Err(error) = execute_step(&mut document, step, None, file, self) {
+          return RuleResult {
+            file: file.to_string(),
+            changed: false,
+            error: Some(error),
+          };
+        }
+      }
+    }
+
     let base_path = rule.path.as_deref();
 
     for step in &rule.pipeline {
@@ -392,6 +418,7 @@ impl Yerbafile {
 
   pub fn apply_file(&self, file: &str, write: bool) -> Vec<RuleResult> {
     let mut results = Vec::new();
+    let mut ran_global = false;
 
     for rule in &self.rules {
       if let Ok(pattern) = glob::Pattern::new(&rule.files) {
@@ -402,7 +429,9 @@ impl Yerbafile {
         continue;
       }
 
-      results.push(self.apply_pipeline_to_file(rule, file, write));
+      let run_global = !self.pipeline.is_empty() && !ran_global;
+      results.push(self.apply_pipeline_to_file(rule, file, write, run_global));
+      ran_global = true;
     }
 
     results
@@ -410,6 +439,10 @@ impl Yerbafile {
 
   pub fn apply_to_document(&self, document: &mut Document, file_path: &str) -> Result<bool, YerbaError> {
     let original = document.to_string();
+
+    for step in &self.pipeline {
+      execute_step(document, step, None, file_path, self)?;
+    }
 
     for rule in &self.rules {
       if !file_path.is_empty() {

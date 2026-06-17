@@ -219,6 +219,136 @@ fn test_apply_to_document_applies_all_matching_rules() {
 }
 
 #[test]
+fn test_global_pipeline_applies_to_all_files() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    pipeline:
+      - quote_style:
+          key_style: plain
+          value_style: double
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    host: localhost
+    port: 5432
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "any/file.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    host: "localhost"
+    port: 5432
+  "#}
+  );
+}
+
+#[test]
+fn test_global_pipeline_runs_before_rule_pipeline() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    pipeline:
+      - quote_style:
+          key_style: plain
+          value_style: double
+
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - quote_style:
+              path: "name"
+              value_style: plain
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    name: Alice
+    host: localhost
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    name: Alice
+    host: "localhost"
+  "#}
+  );
+}
+
+#[test]
+fn test_global_pipeline_with_no_rules() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    pipeline:
+      - collection_style:
+          style: block
+      - sequence_indent:
+          style: indented
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    tags: [ruby, rails]
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+    tags:
+      - ruby
+      - rails
+  "}
+  );
+}
+
+#[test]
+fn test_empty_global_pipeline_is_valid() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - quote_style:
+              key_style: plain
+              value_style: double
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  assert!(yerbafile.pipeline.is_empty());
+}
+
+#[test]
 fn test_apply_collection_style_flow_to_block() {
   let dir = TempDir::new().unwrap();
   fs::write(

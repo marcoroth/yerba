@@ -208,11 +208,12 @@ module Yerba
     def coerce_value(value, style: nil)
       case value
       when Array, Hash
-        resolved_style = style || default_collection_style(value)
+        resolved_style = style || :block
 
-        case resolved_style
-        when :flow then Formatting.to_yaml_value(value)
-        else Formatting.to_block_yaml_value(value)
+        if resolved_style == :flow
+          Formatting.to_yaml_value(value)
+        else
+          Formatting.to_block_yaml_value(value)
         end
       else value
       end

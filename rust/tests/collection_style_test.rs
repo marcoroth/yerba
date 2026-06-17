@@ -162,6 +162,118 @@ fn test_set_collection_style_preserves_surrounding_content() {
 }
 
 #[test]
+fn test_get_collection_style_nested_block_sequence() {
+  let document = parse(indoc! {"
+    app:
+      tags:
+        - ruby
+        - rails
+  "});
+
+  assert_eq!(document.get_collection_style("app.tags"), Some("block"));
+}
+
+#[test]
+fn test_get_collection_style_nested_flow_sequence() {
+  let document = parse(indoc! {"
+    app:
+      tags: [ruby, rails]
+  "});
+
+  assert_eq!(document.get_collection_style("app.tags"), Some("flow"));
+}
+
+#[test]
+fn test_set_collection_style_nested_flow_to_block() {
+  let mut document = parse(indoc! {"
+    app:
+      name: MyApp
+      tags: [ruby, rails]
+      version: 1
+  "});
+
+  document.set_collection_style("app.tags", "block").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      app:
+        name: MyApp
+        tags:
+          - ruby
+          - rails
+        version: 1
+    "}
+  );
+}
+
+#[test]
+fn test_set_collection_style_nested_block_to_flow() {
+  let mut document = parse(indoc! {"
+    app:
+      name: MyApp
+      tags:
+        - ruby
+        - rails
+      version: 1
+  "});
+
+  document.set_collection_style("app.tags", "flow").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      app:
+        name: MyApp
+        tags: [ruby, rails]
+        version: 1
+    "}
+  );
+}
+
+#[test]
+fn test_set_collection_style_flow_to_block_nested_map() {
+  let mut document = parse(indoc! {"
+    app:
+      database: {host: localhost, port: 5432}
+  "});
+
+  document.set_collection_style("app.database", "block").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      app:
+        database:
+          host: localhost
+          port: 5432
+    "}
+  );
+}
+
+#[test]
+fn test_set_collection_style_invalid_style_returns_error() {
+  let mut document = parse(indoc! {"
+    tags: [ruby, rails]
+  "});
+
+  let result = document.set_collection_style("tags", "compact");
+
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_set_collection_style_on_scalar_returns_error() {
+  let mut document = parse(indoc! {"
+    name: Alice
+  "});
+
+  let result = document.set_collection_style("name", "block");
+
+  assert!(result.is_err());
+}
+
+#[test]
 fn test_insert_map_key_with_multiline_value() {
   let mut document = parse(indoc! {"
     name: Alice

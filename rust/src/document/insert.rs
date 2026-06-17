@@ -397,13 +397,23 @@ impl Document {
     let is_block_value = value.contains('\n') || value.starts_with("- ");
     let new_entry_text = if is_block_value {
       let value_indent = format!("{}  ", indent);
-      let indented_lines: Vec<String> = value
-        .lines()
+      let lines: Vec<&str> = value.lines().collect();
+
+      let min_indent = lines
+        .iter()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.len() - line.trim_start().len())
+        .min()
+        .unwrap_or(0);
+
+      let indented_lines: Vec<String> = lines
+        .iter()
         .map(|line| {
           if line.trim().is_empty() {
             String::new()
           } else {
-            format!("{}{}", value_indent, line.trim_start())
+            let relative = &line[min_indent..];
+            format!("{}{}", value_indent, relative)
           }
         })
         .collect();

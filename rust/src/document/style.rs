@@ -14,6 +14,27 @@ impl Document {
       return Ok(());
     }
 
+    match style {
+      "block" | "flow" => {}
+      _ => {
+        return Err(YerbaError::ParseError(format!(
+          "unknown collection style '{}'. Valid options: flow, block",
+          style
+        )))
+      }
+    }
+
+    if style == "block" {
+      let has_flow = self
+        .root
+        .descendants_with_tokens()
+        .any(|element| matches!(element.kind(), SyntaxKind::FLOW_SEQ | SyntaxKind::FLOW_MAP));
+
+      if !has_flow {
+        return Ok(());
+      }
+    }
+
     let value = match self.get_value(scope_path) {
       Some(value) => value,
       None => return Ok(()),
@@ -27,16 +48,15 @@ impl Document {
 
     collect_selectors(&value, scope_path, &mut selectors);
 
-    let mut collection_selectors: Vec<String> = selectors.into_iter().filter(|selector| self.get_collection_style(selector).is_some()).collect();
+    let mut collection_selectors: Vec<String> = selectors
+      .into_iter()
+      .filter(|selector| self.get_collection_style(selector).is_some_and(|current_style| current_style != style))
+      .collect();
 
     collection_selectors.sort_by_key(|selector| std::cmp::Reverse(selector.len()));
 
     for selector in &collection_selectors {
-      if let Some(current_style) = self.get_collection_style(selector) {
-        if current_style != style {
-          self.set_collection_style(selector, style)?;
-        }
-      }
+      self.set_collection_style(selector, style)?;
     }
 
     Ok(())
@@ -55,6 +75,58 @@ impl Document {
       return Ok(());
     }
 
+    let scope_node = if scope_path.is_empty() {
+      self.root.clone()
+    } else {
+      match self.navigate(scope_path) {
+        Ok(node) => node,
+        Err(_) => return Ok(()),
+      }
+    };
+
+    let source = self.root.text().to_string();
+    let has_mismatches = scope_node.descendants().any(|descendant| {
+      if descendant.kind() != SyntaxKind::BLOCK_MAP_VALUE {
+        return false;
+      }
+
+      let has_sequence = descendant.children().any(|child| child.kind() == SyntaxKind::BLOCK_SEQ);
+      if !has_sequence {
+        return false;
+      }
+
+      let parent = match descendant.parent() {
+        Some(parent) if parent.kind() == SyntaxKind::BLOCK_MAP_ENTRY => parent,
+        _ => return false,
+      };
+
+      let entry_start: usize = parent.text_range().start().into();
+      let line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
+      let key_indent_length = entry_start - line_start;
+
+      let sequence = match descendant.children().find_map(BlockSeq::cast) {
+        Some(sequence) => sequence,
+        None => return false,
+      };
+
+      if let Some(first_entry) = sequence.entries().next() {
+        let entry_indent_length = preceding_whitespace_indent(first_entry.syntax()).len();
+        let is_indented = entry_indent_length > key_indent_length;
+
+        match style {
+          "indented" => !is_indented,
+          "compact" => is_indented,
+          _ => false,
+        }
+      } else {
+        false
+      }
+    });
+
+    if !has_mismatches {
+      return Ok(());
+    }
+
     let value = match self.get_value(scope_path) {
       Some(value) => value,
       None => return Ok(()),
@@ -68,14 +140,13 @@ impl Document {
 
     collect_selectors(&value, scope_path, &mut selectors);
 
-    let sequence_selectors: Vec<String> = selectors.into_iter().filter(|selector| self.get_sequence_indent(selector).is_some()).collect();
+    let sequence_selectors: Vec<String> = selectors
+      .into_iter()
+      .filter(|selector| self.get_sequence_indent(selector).is_some_and(|current_style| current_style != style))
+      .collect();
 
     for selector in sequence_selectors.iter().rev() {
-      if let Some(current_style) = self.get_sequence_indent(selector) {
-        if current_style != style {
-          self.set_sequence_indent(selector, style)?;
-        }
-      }
+      self.set_sequence_indent(selector, style)?;
     }
 
     Ok(())

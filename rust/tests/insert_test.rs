@@ -687,3 +687,128 @@ fn test_insert_condition_requires_dot_prefix() {
 
   assert!(result.is_err());
 }
+
+#[test]
+fn test_insert_with_wildcard_adds_key_to_all_entries() {
+  let mut document = parse(indoc! {"
+    - title: Talk 1
+      date: 2024-01-01
+    - title: Talk 2
+      date: 2024-01-02
+  "});
+
+  document.insert_into("[].language", "pt", InsertPosition::Last).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - title: Talk 1
+        date: 2024-01-01
+        language: pt
+      - title: Talk 2
+        date: 2024-01-02
+        language: pt
+    "}
+  );
+}
+
+#[test]
+fn test_insert_with_wildcard_after_position() {
+  let mut document = parse(indoc! {"
+    - title: Talk 1
+      date: 2024-01-01
+      speakers:
+        - Alice
+    - title: Talk 2
+      date: 2024-01-02
+      speakers:
+        - Bob
+  "});
+
+  document.insert_into("[].language", "pt", InsertPosition::After("date".to_string())).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - title: Talk 1
+        date: 2024-01-01
+        language: pt
+        speakers:
+          - Alice
+      - title: Talk 2
+        date: 2024-01-02
+        language: pt
+        speakers:
+          - Bob
+    "}
+  );
+}
+
+#[test]
+fn test_insert_with_wildcard_skips_entries_that_already_have_key() {
+  let mut document = parse(indoc! {"
+    - title: Talk 1
+      language: en
+    - title: Talk 2
+  "});
+
+  document.insert_into("[].language", "pt", InsertPosition::Last).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - title: Talk 1
+        language: en
+      - title: Talk 2
+        language: pt
+    "}
+  );
+}
+
+#[test]
+fn test_insert_with_nested_wildcard() {
+  let mut document = parse(indoc! {"
+    - title: Session 1
+      talks:
+        - title: Talk A
+          date: 2024-01-01
+        - title: Talk B
+          date: 2024-01-02
+    - title: Session 2
+      speakers:
+        - Charlie
+  "});
+
+  document
+    .insert_into("[].talks[].language", "pt", InsertPosition::After("date".to_string()))
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - title: Session 1
+        talks:
+          - title: Talk A
+            date: 2024-01-01
+            language: pt
+          - title: Talk B
+            date: 2024-01-02
+            language: pt
+      - title: Session 2
+        speakers:
+          - Charlie
+    "}
+  );
+}
+
+#[test]
+fn test_insert_with_wildcard_no_matches_is_ok() {
+  let mut document = parse(indoc! {"
+    - title: Talk 1
+    - title: Talk 2
+  "});
+
+  let result = document.insert_into("[].talks[].language", "pt", InsertPosition::Last);
+
+  assert!(result.is_ok());
+}

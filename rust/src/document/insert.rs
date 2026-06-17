@@ -131,7 +131,88 @@ impl Document {
       }
     }
 
+    let selector = crate::selector::Selector::parse(dot_path);
+    let has_wildcard = selector.has_wildcard() || selector.has_brackets();
     let (parent_path, key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
+
+    if has_wildcard {
+      let count = self.navigate_all_compact(parent_path).len();
+
+      if count == 0 {
+        return Ok(());
+      }
+
+      for i in (0..count).rev() {
+        let nodes = self.navigate_all_compact(parent_path);
+
+        let node = match nodes.get(i) {
+          Some(node) => node.clone(),
+          None => continue,
+        };
+
+        let map = match node.descendants().find_map(BlockMap::cast) {
+          Some(map) => map,
+          None => continue,
+        };
+
+        if find_entry_by_key(&map, key).is_some() {
+          continue;
+        }
+
+        let entries: Vec<_> = map.entries().collect();
+
+        if entries.is_empty() {
+          continue;
+        }
+
+        let first_entry = entries.first().unwrap();
+
+        let start_col = {
+          let offset: usize = first_entry.syntax().text_range().start().into();
+          let source = self.to_string();
+          let before = &source[..offset];
+
+          offset - before.rfind('\n').map(|p| p + 1).unwrap_or(0)
+        };
+
+        let indent = " ".repeat(start_col);
+        let new_entry_text = format!("{}: {}", key, value);
+
+        match &position {
+          InsertPosition::After(target_key) => {
+            let target = find_entry_by_key(&map, target_key);
+            let after_node = target.map(|e| e.syntax().clone()).unwrap_or_else(|| entries.last().unwrap().syntax().clone());
+            let new_text = format!("\n{}{}", indent, new_entry_text);
+
+            self.insert_after_node(&after_node, &new_text)?;
+          }
+
+          InsertPosition::Before(target_key) => {
+            if let Some(target_entry) = find_entry_by_key(&map, target_key) {
+              let target_range = target_entry.syntax().text_range();
+              let replacement = format!("{}\n{}", new_entry_text, indent);
+              let insert_range = TextRange::new(target_range.start(), target_range.start());
+
+              self.apply_edit(insert_range, &replacement)?;
+            } else {
+              let last_entry = entries.last().unwrap();
+              let new_text = format!("\n{}{}", indent, new_entry_text);
+
+              self.insert_after_node(last_entry.syntax(), &new_text)?;
+            }
+          }
+
+          _ => {
+            let last_entry = entries.last().unwrap();
+            let new_text = format!("\n{}{}", indent, new_entry_text);
+
+            self.insert_after_node(last_entry.syntax(), &new_text)?;
+          }
+        }
+      }
+
+      return Ok(());
+    }
 
     self.insert_map_key(parent_path, key, value, position)
   }

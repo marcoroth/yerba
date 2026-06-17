@@ -219,6 +219,190 @@ fn test_apply_to_document_applies_all_matching_rules() {
 }
 
 #[test]
+fn test_apply_collection_style_flow_to_block() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - collection_style:
+              path: "tags"
+              style: block
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    tags: [ruby, rails]
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+    tags:
+      - ruby
+      - rails
+  "}
+  );
+}
+
+#[test]
+fn test_apply_collection_style_block_to_flow() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - collection_style:
+              path: "tags"
+              style: flow
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    tags:
+      - ruby
+      - rails
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+    tags: [ruby, rails]
+  "}
+  );
+}
+
+#[test]
+fn test_apply_collection_style_with_wildcard_path() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - collection_style:
+              path: "[].tags"
+              style: block
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    - name: Alice
+      tags: [ruby, rails]
+    - name: Bob
+      tags: [python, django]
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+    - name: Alice
+      tags:
+        - ruby
+        - rails
+    - name: Bob
+      tags:
+        - python
+        - django
+  "}
+  );
+}
+
+#[test]
+fn test_apply_collection_style_without_path_applies_to_whole_file() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - collection_style:
+              style: block
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    tags: [ruby, rails]
+    database: {host: localhost, port: 5432}
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+    tags:
+      - ruby
+      - rails
+    database:
+      host: localhost
+      port: 5432
+  "}
+  );
+}
+
+#[test]
+fn test_apply_collection_style_without_path_noop_when_already_matching() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - collection_style:
+              style: block
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    tags:
+      - ruby
+      - rails
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(!changed);
+}
+
+#[test]
 fn test_schema_validation_passes_for_valid_document() {
   let dir = TempDir::new().unwrap();
 

@@ -32,7 +32,6 @@ module Yerba
       when true then "true"
       when false then "false"
       when nil then "null"
-      when Numeric then value.to_s
       else value.to_s
       end
     end

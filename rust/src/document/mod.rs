@@ -563,6 +563,17 @@ pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> yaml_serde::Value {
     return yaml_serde::Value::String(text);
   }
 
+  if node
+    .descendants()
+    .any(|descendant| descendant.kind() == SyntaxKind::FLOW_SEQ || descendant.kind() == SyntaxKind::FLOW_MAP)
+  {
+    let text = node.text().to_string().trim().to_string();
+
+    if let Ok(value) = yaml_serde::from_str(&text) {
+      return value;
+    }
+  }
+
   if let Some(scalar) = extract_scalar(node) {
     use crate::syntax::{detect_yaml_type, is_yaml_truthy, YerbaValueType};
 

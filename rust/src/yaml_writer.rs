@@ -37,11 +37,109 @@ pub fn json_to_yaml_text(value: &Value, quote_style: &QuoteStyle, indent: usize)
         .join("\n")
     }
 
+    Value::Array(array) => {
+      let prefix = " ".repeat(indent);
+
+      array
+        .iter()
+        .map(|item| match item {
+          Value::Object(_) => {
+            let inner = json_to_yaml_text(item, quote_style, indent + 2);
+            format!("{}- {}", prefix, inner.trim_start())
+          }
+
+          _ => format!("{}- {}", prefix, format_yaml_scalar(item, quote_style)),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+    }
+
     _ => {
       let prefix = " ".repeat(indent);
 
       format!("{}{}", prefix, format_yaml_scalar(value, quote_style))
     }
+  }
+}
+
+pub fn yaml_value_to_flow_text(value: &yaml_serde::Value) -> String {
+  match value {
+    yaml_serde::Value::Null => "null".to_string(),
+    yaml_serde::Value::Bool(boolean) => boolean.to_string(),
+    yaml_serde::Value::Number(number) => number.to_string(),
+
+    yaml_serde::Value::String(string) => {
+      if crate::syntax::is_yaml_non_string(string) {
+        format!("\"{}\"", string.replace('"', "\\\""))
+      } else {
+        string.clone()
+      }
+    }
+
+    yaml_serde::Value::Sequence(sequence) => {
+      let items: Vec<String> = sequence.iter().map(yaml_value_to_flow_text).collect();
+
+      format!("[{}]", items.join(", "))
+    }
+
+    yaml_serde::Value::Mapping(mapping) => {
+      let pairs: Vec<String> = mapping
+        .iter()
+        .map(|(key, value)| {
+          let key_string = match key {
+            yaml_serde::Value::String(string) => string.clone(),
+            _ => format!("{:?}", key),
+          };
+
+          format!("{}: {}", key_string, yaml_value_to_flow_text(value))
+        })
+        .collect();
+
+      format!("{{{}}}", pairs.join(", "))
+    }
+
+    yaml_serde::Value::Tagged(tagged) => yaml_value_to_flow_text(&tagged.value),
+  }
+}
+
+pub fn yaml_value_to_block_text(value: &yaml_serde::Value, indent: usize) -> String {
+  let prefix = " ".repeat(indent);
+
+  match value {
+    yaml_serde::Value::Sequence(sequence) => sequence
+      .iter()
+      .map(|item| match item {
+        yaml_serde::Value::Mapping(_) => {
+          let inner = yaml_value_to_block_text(item, indent + 2);
+          format!("{}- {}", prefix, inner.trim_start())
+        }
+
+        _ => format!("{}- {}", prefix, yaml_value_to_flow_text(item)),
+      })
+      .collect::<Vec<_>>()
+      .join("\n"),
+
+    yaml_serde::Value::Mapping(mapping) => mapping
+      .iter()
+      .map(|(key, value)| {
+        let key_string = match key {
+          yaml_serde::Value::String(string) => string.clone(),
+          _ => format!("{:?}", key),
+        };
+        match value {
+          yaml_serde::Value::Sequence(_) | yaml_serde::Value::Mapping(_) => {
+            let inner = yaml_value_to_block_text(value, indent + 2);
+
+            format!("{}{}:\n{}", prefix, key_string, inner)
+          }
+
+          _ => format!("{}{}: {}", prefix, key_string, yaml_value_to_flow_text(value)),
+        }
+      })
+      .collect::<Vec<_>>()
+      .join("\n"),
+
+    _ => format!("{}{}", prefix, yaml_value_to_flow_text(value)),
   }
 }
 

@@ -581,11 +581,25 @@ class MapTest < Minitest::Spec
     YAML
   end
 
-  test "[]= sets array with values" do
+  test "[]= sets array with values (block by default)" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
     YAML
     document.root["tags"] = ["ruby", "rails"]
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      tags:
+        - ruby
+        - rails
+    YAML
+  end
+
+  test "[]= sets array with values (flow style)" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root.set("tags", ["ruby", "rails"], style: :flow)
 
     assert_equal <<~YAML, document.to_s
       name: Alice
@@ -605,11 +619,25 @@ class MapTest < Minitest::Spec
     YAML
   end
 
-  test "[]= sets hash with values" do
+  test "[]= sets hash with values (block by default)" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
     YAML
     document.root["settings"] = { theme: "dark", lang: "en" }
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      settings:
+        theme: dark
+        lang: en
+    YAML
+  end
+
+  test "[]= sets hash with values (flow style)" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root.set("settings", { theme: "dark", lang: "en" }, style: :flow)
 
     assert_equal <<~YAML, document.to_s
       name: Alice
@@ -631,7 +659,23 @@ class MapTest < Minitest::Spec
     YAML
   end
 
-  test "[]= replaces existing value with array" do
+  test "insert with block style array" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      age: 30
+    YAML
+    document.root.insert("tags", ["ruby", "rails"], after: "name")
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      tags:
+        - ruby
+        - rails
+      age: 30
+    YAML
+  end
+
+  test "[]= replaces existing value with array (block by default)" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
       tags: old
@@ -640,7 +684,163 @@ class MapTest < Minitest::Spec
 
     assert_equal <<~YAML, document.to_s
       name: Alice
-      tags: [new]
+      tags:
+        - new
+    YAML
+  end
+
+  test "collection_style reads flow" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags: [ruby, rails]
+    YAML
+
+    assert_equal :flow, document["tags"].collection_style
+  end
+
+  test "collection_style reads block" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rails
+    YAML
+
+    assert_equal :block, document["tags"].collection_style
+  end
+
+  test "collection_style= converts flow to block" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags: [ruby, rails]
+    YAML
+    document["tags"].collection_style = :block
+
+    assert_equal <<~YAML, document.to_s
+      tags:
+        - ruby
+        - rails
+    YAML
+  end
+
+  test "collection_style= converts block to flow" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rails
+    YAML
+    document["tags"].collection_style = :flow
+
+    assert_equal <<~YAML, document.to_s
+      tags: [ruby, rails]
+    YAML
+  end
+
+  test "collection_style reads flow map" do
+    document = Yerba::Document.parse(<<~YAML)
+      database: {host: localhost, port: 5432}
+    YAML
+
+    assert_equal :flow, document["database"].collection_style
+  end
+
+  test "collection_style reads block map" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
+
+    assert_equal :block, document["database"].collection_style
+  end
+
+  test "collection_style= converts flow map to block" do
+    document = Yerba::Document.parse(<<~YAML)
+      database: {host: localhost, port: 5432}
+    YAML
+    document["database"].collection_style = :block
+
+    assert_equal <<~YAML, document.to_s
+      database:
+        host: localhost
+        port: 5432
+    YAML
+  end
+
+  test "collection_style= converts block map to flow" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+        port: 5432
+    YAML
+    document["database"].collection_style = :flow
+
+    assert_equal <<~YAML, document.to_s
+      database: {host: localhost, port: 5432}
+    YAML
+  end
+
+  test "[]= sets nested hash with block style" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root["config"] = { database: { host: "localhost", port: 5432 } }
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      config:
+        database:
+          host: localhost
+          port: 5432
+    YAML
+  end
+
+  test "[]= sets nested array with block style" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root["speakers"] = [{ name: "Bob" }, { name: "Carol" }]
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      speakers:
+        - name: Bob
+        - name: Carol
+    YAML
+  end
+
+  test "set with style: :flow for nested structure" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+    document.root.set("config", { host: "localhost", port: 5432 }, style: :flow)
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      config: {host: localhost, port: 5432}
+    YAML
+  end
+
+  test "collection_style on nested sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      app:
+        tags:
+          - ruby
+          - rails
+    YAML
+
+    assert_equal :block, document["app"]["tags"].collection_style
+  end
+
+  test "collection_style= on nested sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      app:
+        tags: [ruby, rails]
+    YAML
+    document["app"]["tags"].collection_style = :block
+
+    assert_equal <<~YAML, document.to_s
+      app:
+        tags:
+          - ruby
+          - rails
     YAML
   end
 end

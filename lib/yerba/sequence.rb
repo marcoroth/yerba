@@ -293,6 +293,16 @@ module Yerba
       end
     end
 
+    def collection_style
+      @collection_style || document&.get_collection_style(@selector)
+    end
+
+    def collection_style=(style)
+      document&.set_collection_style(@selector, style)
+
+      @collection_style = style
+    end
+
     private
 
     def dig_into(hash, path)

@@ -966,6 +966,16 @@ class DocumentTest < Minitest::Spec
     assert_equal "Charlie", document.find_by(name: "Charlie")["name"].value
   end
 
+  test "document << appends to empty array" do
+    document = Yerba::Document.parse(<<~YAML)
+      names: []
+    YAML
+
+    document["names"] << "Chael"
+
+    assert_equal ["Chael"], document.value_at("names")
+  end
+
   test "document.apply reorders keys from Yerbafile" do
     yerbafile = Tempfile.new(["Yerbafile", ".yml"])
     yerbafile.write(<<~YAML)

@@ -130,24 +130,11 @@ impl Document {
   }
 
   pub fn node_type(&self, dot_path: &str) -> NodeType {
-    match self.navigate(dot_path) {
-      Ok(node) => {
-        if let Some(first_structural) = node
-          .descendants()
-          .find(|child| BlockMap::can_cast(child.kind()) || BlockSeq::can_cast(child.kind()))
-        {
-          if BlockMap::can_cast(first_structural.kind()) {
-            NodeType::Map
-          } else {
-            NodeType::Sequence
-          }
-        } else if extract_scalar(&node).is_some() {
-          NodeType::Scalar
-        } else {
-          NodeType::NotFound
-        }
-      }
-      Err(_) => NodeType::NotFound,
+    match self.get_value(dot_path) {
+      Some(yaml_serde::Value::Mapping(_)) => NodeType::Map,
+      Some(yaml_serde::Value::Sequence(_)) => NodeType::Sequence,
+      Some(_) => NodeType::Scalar,
+      None => NodeType::NotFound,
     }
   }
 

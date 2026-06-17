@@ -199,6 +199,54 @@ fn test_set_sequence_indent_with_nested_map_entries() {
 }
 
 #[test]
+fn test_enforce_sequence_indent_converts_all_nested_sequences() {
+  let mut document = parse(indoc! {"
+    talks:
+    - title: Talk 1
+      speakers:
+      - Alice
+      - Bob
+    - title: Talk 2
+      speakers:
+      - Charlie
+  "});
+
+  document.enforce_sequence_indent("indented", None).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      talks:
+        - title: Talk 1
+          speakers:
+            - Alice
+            - Bob
+        - title: Talk 2
+          speakers:
+            - Charlie
+    "}
+  );
+}
+
+#[test]
+fn test_enforce_sequence_indent_noop_when_all_already_indented() {
+  let mut document = parse(indoc! {"
+    talks:
+      - title: Talk 1
+        speakers:
+          - Alice
+      - title: Talk 2
+        speakers:
+          - Bob
+  "});
+
+  let original = document.to_string();
+  document.enforce_sequence_indent("indented", None).unwrap();
+
+  assert_eq!(document.to_string(), original);
+}
+
+#[test]
 fn test_set_sequence_indent_invalid_style_returns_error() {
   let mut document = parse(indoc! {"
     tags:

@@ -84,42 +84,34 @@ impl Document {
       }
     };
 
-    let source = self.root.text().to_string();
     let has_mismatches = scope_node.descendants().any(|descendant| {
-      if descendant.kind() != SyntaxKind::BLOCK_MAP_VALUE {
+      if !BlockSeq::can_cast(descendant.kind()) {
         return false;
       }
 
-      let has_sequence = descendant.children().any(|child| child.kind() == SyntaxKind::BLOCK_SEQ);
-      if !has_sequence {
-        return false;
-      }
-
-      let parent = match descendant.parent() {
-        Some(parent) if parent.kind() == SyntaxKind::BLOCK_MAP_ENTRY => parent,
-        _ => return false,
-      };
-
-      let entry_start: usize = parent.text_range().start().into();
-      let line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
-      let key_indent_length = entry_start - line_start;
-
-      let sequence = match descendant.children().find_map(BlockSeq::cast) {
+      let sequence = match BlockSeq::cast(descendant.clone()) {
         Some(sequence) => sequence,
         None => return false,
       };
 
-      if let Some(first_entry) = sequence.entries().next() {
-        let entry_indent_length = preceding_whitespace_indent(first_entry.syntax()).len();
-        let is_indented = entry_indent_length > key_indent_length;
+      let first_entry = match sequence.entries().next() {
+        Some(entry) => entry,
+        None => return false,
+      };
 
-        match style {
-          "indented" => !is_indented,
-          "compact" => is_indented,
-          _ => false,
-        }
-      } else {
-        false
+      let parent_entry = match descendant.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY) {
+        Some(entry) => entry,
+        None => return false,
+      };
+
+      let key_indent_length = preceding_whitespace_indent(&parent_entry).len();
+      let entry_indent_length = preceding_whitespace_indent(first_entry.syntax()).len();
+      let is_indented = entry_indent_length > key_indent_length;
+
+      match style {
+        "indented" => !is_indented,
+        "compact" => is_indented,
+        _ => false,
       }
     });
 
@@ -127,29 +119,44 @@ impl Document {
       return Ok(());
     }
 
-    let value = match self.get_value(scope_path) {
-      Some(value) => value,
-      None => return Ok(()),
-    };
+    loop {
+      let value = match self.get_value(scope_path) {
+        Some(value) => value,
+        None => return Ok(()),
+      };
 
-    let mut selectors = Vec::new();
+      let mut selectors = Vec::new();
 
-    if !scope_path.is_empty() {
-      selectors.push(scope_path.to_string());
+      if !scope_path.is_empty() {
+        selectors.push(scope_path.to_string());
+      }
+
+      collect_selectors(&value, scope_path, &mut selectors);
+
+      let concrete_selectors: Vec<String> = selectors
+        .into_iter()
+        .flat_map(|selector| {
+          if selector.contains("[]") {
+            self.resolve_selectors(&selector)
+          } else {
+            vec![selector]
+          }
+        })
+        .collect();
+
+      let mut sequence_selectors: Vec<String> = concrete_selectors
+        .into_iter()
+        .filter(|selector| self.get_sequence_indent(selector).is_some_and(|current_style| current_style != style))
+        .collect();
+
+      if sequence_selectors.is_empty() {
+        return Ok(());
+      }
+
+      sequence_selectors.sort_by_key(|selector| std::cmp::Reverse(selector.len()));
+
+      self.set_sequence_indent(&sequence_selectors[0], style)?;
     }
-
-    collect_selectors(&value, scope_path, &mut selectors);
-
-    let sequence_selectors: Vec<String> = selectors
-      .into_iter()
-      .filter(|selector| self.get_sequence_indent(selector).is_some_and(|current_style| current_style != style))
-      .collect();
-
-    for selector in sequence_selectors.iter().rev() {
-      self.set_sequence_indent(selector, style)?;
-    }
-
-    Ok(())
   }
 
   pub fn set_sequence_indent(&mut self, dot_path: &str, style: &str) -> Result<(), YerbaError> {

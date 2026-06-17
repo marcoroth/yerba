@@ -1268,3 +1268,35 @@ fn test_double_to_literal_nested() {
     "}
   );
 }
+
+#[test]
+fn test_enforce_quotes_empty_single_to_double() {
+  let mut document = parse(indoc! {"
+    name: ''
+  "});
+
+  document.enforce_quotes(&yerba::QuoteStyle::Double).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      name: ""
+    "#}
+  );
+}
+
+#[test]
+fn test_enforce_quotes_empty_double_to_single() {
+  let mut document = parse(indoc! {r#"
+    name: ""
+  "#});
+
+  document.enforce_quotes(&yerba::QuoteStyle::Single).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: ''
+    "}
+  );
+}

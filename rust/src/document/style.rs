@@ -226,7 +226,7 @@ impl Document {
               _ => continue,
             };
 
-            if is_yaml_non_string(&raw_value) {
+            if current_kind == SyntaxKind::PLAIN_SCALAR && is_yaml_non_string(&raw_value) {
               continue;
             }
 
@@ -970,7 +970,7 @@ impl Document {
             _ => continue,
           };
 
-          if raw_value.is_empty() || is_yaml_non_string(&raw_value) {
+          if is_yaml_non_string(&raw_value) {
             continue;
           }
 
@@ -1020,7 +1020,7 @@ impl Document {
           _ => continue,
         };
 
-        if is_yaml_non_string(&raw_value) {
+        if current_kind == SyntaxKind::PLAIN_SCALAR && is_yaml_non_string(&raw_value) {
           continue;
         }
 

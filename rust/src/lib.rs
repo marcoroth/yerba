@@ -10,6 +10,7 @@ mod syntax;
 mod yaml_writer;
 pub mod yerbafile;
 
+pub use document::style::StyleEnforcement;
 pub use document::{collect_selectors, Document, DuplicateInfo, InsertPosition, LocatedNode, Location, NodeInfo, NodeType, SortField};
 pub use error::YerbaError;
 pub use quote_style::{KeyStyle, QuoteStyle};

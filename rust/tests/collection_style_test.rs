@@ -326,7 +326,7 @@ fn test_insert_map_key_with_multiline_value() {
 
 #[test]
 fn test_enforce_styles_combined_collection_and_quote() {
-  use yerba::document::style::StyleEnforcement;
+  use yerba::StyleEnforcement;
 
   let mut document = parse(indoc! {"
     tags: [ruby, rails]
@@ -355,7 +355,7 @@ fn test_enforce_styles_combined_collection_and_quote() {
 
 #[test]
 fn test_enforce_styles_combined_all() {
-  use yerba::document::style::StyleEnforcement;
+  use yerba::StyleEnforcement;
 
   let mut document = parse(indoc! {"
     tags: [ruby, rails]
@@ -384,12 +384,12 @@ fn test_enforce_styles_combined_all() {
 
 #[test]
 fn test_enforce_styles_noop_when_all_match() {
-  use yerba::document::style::StyleEnforcement;
+  use yerba::StyleEnforcement;
 
   let mut document = parse(indoc! {r#"
     tags:
-      - ruby
-      - rails
+      - "ruby"
+      - "rails"
     name: "localhost"
   "#});
 
@@ -409,7 +409,7 @@ fn test_enforce_styles_noop_when_all_match() {
 
 #[test]
 fn test_enforce_styles_partial_only_collection() {
-  use yerba::document::style::StyleEnforcement;
+  use yerba::StyleEnforcement;
 
   let mut document = parse(indoc! {"
     tags: [ruby, rails]

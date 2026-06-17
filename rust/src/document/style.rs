@@ -11,6 +11,7 @@ impl Document {
   pub fn enforce_styles(&mut self, enforcement: &StyleEnforcement) -> Result<(), YerbaError> {
     let source = self.root.text().to_string();
     let mut edits: Vec<(TextRange, String)> = Vec::new();
+    let mut converted_ranges: Vec<TextRange> = Vec::new();
 
     let want_block_collections = enforcement.collection_style.as_deref() == Some("block");
     let want_indented = enforcement.sequence_indent.as_deref() == Some("indented");
@@ -50,6 +51,7 @@ impl Document {
                 let block_text = crate::yaml_writer::yaml_value_to_block_text(&value, value_indent);
                 let replace_range = TextRange::new(rowan::TextSize::from((colon_position + 1) as u32), node.text_range().end());
 
+                converted_ranges.push(node.text_range());
                 edits.push((replace_range, format!("\n{}", block_text)));
               }
             }
@@ -125,6 +127,10 @@ impl Document {
         }
 
         rowan::NodeOrToken::Token(ref token) => {
+          if converted_ranges.iter().any(|range| range.contains_range(token.text_range())) {
+            continue;
+          }
+
           let current_kind = token.kind();
 
           if let Some(ref key_style) = enforcement.key_style {

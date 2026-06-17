@@ -481,6 +481,7 @@ impl Document {
     let new_item = Self::format_sequence_item(value, &item_indent);
     let current_node = self.navigate(dot_path)?;
     let mut range = current_node.text_range();
+    let inline_comment = self.trailing_inline_comment(&current_node);
 
     if let Some(previous) = current_node.prev_sibling_or_token().and_then(|element| element.into_token()) {
       if previous.kind() == SyntaxKind::WHITESPACE && !previous.text().contains('\n') {
@@ -488,7 +489,34 @@ impl Document {
       }
     }
 
-    self.apply_edit(range, &format!("\n{}{}", item_indent, new_item))
+    if let Some((_, comment_end)) = inline_comment {
+      range = TextRange::new(range.start(), comment_end);
+    }
+
+    let replacement = match inline_comment {
+      Some((comment_text, _)) => format!(" {}\n{}{}", comment_text, item_indent, new_item),
+      None => format!("\n{}{}", item_indent, new_item),
+    };
+
+    self.apply_edit(range, &replacement)
+  }
+
+  fn trailing_inline_comment(&self, node: &SyntaxNode) -> Option<(String, rowan::TextSize)> {
+    let source = self.root.text().to_string();
+    let start: usize = node.text_range().end().into();
+    let rest = &source[start..];
+    let line_end = rest.find('\n').unwrap_or(rest.len());
+    let trailing = &rest[..line_end];
+    let comment_start = trailing.find('#')?;
+
+    if !trailing[..comment_start].trim().is_empty() {
+      return None;
+    }
+
+    Some((
+      trailing[comment_start..].to_string(),
+      rowan::TextSize::from((start + line_end) as u32),
+    ))
   }
 
   fn format_sequence_item(value: &str, indent: &str) -> String {

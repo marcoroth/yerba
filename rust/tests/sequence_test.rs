@@ -41,6 +41,23 @@ fn test_append_to_empty_sequence() {
 }
 
 #[test]
+fn test_append_to_empty_sequence_preserves_inline_comment() {
+  let mut document = parse(indoc! {"
+    tags: [] # Keep this comment
+  "});
+
+  document.append("tags", "yaml").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tags: # Keep this comment
+        - yaml
+    "}
+  );
+}
+
+#[test]
 fn test_append_to_nested_sequence() {
   let mut document = parse(indoc! {"
     app:

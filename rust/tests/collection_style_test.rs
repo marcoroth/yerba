@@ -274,6 +274,38 @@ fn test_set_collection_style_on_scalar_returns_error() {
 }
 
 #[test]
+fn test_set_collection_style_skips_empty_flow_sequence() {
+  let mut document = parse(indoc! {"
+    talks: []
+  "});
+
+  document.set_collection_style("talks", "block").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      talks: []
+    "}
+  );
+}
+
+#[test]
+fn test_set_collection_style_skips_empty_flow_map() {
+  let mut document = parse(indoc! {"
+    config: {}
+  "});
+
+  document.set_collection_style("config", "block").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      config: {}
+    "}
+  );
+}
+
+#[test]
 fn test_insert_map_key_with_multiline_value() {
   let mut document = parse(indoc! {"
     name: Alice

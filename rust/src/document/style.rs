@@ -170,6 +170,13 @@ impl Document {
 
     let current_node = self.navigate(dot_path)?;
     let value = node_to_yaml_value(&current_node);
+
+    match &value {
+      yaml_serde::Value::Sequence(sequence) if sequence.is_empty() => return Ok(()),
+      yaml_serde::Value::Mapping(mapping) if mapping.is_empty() => return Ok(()),
+      _ => {}
+    }
+
     let source = self.to_string();
 
     let entry_node = current_node.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY);

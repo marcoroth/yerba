@@ -26,6 +26,7 @@ pub enum PipelineStep {
   SortKeys(SortKeysConfig),
   QuoteStyle(QuoteStyleConfig),
   CollectionStyle(CollectionStyleConfig),
+  SequenceIndent(SequenceIndentConfig),
   Set(SetConfig),
   Insert(InsertConfig),
   Delete(DeleteConfig),
@@ -126,6 +127,11 @@ impl<'de> Deserialize<'de> for PipelineStep {
       return Ok(PipelineStep::CollectionStyle(config));
     }
 
+    if let Some(value) = mapping.get(yaml_serde::Value::String("sequence_indent".to_string())) {
+      let config: SequenceIndentConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      return Ok(PipelineStep::SequenceIndent(config));
+    }
+
     if let Some(value) = mapping.get(yaml_serde::Value::String("set".to_string())) {
       let config: SetConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::Set(config));
@@ -177,7 +183,7 @@ impl<'de> Deserialize<'de> for PipelineStep {
     }
 
     Err(serde::de::Error::custom(
-      "unknown pipeline step: expected sort_keys, quote_style, collection_style, set, insert, delete, rename, remove, blank_lines, sort, directives, unique, or schema",
+      "unknown pipeline step: expected sort_keys, quote_style, collection_style, sequence_indent, set, insert, delete, rename, remove, blank_lines, sort, directives, unique, or schema",
     ))
   }
 }
@@ -200,6 +206,13 @@ pub struct QuoteStyleConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CollectionStyleConfig {
+  pub style: String,
+  #[serde(default)]
+  pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SequenceIndentConfig {
   pub style: String,
   #[serde(default)]
   pub path: Option<String>,
@@ -444,6 +457,13 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
       let path = if dot_path.is_empty() { None } else { Some(dot_path.as_str()) };
 
       document.enforce_collection_style(&config.style, path)
+    }
+
+    PipelineStep::SequenceIndent(config) => {
+      let dot_path = resolve_step_path(base_path, config.path.as_deref());
+      let path = if dot_path.is_empty() { None } else { Some(dot_path.as_str()) };
+
+      document.enforce_sequence_indent(&config.style, path)
     }
 
     PipelineStep::SortKeys(config) => {

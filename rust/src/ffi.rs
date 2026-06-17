@@ -375,6 +375,29 @@ pub unsafe extern "C" fn yerba_document_set_collection_style(document: *mut Docu
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_get_sequence_indent(document: *const Document, path: *const c_char) -> *mut c_char {
+  let document = &*document;
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  match document.get_sequence_indent(selector_string) {
+    Some(style) => CString::new(style).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut()),
+    None => std::ptr::null_mut(),
+  }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_document_set_sequence_indent(document: *mut Document, path: *const c_char, style: *const c_char) -> YerbaResult {
+  let document = &mut *document;
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+  let style_string = CStr::from_ptr(style).to_str().unwrap_or("");
+
+  match document.set_sequence_indent(selector_string, style_string) {
+    Ok(()) => YerbaResult::ok(),
+    Err(e) => YerbaResult::err(&e.to_string()),
+  }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_evaluate_condition(document: *const Document, parent_path: *const c_char, condition: *const c_char) -> bool {
   let document = &*document;
   let parent = CStr::from_ptr(parent_path).to_str().unwrap_or("");

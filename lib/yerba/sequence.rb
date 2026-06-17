@@ -303,6 +303,16 @@ module Yerba
       @collection_style = style
     end
 
+    def sequence_indent
+      @sequence_indent || document&.get_sequence_indent(@selector)
+    end
+
+    def sequence_indent=(style)
+      document&.set_sequence_indent(@selector, style)
+
+      @sequence_indent = style
+    end
+
     private
 
     def dig_into(hash, path)

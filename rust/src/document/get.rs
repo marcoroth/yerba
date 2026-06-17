@@ -400,6 +400,28 @@ impl Document {
     None
   }
 
+  pub fn get_sequence_indent(&self, dot_path: &str) -> Option<&'static str> {
+    let current_node = self.navigate(dot_path).ok()?;
+
+    let sequence = current_node.descendants().find_map(BlockSeq::cast)?;
+    let first_entry = sequence.entries().next()?;
+
+    let entry_indent = preceding_whitespace_indent(first_entry.syntax());
+
+    let entry_node = current_node.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY)?;
+
+    let source = self.root.text().to_string();
+    let entry_start: usize = entry_node.text_range().start().into();
+    let line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
+    let key_indent = &source[line_start..entry_start];
+
+    if entry_indent.len() > key_indent.len() {
+      Some("indented")
+    } else {
+      Some("compact")
+    }
+  }
+
   pub fn get_quote_style(&self, dot_path: &str) -> Option<&'static str> {
     let current_node = self.navigate(dot_path).ok()?;
 

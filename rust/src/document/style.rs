@@ -42,6 +42,123 @@ impl Document {
     Ok(())
   }
 
+  pub fn enforce_sequence_indent(&mut self, style: &str, dot_path: Option<&str>) -> Result<(), YerbaError> {
+    let scope_path = dot_path.unwrap_or("");
+
+    if scope_path.contains("[]") {
+      let concrete_selectors = self.resolve_selectors(scope_path);
+
+      for selector in concrete_selectors.iter().rev() {
+        self.enforce_sequence_indent(style, Some(selector))?;
+      }
+
+      return Ok(());
+    }
+
+    let value = match self.get_value(scope_path) {
+      Some(value) => value,
+      None => return Ok(()),
+    };
+
+    let mut selectors = Vec::new();
+
+    if !scope_path.is_empty() {
+      selectors.push(scope_path.to_string());
+    }
+
+    collect_selectors(&value, scope_path, &mut selectors);
+
+    let sequence_selectors: Vec<String> = selectors.into_iter().filter(|selector| self.get_sequence_indent(selector).is_some()).collect();
+
+    for selector in sequence_selectors.iter().rev() {
+      if let Some(current_style) = self.get_sequence_indent(selector) {
+        if current_style != style {
+          self.set_sequence_indent(selector, style)?;
+        }
+      }
+    }
+
+    Ok(())
+  }
+
+  pub fn set_sequence_indent(&mut self, dot_path: &str, style: &str) -> Result<(), YerbaError> {
+    let current_style = self
+      .get_sequence_indent(dot_path)
+      .ok_or_else(|| YerbaError::ParseError(format!("'{}' is not a block sequence", dot_path)))?;
+
+    if current_style == style {
+      return Ok(());
+    }
+
+    if style != "indented" && style != "compact" {
+      return Err(YerbaError::ParseError(format!(
+        "unknown sequence indent style '{}'. Valid options: compact, indented",
+        style
+      )));
+    }
+
+    let current_node = self.navigate(dot_path)?;
+    let source = self.to_string();
+
+    let entry_node = current_node
+      .ancestors()
+      .find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY)
+      .ok_or_else(|| YerbaError::ParseError("could not find parent map entry".to_string()))?;
+
+    let entry_start: usize = entry_node.text_range().start().into();
+    let line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
+    let key_indent_length = entry_start - line_start;
+
+    let sequence = current_node
+      .descendants()
+      .find_map(BlockSeq::cast)
+      .ok_or_else(|| YerbaError::ParseError("could not find block sequence".to_string()))?;
+
+    let first_entry = sequence.entries().next();
+
+    if first_entry.is_none() {
+      return Ok(());
+    }
+
+    let current_entry_indent_length = preceding_whitespace_indent(first_entry.unwrap().syntax()).len();
+
+    let indent_diff: i32 = match style {
+      "indented" => (key_indent_length as i32 + 2) - current_entry_indent_length as i32,
+      "compact" => key_indent_length as i32 - current_entry_indent_length as i32,
+      _ => unreachable!(),
+    };
+
+    if indent_diff == 0 {
+      return Ok(());
+    }
+
+    let sequence_range = sequence.syntax().text_range();
+    let sequence_start: usize = sequence_range.start().into();
+    let sequence_end: usize = sequence_range.end().into();
+
+    let before_sequence = &source[..sequence_start];
+    let line_start_of_first_entry = before_sequence.rfind('\n').map(|position| position + 1).unwrap_or(0);
+    let full_text = &source[line_start_of_first_entry..sequence_end];
+
+    let reindented: String = full_text
+      .lines()
+      .map(|line| {
+        if line.trim().is_empty() {
+          String::new()
+        } else {
+          let current_line_indent = line.len() - line.trim_start().len();
+          let new_indent = (current_line_indent as i32 + indent_diff).max(0) as usize;
+          format!("{}{}", " ".repeat(new_indent), line.trim_start())
+        }
+      })
+      .collect::<Vec<_>>()
+      .join("\n");
+
+    let replace_range = TextRange::new(rowan::TextSize::from(line_start_of_first_entry as u32), sequence_range.end());
+
+    self.apply_edit(replace_range, &reindented)
+  }
+
   pub fn set_collection_style(&mut self, dot_path: &str, style: &str) -> Result<(), YerbaError> {
     let current_style = self
       .get_collection_style(dot_path)

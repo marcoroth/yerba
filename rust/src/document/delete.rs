@@ -43,6 +43,19 @@ impl Document {
     match last_segment {
       crate::selector::SelectorSegment::Key(last_key) => {
         let has_wildcard = selector.has_wildcard() || selector.has_brackets();
+
+        if parent_path.is_empty() && !has_wildcard {
+          let parent_node = self.navigate(&parent_path)?;
+          let map = parent_node
+            .descendants()
+            .find_map(BlockMap::cast)
+            .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+          let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+          return self.remove_map_entry(&entry);
+        }
+
         let parent_nodes = self.navigate_all_compact(&parent_path);
 
         if parent_nodes.is_empty() {
@@ -61,7 +74,7 @@ impl Document {
 
           let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
-          return self.remove_node(entry.syntax());
+          return self.remove_map_entry(&entry);
         }
 
         let mut ranges: Vec<TextRange> = Vec::new();

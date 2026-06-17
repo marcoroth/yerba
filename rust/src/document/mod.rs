@@ -25,9 +25,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use rowan::ast::AstNode;
-use rowan::TextRange;
+use rowan::{TextRange, TextSize};
 
-use yaml_parser::ast::{BlockMap, BlockSeq, Root};
+use yaml_parser::ast::{BlockMap, BlockMapEntry, BlockSeq, Root};
 use yaml_parser::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 use crate::error::YerbaError;
@@ -35,7 +35,7 @@ use crate::QuoteStyle;
 
 use crate::syntax::{
   dedent_block_scalar, extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key, is_yaml_non_string,
-  preceding_whitespace_indent, removal_range, unescape_double_quoted, unescape_single_quoted, ScalarValue,
+  preceding_whitespace_indent, preceding_whitespace_token, removal_range, unescape_double_quoted, unescape_single_quoted, ScalarValue,
 };
 
 #[derive(Debug, Clone)]
@@ -295,6 +295,41 @@ impl Document {
     let range = TextRange::new(position, position);
 
     self.apply_edit(range, text)
+  }
+
+  fn remove_map_entry(&mut self, entry: &BlockMapEntry) -> Result<(), YerbaError> {
+    let entry_node = entry.syntax();
+    let entry_range = entry_node.text_range();
+
+    let has_block_value = entry.value()
+      .map(|v| v.syntax().descendants().any(|d| d.kind() == SyntaxKind::BLOCK_SEQ || d.kind() == SyntaxKind::BLOCK_MAP))
+      .unwrap_or(false);
+
+    if !has_block_value {
+      return self.remove_node(entry_node);
+    }
+
+    let end = if let Some(next_sibling) = entry_node.next_sibling() {
+      next_sibling.text_range().start()
+    } else {
+      entry_node.parent()
+        .map(|p| p.text_range().end())
+        .unwrap_or(entry_range.end())
+    };
+
+    let start = if let Some(whitespace_token) = preceding_whitespace_token(entry_node) {
+      let whitespace_text = whitespace_token.text();
+      let whitespace_start = whitespace_token.text_range().start();
+
+      whitespace_text
+        .rfind('\n')
+        .map(|offset| whitespace_start + TextSize::from(offset as u32))
+        .unwrap_or(whitespace_start)
+    } else {
+      entry_range.start()
+    };
+
+    self.apply_edit(TextRange::new(start, end), "")
   }
 
   fn remove_node(&mut self, node: &SyntaxNode) -> Result<(), YerbaError> {

@@ -293,3 +293,43 @@ fn test_delete_non_wildcard_missing_key_errors() {
 
   assert!(result.is_err());
 }
+
+#[test]
+fn test_delete_key_with_sequence_value() {
+  let mut document = parse(indoc! {"
+    name: Helvetic Ruby
+    kind: conference
+    youtube_channels:
+    - id: UChetoakh7nU0EXrKN8QFUUA
+      name: HelveticRuby
+    - id: UC123
+      name: Other
+  "});
+
+  document.delete("youtube_channels").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: Helvetic Ruby
+      kind: conference
+    "}
+  );
+}
+
+#[test]
+fn test_delete_key_with_empty_sequence_value() {
+  let mut document = parse(indoc! {"
+    name: Helvetic Ruby
+    youtube_channels:
+  "});
+
+  document.delete("youtube_channels").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: Helvetic Ruby
+    "}
+  );
+}

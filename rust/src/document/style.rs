@@ -29,7 +29,7 @@ impl Document {
 
     let mut collection_selectors: Vec<String> = selectors.into_iter().filter(|selector| self.get_collection_style(selector).is_some()).collect();
 
-    collection_selectors.sort_by(|a, b| b.len().cmp(&a.len()));
+    collection_selectors.sort_by_key(|selector| std::cmp::Reverse(selector.len()));
 
     for selector in &collection_selectors {
       if let Some(current_style) = self.get_collection_style(selector) {

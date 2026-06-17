@@ -39,7 +39,7 @@ module Yerba
           # Delete the key and re-insert at the same position.
           all_keys = keys
           key_index = all_keys.index(key.to_s)
-          after_key = key_index && key_index > 0 ? all_keys[key_index - 1] : nil
+          after_key = key_index&.positive? ? all_keys[key_index - 1] : nil
 
           document.delete(new_path)
 
@@ -211,7 +211,6 @@ module Yerba
         resolved_style = style || default_collection_style(value)
 
         case resolved_style
-        when :block then Formatting.to_block_yaml_value(value)
         when :flow then Formatting.to_yaml_value(value)
         else Formatting.to_block_yaml_value(value)
         end

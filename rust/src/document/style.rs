@@ -1,6 +1,47 @@
 use super::*;
 
 impl Document {
+  pub fn enforce_collection_style(&mut self, style: &str, dot_path: Option<&str>) -> Result<(), YerbaError> {
+    let scope_path = dot_path.unwrap_or("");
+
+    if scope_path.contains("[]") {
+      let concrete_selectors = self.resolve_selectors(scope_path);
+
+      for selector in concrete_selectors.iter().rev() {
+        self.enforce_collection_style(style, Some(selector))?;
+      }
+
+      return Ok(());
+    }
+
+    let value = match self.get_value(scope_path) {
+      Some(value) => value,
+      None => return Ok(()),
+    };
+
+    let mut selectors = Vec::new();
+
+    if !scope_path.is_empty() {
+      selectors.push(scope_path.to_string());
+    }
+
+    collect_selectors(&value, scope_path, &mut selectors);
+
+    let mut collection_selectors: Vec<String> = selectors.into_iter().filter(|selector| self.get_collection_style(selector).is_some()).collect();
+
+    collection_selectors.sort_by(|a, b| b.len().cmp(&a.len()));
+
+    for selector in &collection_selectors {
+      if let Some(current_style) = self.get_collection_style(selector) {
+        if current_style != style {
+          self.set_collection_style(selector, style)?;
+        }
+      }
+    }
+
+    Ok(())
+  }
+
   pub fn set_collection_style(&mut self, dot_path: &str, style: &str) -> Result<(), YerbaError> {
     let current_style = self
       .get_collection_style(dot_path)

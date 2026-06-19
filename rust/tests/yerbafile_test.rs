@@ -416,6 +416,168 @@ fn test_global_pipeline_merges_style_steps() {
 }
 
 #[test]
+fn test_directives_max_errors_on_duplicates() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - directives:
+              max: 1
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    ---
+    ---
+    name: Alice
+  "})
+  .unwrap();
+
+  let result = yerbafile.apply_to_document(&mut document, "data/config.yml");
+
+  assert_eq!(
+    result.unwrap_err().to_string(),
+    "parse error: found 2 directive markers (---) at 1:1, 2:1, expected at most 1"
+  );
+}
+
+#[test]
+fn test_directives_max_passes_when_within_limit() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - directives:
+              max: 1
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    ---
+    name: Alice
+  "})
+  .unwrap();
+
+  let result = yerbafile.apply_to_document(&mut document, "data/config.yml");
+
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_directives_max_with_ensure_errors_on_duplicates() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - directives:
+              max: 1
+              ensure: true
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    ---
+    ---
+    name: Alice
+  "})
+  .unwrap();
+
+  let result = yerbafile.apply_to_document(&mut document, "data/config.yml");
+
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_directives_without_max_does_not_complain() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - directives:
+              ensure: true
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    ---
+    ---
+    name: Alice
+  "})
+  .unwrap();
+
+  let result = yerbafile.apply_to_document(&mut document, "data/config.yml");
+
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_directives_max_preserves_block_scalar_content() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - directives:
+              max: 1
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    ---
+    title: My Talk
+    description: |-
+      First part
+      ---
+      Second part
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(!changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      ---
+      title: My Talk
+      description: |-
+        First part
+        ---
+        Second part
+    "}
+  );
+}
+
+#[test]
 fn test_apply_collection_style_flow_to_block() {
   let dir = TempDir::new().unwrap();
   fs::write(

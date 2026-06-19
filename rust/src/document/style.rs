@@ -674,6 +674,23 @@ impl Document {
     self.root.descendants_with_tokens().any(|element| element.kind() == SyntaxKind::DIRECTIVES_END)
   }
 
+  pub fn directive_locations(&self) -> Vec<(usize, usize)> {
+    let source = self.root.text().to_string();
+
+    self
+      .root
+      .descendants_with_tokens()
+      .filter(|element| element.kind() == SyntaxKind::DIRECTIVES_END)
+      .map(|element| {
+        let offset: usize = element.text_range().start().into();
+        let line = source[..offset].matches('\n').count() + 1;
+        let column = offset - source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0) + 1;
+
+        (line, column)
+      })
+      .collect()
+  }
+
   pub fn ensure_directives(&mut self) -> Result<(), YerbaError> {
     if self.has_directives_marker() {
       return Ok(());

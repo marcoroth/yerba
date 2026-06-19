@@ -66,6 +66,8 @@ pub struct DirectivesConfig {
   pub ensure: bool,
   #[serde(default)]
   pub remove: bool,
+  #[serde(default)]
+  pub max: Option<usize>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -673,6 +675,21 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     PipelineStep::Directives(config) => {
       if config.ensure && config.remove {
         return Err(YerbaError::ParseError("directives: ensure and remove are mutually exclusive".to_string()));
+      }
+
+      if let Some(max) = config.max {
+        let locations = document.directive_locations();
+
+        if locations.len() > max {
+          let positions: Vec<String> = locations.iter().map(|(line, col)| format!("{}:{}", line, col)).collect();
+
+          return Err(YerbaError::ParseError(format!(
+            "found {} directive markers (---) at {}, expected at most {}",
+            locations.len(),
+            positions.join(", "),
+            max
+          )));
+        }
       }
 
       if config.ensure {

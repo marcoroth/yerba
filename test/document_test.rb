@@ -1087,8 +1087,7 @@ class DocumentTest < Minitest::Spec
 
     error = assert_raises(Yerba::Error) { document["hello"] = "world" }
 
-    assert_includes error.message, "document root is not set"
-    assert_includes error.message, "document.root = {}"
+    assert_equal "document root is not set. Use `document.root = {}` or `document.root = []` first", error.message
   end
 
   test "root= replaces existing root" do
@@ -1115,6 +1114,70 @@ class DocumentTest < Minitest::Spec
 
     error = assert_raises(ArgumentError) { document.root = 42 }
     assert_equal "expected Array or Hash, got Integer", error.message
+  end
+
+  test "document[] is shortcut for document.root[]" do
+    document = Yerba::Document.from({ name: "Alice" })
+
+    assert_equal document.root["name"].value, document["name"].value
+  end
+
+  test "document[]= is shortcut for document.root[]=" do
+    document = Yerba::Document.from({ name: "Alice" })
+    document["age"] = 30
+
+    assert_equal 30, document.root["age"].value
+  end
+
+  test "document << is shortcut for document.root <<" do
+    document = Yerba::Document.from([{ id: "talk-1" }])
+    document << { id: "talk-2" }
+
+    assert_equal 2, document.root.length
+    assert_equal "talk-2", document.root[1]["id"].value
+  end
+
+  test "document << raises when root not set" do
+    document = Yerba::Document.new
+
+    error = assert_raises(Yerba::Error) { document << { id: "talk-1" } }
+
+    assert_equal "document root is not set. Use `document.root = []` first", error.message
+  end
+
+  test "document << raises when root is Map" do
+    document = Yerba::Document.from({})
+
+    error = assert_raises(Yerba::Error) { document << { id: "talk-1" } }
+
+    assert_equal 'document root is a Map, not a Sequence. Use `document["key"] = value` to set keys, or `document.root = []` to switch to a Sequence', error.message
+  end
+
+  test "document[]= raises when root is Sequence" do
+    document = Yerba::Document.from([])
+
+    error = assert_raises(Yerba::Error) { document["name"] = "Alice" }
+
+    assert_equal "document root is a Sequence, not a Map. Use `document << item` to append, or `document.root = {}` to switch to a Map", error.message
+  end
+
+  test "document[]= with shortcut builds full document" do
+    document = Yerba::Document.from({})
+    document["name"] = "Event 123"
+    document["kind"] = "conference"
+    document["tags"] = ["ruby", "rails"]
+
+    assert_equal "Event 123", document.value_at("name")
+    assert_equal "conference", document.value_at("kind")
+    assert_equal ["ruby", "rails"], document.value_at("tags")
+  end
+
+  test "document << with shortcut builds sequence" do
+    document = Yerba::Document.from([])
+    document << { id: "talk-1" }
+    document << { id: "talk-2" }
+
+    assert_equal 2, document.root.length
   end
 
   test "Document.from with hash" do

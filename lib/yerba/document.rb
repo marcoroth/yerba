@@ -35,6 +35,10 @@ module Yerba
         raise Error, "document root is not set. Use `document.root = {}` or `document.root = []` first"
       end
 
+      if root.is_a?(Sequence)
+        raise Error, "document root is a Sequence, not a Map. Use `document << item` to append, or `document.root = {}` to switch to a Map"
+      end
+
       root[key] = value
     end
 
@@ -86,6 +90,14 @@ module Yerba
     end
 
     def <<(item)
+      if root.is_a?(Scalar)
+        raise Error, "document root is not set. Use `document.root = []` first"
+      end
+
+      if root.is_a?(Map)
+        raise Error, "document root is a Map, not a Sequence. Use `document[\"key\"] = value` to set keys, or `document.root = []` to switch to a Sequence"
+      end
+
       root << item
     end
 

@@ -580,10 +580,10 @@ Build incrementally using `Document.new` and `root=`:
 ```ruby
 document = Yerba::Document.new
 document.root = {}
-document.root["name"] = "Event 123"
-document.root["kind"] = "conference"
-document.root["tags"] = ["ruby", "rails"]
-document.root["config"] = { host: "localhost", port: 5432 }
+document["name"] = "Event 123"
+document["kind"] = "conference"
+document["tags"] = ["ruby", "rails"]
+document["config"] = { host: "localhost", port: 5432 }
 document.save_to!("event.yml")
 ```
 
@@ -603,9 +603,9 @@ Or start with `Document.from` and keep building:
 
 ```ruby
 document = Yerba::Document.from({ name: "Event 123" })
-document.root["tags"] = []
-document.root["tags"] << "ruby"
-document.root["tags"] << "rails"
+document["tags"] = []
+document["tags"] << "ruby"
+document["tags"] << "rails"
 ```
 
 Build a sequence document and append entries:
@@ -613,10 +613,12 @@ Build a sequence document and append entries:
 ```ruby
 document = Yerba::Document.new
 document.root = []
-document.root << { id: "talk-1", title: "First Talk", speakers: ["Alice"] }
-document.root << { id: "talk-2", title: "Second Talk", speakers: ["Bob", "Carol"] }
+document << { id: "talk-1", title: "First Talk", speakers: ["Alice"] }
+document << { id: "talk-2", title: "Second Talk", speakers: ["Bob", "Carol"] }
 document.save_to!("videos.yml")
 ```
+
+`document["key"]` and `document << item` are shortcuts for `document.root["key"]` and `document.root << item`.
 
 ### Reading Values
 

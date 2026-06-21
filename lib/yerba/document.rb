@@ -12,6 +12,12 @@ module Yerba
       @cache = nil
     end
 
+    def self.from(object, path: nil)
+      document = parse(Formatting.to_yaml_document(object))
+      document.instance_variable_set(:@path, path) if path
+      document
+    end
+
     def selector
       ROOT_SELECTOR
     end
@@ -20,7 +26,15 @@ module Yerba
       self[ROOT_SELECTOR]
     end
 
+    def root=(value)
+      replace_content!(Formatting.to_yaml_document(value))
+    end
+
     def []=(key, value)
+      if root.is_a?(Scalar)
+        raise Error, "document root is not set. Use `document.root = {}` or `document.root = []` first"
+      end
+
       root[key] = value
     end
 
@@ -42,6 +56,11 @@ module Yerba
 
     def to_yaml
       to_s
+    end
+
+    def save_to!(path)
+      @path = path
+      save!
     end
 
     def dig(*keys)

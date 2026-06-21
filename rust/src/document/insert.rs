@@ -154,7 +154,22 @@ impl Document {
 
         let map = match node.descendants().find_map(BlockMap::cast) {
           Some(map) => map,
-          None => continue,
+          None => {
+            let has_empty_flow_map = node
+              .descendants()
+              .any(|descendant| descendant.kind() == SyntaxKind::FLOW_MAP && !descendant.descendants().any(|child| child.kind() == SyntaxKind::FLOW_MAP_ENTRY));
+
+            if has_empty_flow_map {
+              let selectors = self.resolve_selectors(parent_path);
+
+              if let Some(selector) = selectors.get(i) {
+                self.replace_empty_inline_map(selector, key, value)?;
+                continue;
+              }
+            }
+
+            continue;
+          }
         };
 
         if find_entry_by_key(&map, key).is_some() {
@@ -178,7 +193,35 @@ impl Document {
         };
 
         let indent = " ".repeat(start_col);
-        let new_entry_text = format!("{}: {}", key, value);
+
+        let is_block_value = value.contains('\n') || value.starts_with("- ");
+        let new_entry_text = if is_block_value {
+          let value_indent = format!("{}  ", indent);
+          let lines: Vec<&str> = value.lines().collect();
+
+          let min_indent = lines
+            .iter()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| line.len() - line.trim_start().len())
+            .min()
+            .unwrap_or(0);
+
+          let indented_lines: Vec<String> = lines
+            .iter()
+            .map(|line| {
+              if line.trim().is_empty() {
+                String::new()
+              } else {
+                let relative = &line[min_indent..];
+                format!("{}{}", value_indent, relative)
+              }
+            })
+            .collect();
+
+          format!("{}:\n{}", key, indented_lines.join("\n"))
+        } else {
+          format!("{}: {}", key, value)
+        };
 
         match &position {
           InsertPosition::After(target_key) => {
@@ -370,10 +413,22 @@ impl Document {
   fn insert_map_key(&mut self, dot_path: &str, key: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
-    let map = current_node
-      .descendants()
-      .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let map = match current_node.descendants().find_map(BlockMap::cast) {
+      Some(map) => map,
+      None => {
+        let flow_map = current_node.descendants().find(|descendant| descendant.kind() == SyntaxKind::FLOW_MAP);
+
+        if let Some(flow_map_node) = flow_map {
+          let is_empty = !flow_map_node.descendants().any(|descendant| descendant.kind() == SyntaxKind::FLOW_MAP_ENTRY);
+
+          if is_empty {
+            return self.replace_empty_inline_map(dot_path, key, value);
+          }
+        }
+
+        return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+      }
+    };
 
     let entries: Vec<_> = map.entries().collect();
 
@@ -495,7 +550,76 @@ impl Document {
     }
   }
 
+  fn replace_empty_inline_map(&mut self, dot_path: &str, key: &str, value: &str) -> Result<(), YerbaError> {
+    let current_node = self.navigate(dot_path)?;
+
+    if dot_path.is_empty() {
+      let flow_map = current_node
+        .descendants()
+        .find(|descendant| descendant.kind() == SyntaxKind::FLOW_MAP)
+        .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+      let mut range = flow_map.text_range();
+
+      if let Some(previous) = flow_map.prev_sibling_or_token().and_then(|element| element.into_token()) {
+        if previous.kind() == SyntaxKind::WHITESPACE && !previous.text().contains('\n') {
+          range = TextRange::new(previous.text_range().start(), range.end());
+        }
+      }
+
+      let replacement = format!("\n{}: {}", key, value);
+
+      return self.apply_edit(range, &replacement);
+    }
+
+    let (parent_path, map_key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
+    let parent_node = self.navigate(parent_path)?;
+
+    let map = parent_node
+      .descendants()
+      .find_map(BlockMap::cast)
+      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+    let entry = find_entry_by_key(&map, map_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let entry_indent = preceding_whitespace_indent(entry.syntax());
+    let child_indent = format!("{}  ", entry_indent);
+    let new_entry_text = format!("{}{}: {}", child_indent, key, value);
+
+    let mut range = current_node.text_range();
+
+    if let Some(previous) = current_node.prev_sibling_or_token().and_then(|element| element.into_token()) {
+      if previous.kind() == SyntaxKind::WHITESPACE && !previous.text().contains('\n') {
+        range = TextRange::new(previous.text_range().start(), range.end());
+      }
+    }
+
+    let replacement = format!("\n{}", new_entry_text);
+
+    self.apply_edit(range, &replacement)
+  }
+
   fn replace_empty_inline_sequence(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
+    if dot_path.is_empty() {
+      let current_node = self.navigate(dot_path)?;
+      let flow_seq = current_node
+        .descendants()
+        .find(|descendant| descendant.kind() == SyntaxKind::FLOW_SEQ)
+        .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+
+      let new_item = Self::format_sequence_item(value, "");
+      let mut range = flow_seq.text_range();
+
+      if let Some(previous) = flow_seq.prev_sibling_or_token().and_then(|element| element.into_token()) {
+        if previous.kind() == SyntaxKind::WHITESPACE && !previous.text().contains('\n') {
+          range = TextRange::new(previous.text_range().start(), range.end());
+        }
+      }
+
+      let replacement = format!("\n{}", new_item);
+
+      return self.apply_edit(range, &replacement);
+    }
+
     let (parent_path, key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
     let parent_node = self.navigate(parent_path)?;
     let map = parent_node

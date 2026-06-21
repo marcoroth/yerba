@@ -110,9 +110,20 @@ static int should_proceed(struct Document *document, VALUE opts) {
 }
 
 /* Document.new(path) */
-static VALUE document_initialize(VALUE self, VALUE path) {
-  const char *file_path = StringValueCStr(path);
-  YerbaParseResult result = yerba_document_parse_file(file_path);
+static VALUE document_initialize(int argc, VALUE *argv, VALUE self) {
+  VALUE path;
+  rb_scan_args(argc, argv, "01", &path);
+
+  YerbaParseResult result;
+
+  if (NIL_P(path)) {
+    result = yerba_document_parse("---\n");
+    rb_iv_set(self, "@path", Qnil);
+  } else {
+    const char *file_path = StringValueCStr(path);
+    result = yerba_document_parse_file(file_path);
+    rb_iv_set(self, "@path", path);
+  }
 
   if (!result.document) {
     VALUE message = make_utf8_string(result.error);
@@ -122,7 +133,29 @@ static VALUE document_initialize(VALUE self, VALUE path) {
   }
 
   RTYPEDDATA_DATA(self) = result.document;
-  rb_iv_set(self, "@path", path);
+
+  return self;
+}
+
+/* document.replace_content!(content) — re-parse from YAML string, keeping the same Ruby object */
+static VALUE document_replace_content(VALUE self, VALUE content) {
+  const char *yaml_content = StringValueCStr(content);
+  YerbaParseResult result = yerba_document_parse(yaml_content);
+
+  if (!result.document) {
+    VALUE message = make_utf8_string(result.error);
+    yerba_string_free(result.error);
+
+    rb_raise(rb_eParseError, "%s", StringValueCStr(message));
+  }
+
+  struct Document *old_document = get_document(self);
+
+  if (old_document) {
+    yerba_document_free(old_document);
+  }
+
+  RTYPEDDATA_DATA(self) = result.document;
 
   return self;
 }
@@ -1024,7 +1057,8 @@ void Init_yerba(void) {
   rb_cDocument = rb_define_class_under(rb_mYerba, "Document", rb_cObject);
 
   rb_define_alloc_func(rb_cDocument, document_alloc);
-  rb_define_method(rb_cDocument, "initialize", document_initialize, 1);
+  rb_define_method(rb_cDocument, "initialize", document_initialize, -1);
+  rb_define_method(rb_cDocument, "replace_content!", document_replace_content, 1);
   rb_define_singleton_method(rb_cDocument, "parse", document_s_parse, 1);
   rb_define_method(rb_cDocument, "[]", document_bracket, 1);
   rb_define_method(rb_cDocument, "node_at", document_bracket, 1);

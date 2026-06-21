@@ -326,6 +326,21 @@ class DocumentTest < Minitest::Spec
     assert_includes document.to_s, "name: Alice"
   end
 
+  test "delete via scalar node" do
+    document = Yerba::Document.parse(<<~YAML)
+      title: Hello
+      name: Alice
+      age: 30
+    YAML
+
+    document["title"].delete
+
+    assert_equal <<~YAML, document.to_s
+      name: Alice
+      age: 30
+    YAML
+  end
+
   test "delete removes a sequence entry by index selector" do
     document = Yerba::Document.parse(<<~YAML)
       - name: "Entry 1"
@@ -976,8 +991,335 @@ class DocumentTest < Minitest::Spec
     assert_equal ["Chael"], document.value_at("names")
   end
 
+  test "Document.new creates empty document" do
+    document = Yerba::Document.new
+
+    assert_equal "---\n", document.to_s
+  end
+
+  test "Document.new root is Scalar (null)" do
+    document = Yerba::Document.new
+
+    assert document.root.is_a?(Yerba::Scalar)
+  end
+
+  test "Document.new with path loads file" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("name: Alice\n")
+    file.close
+
+    document = Yerba::Document.new(file.path)
+
+    assert_equal "Alice", document.root["name"].value
+  end
+
+  test "Document.new then root = {} creates map" do
+    document = Yerba::Document.new
+    document.root = {}
+
+    assert document.map?
+  end
+
+  test "Document.new then root = [] creates sequence" do
+    document = Yerba::Document.new
+    document.root = []
+
+    assert document.sequence?
+  end
+
+  test "Document.new then root = hash with values" do
+    document = Yerba::Document.new
+    document.root = { title: "Title", kind: "conference" }
+
+    assert_equal "Title", document.root["title"].value
+    assert_equal "conference", document.root["kind"].value
+  end
+
+  test "Document.new then root = array with values" do
+    document = Yerba::Document.new
+    document.root = [{ id: "talk-1" }, { id: "talk-2" }]
+
+    assert_equal 2, document.root.length
+    assert_equal "talk-1", document.root[0]["id"].value
+  end
+
+  test "Document.new then root = {} then set keys" do
+    document = Yerba::Document.new
+    document.root = {}
+    document.root["name"] = "Event 123"
+    document.root["kind"] = "conference"
+
+    assert_equal "Event 123", document.root["name"].value
+    assert_equal "conference", document.root["kind"].value
+  end
+
+  test "Document.new then root = [] then append" do
+    document = Yerba::Document.new
+    document.root = []
+    document.root << { id: "talk-1", title: "First" }
+    document.root << { id: "talk-2", title: "Second" }
+
+    assert_equal 2, document.root.length
+    assert_equal "talk-1", document.root[0]["id"].value
+  end
+
+  test "Document.new then root = {} then set array and hash" do
+    document = Yerba::Document.new
+    document.root = {}
+    document.root["tags"] = ["ruby", "rails"]
+    document.root["config"] = { host: "localhost", port: 5432 }
+
+    assert_equal ["ruby", "rails"], document.value_at("tags")
+    assert_equal "localhost", document.value_at("config.host")
+  end
+
+  test "Document.new then root = {} then save_to!" do
+    document = Yerba::Document.new
+    document.root = { name: "Alice" }
+    path = Tempfile.new(["test", ".yml"]).path
+    document.save_to!(path)
+
+    assert_equal "---\nname: Alice\n", File.read(path)
+  end
+
+  test "Document.new []= raises when root not set" do
+    document = Yerba::Document.new
+
+    error = assert_raises(Yerba::Error) { document["hello"] = "world" }
+
+    assert_includes error.message, "document root is not set"
+    assert_includes error.message, "document.root = {}"
+  end
+
+  test "root= replaces existing root" do
+    document = Yerba::Document.from({ name: "Alice" })
+    document.root = { name: "Bob", age: 25 }
+
+    assert_equal "Bob", document.root["name"].value
+    assert_equal 25, document.root["age"].value
+  end
+
+  test "root= with array replaces map root" do
+    document = Yerba::Document.from({ name: "Alice" })
+    document.root = [{ id: "talk-1" }]
+
+    assert document.sequence?
+    assert_equal "talk-1", document.root[0]["id"].value
+  end
+
+  test "root= raises for invalid input" do
+    document = Yerba::Document.new
+
+    error = assert_raises(ArgumentError) { document.root = "string" }
+    assert_equal "expected Array or Hash, got String", error.message
+
+    error = assert_raises(ArgumentError) { document.root = 42 }
+    assert_equal "expected Array or Hash, got Integer", error.message
+  end
+
+  test "Document.from with hash" do
+    document = Yerba::Document.from({ name: "Alice", age: 30 })
+
+    assert document.map?
+    assert_equal "Alice", document.root["name"].value
+    assert_equal 30, document.root["age"].value
+  end
+
+  test "Document.from with array of hashes" do
+    document = Yerba::Document.from(
+      [
+        { id: "talk-1", title: "First" },
+        { id: "talk-2", title: "Second" }
+      ]
+    )
+
+    assert document.sequence?
+    assert_equal 2, document.root.length
+    assert_equal "talk-1", document.root[0]["id"].value
+    assert_equal "Second", document.root[1]["title"].value
+  end
+
+  test "Document.from with nested structures" do
+    document = Yerba::Document.from({
+      database: { host: "localhost", port: 5432 },
+      tags: ["ruby", "rails"],
+    })
+
+    assert_equal "localhost", document.value_at("database.host")
+    assert_equal ["ruby", "rails"], document.value_at("tags")
+  end
+
+  test "Document.from with empty hash" do
+    document = Yerba::Document.from({})
+
+    assert document.map?
+  end
+
+  test "Document.from with empty array" do
+    document = Yerba::Document.from([])
+
+    assert document.sequence?
+  end
+
+  test "Document.from raises for invalid input" do
+    assert_raises(ArgumentError) { Yerba::Document.from("string") }
+    assert_raises(ArgumentError) { Yerba::Document.from(42) }
+  end
+
+  test "Document.from with path: sets save path" do
+    path = Tempfile.new(["test", ".yml"]).path
+    document = Yerba::Document.from({ name: "Alice" }, path: path)
+    document.save!
+
+    assert_equal "---\nname: Alice\n", File.read(path)
+  end
+
+  test "Document.from then append to sequence" do
+    document = Yerba::Document.from([{ id: "talk-1" }])
+    document.root << { id: "talk-2", title: "Second" }
+
+    assert_equal 2, document.root.length
+    assert_equal "talk-2", document.root[1]["id"].value
+  end
+
+  test "Document.from then append hash with nested array" do
+    document = Yerba::Document.from([{ id: "talk-1", title: "First" }])
+    document.root << { id: "talk-2", speakers: ["Alice", "Bob"] }
+
+    assert_equal <<~YAML, document.to_s
+      ---
+      - id: talk-1
+        title: First
+      - id: talk-2
+        speakers:
+          - Alice
+          - Bob
+    YAML
+  end
+
+  test "Document.from empty hash then set keys" do
+    document = Yerba::Document.from({})
+    document.root["name"] = "Event 123"
+    document.root["kind"] = "conference"
+
+    assert_equal "Event 123", document.root["name"].value
+    assert_equal "conference", document.root["kind"].value
+  end
+
+  test "Document.from empty hash then set array value" do
+    document = Yerba::Document.from({})
+
+    document.root["name"] = "Event"
+    document.root["tags"] = []
+    document.root["tags"] << "ruby"
+    document.root["tags"] << "rails"
+
+    assert_equal ["ruby", "rails"], document.value_at("tags")
+  end
+
+  test "Document.from empty array then append" do
+    document = Yerba::Document.from([])
+    document.root << { id: "first" }
+
+    assert_equal 1, document.root.length
+    assert_equal "first", document.root[0]["id"].value
+  end
+
+  test "Document.from empty array then append multiple" do
+    document = Yerba::Document.from([])
+    document.root << { id: "first" }
+    document.root << { id: "second" }
+
+    assert_equal 2, document.root.length
+  end
+
+  test "save_to! writes to path" do
+    document = Yerba::Document.from({ name: "Alice" })
+    path = Tempfile.new(["test", ".yml"]).path
+    document.save_to!(path)
+
+    assert_equal "---\nname: Alice\n", File.read(path)
+  end
+
+  test "insert into empty flow map" do
+    document = Yerba::Document.parse(<<~YAML)
+      metadata: {}
+    YAML
+
+    document.root["metadata"]["source"] = "youtube"
+
+    assert_equal <<~YAML, document.to_s
+      metadata:
+        source: youtube
+    YAML
+  end
+
+  test "insert into nested empty flow map" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: "talk-1"
+        metadata: {}
+    YAML
+
+    document["[0].metadata"]["source"] = "youtube"
+
+    assert_equal <<~YAML, document.to_s
+      - id: "talk-1"
+        metadata:
+          source: youtube
+    YAML
+  end
+
+  test "insert multiple keys into empty flow map" do
+    document = Yerba::Document.parse(<<~YAML)
+      config: {}
+    YAML
+
+    document.root["config"]["host"] = "localhost"
+    document.root["config"]["port"] = 5432
+
+    assert_equal "localhost", document.value_at("config.host")
+    assert_equal 5432, document.value_at("config.port")
+  end
+
+  test "set array value on sequence entry" do
+    document = Yerba::Document.parse(<<~YAML)
+      ---
+      - id: "talk-1"
+        title: "First Talk"
+    YAML
+
+    document.root[0]["speakers"] = ["Alice", "Bob"]
+
+    assert_equal <<~YAML, document.to_s
+      ---
+      - id: "talk-1"
+        title: "First Talk"
+        speakers:
+          - Alice
+          - Bob
+    YAML
+  end
+
+  test "set hash value on sequence entry" do
+    document = Yerba::Document.parse(<<~YAML)
+      ---
+      - id: "talk-1"
+    YAML
+
+    document.root[0]["config"] = { host: "localhost", port: 5432 }
+
+    assert_equal <<~YAML, document.to_s
+      ---
+      - id: "talk-1"
+        config:
+          host: localhost
+          port: 5432
+    YAML
+  end
+
   test "document.apply reorders keys from Yerbafile" do
     yerbafile = Tempfile.new(["Yerbafile", ".yml"])
+
     yerbafile.write(<<~YAML)
       rules:
         - files: "**/*.yml"
@@ -989,6 +1331,7 @@ class DocumentTest < Minitest::Spec
                   - slug
                   - github
     YAML
+
     yerbafile.close
 
     document = Yerba::Document.parse(<<~YAML)
@@ -1010,6 +1353,7 @@ class DocumentTest < Minitest::Spec
 
   test "document.apply with quote_style enforces style" do
     yerbafile = Tempfile.new(["Yerbafile", ".yml"])
+
     yerbafile.write(<<~YAML)
       rules:
         - files: "**/*.yml"
@@ -1037,6 +1381,7 @@ class DocumentTest < Minitest::Spec
   test "document.save! with apply: true applies rules before saving" do
     dir = Dir.mktmpdir
     yerbafile_path = File.join(dir, "Yerbafile")
+
     File.write(yerbafile_path, <<~YAML)
       rules:
         - files: "**/*.yml"

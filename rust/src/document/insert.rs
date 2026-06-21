@@ -564,7 +564,7 @@ impl Document {
       let source = self.to_string();
       let start: usize = range.start().into();
       let before = &source[..start];
-      let trimmed_length = before.trim_end_matches(|character: char| character == ' ' || character == '\n').len();
+      let trimmed_length = before.trim_end_matches([' ', '\n']).len();
 
       let adjusted_range = TextRange::new(rowan::TextSize::from(trimmed_length as u32), range.end());
       let replacement = format!("\n{}: {}", key, value);
@@ -612,7 +612,7 @@ impl Document {
       let start: usize = range.start().into();
       let before = &source[..start];
 
-      let trimmed_length = before.trim_end_matches(|character: char| character == ' ' || character == '\n').len();
+      let trimmed_length = before.trim_end_matches([' ', '\n']).len();
       let adjusted_start = trimmed_length;
 
       let adjusted_range = TextRange::new(rowan::TextSize::from(adjusted_start as u32), range.end());

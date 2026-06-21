@@ -1018,6 +1018,7 @@ class DocumentTest < Minitest::Spec
     document.root = {}
 
     assert document.map?
+    assert_equal "---\n{}\n", document.to_s
   end
 
   test "Document.new then root = [] creates sequence" do
@@ -1025,6 +1026,7 @@ class DocumentTest < Minitest::Spec
     document.root = []
 
     assert document.sequence?
+    assert_equal "---\n[]\n", document.to_s
   end
 
   test "Document.new then root = hash with values" do
@@ -1159,6 +1161,63 @@ class DocumentTest < Minitest::Spec
     error = assert_raises(Yerba::Error) { document["name"] = "Alice" }
 
     assert_equal "document root is a Sequence, not a Map. Use `document << item` to append, or `document.root = {}` to switch to a Map", error.message
+  end
+
+  test "switching root from Map to Sequence with root=" do
+    document = Yerba::Document.from({ name: "Alice" })
+
+    assert document.map?
+
+    document.root = []
+    document << { id: "talk-1" }
+
+    assert document.sequence?
+    assert_equal 1, document.root.length
+    assert_equal "talk-1", document.root[0]["id"].value
+
+    assert_equal "---\n- id: talk-1\n", document.to_s
+  end
+
+  test "switching root from Sequence to Map with root=" do
+    document = Yerba::Document.from([{ id: "talk-1" }])
+
+    assert document.sequence?
+
+    document.root = {}
+    document["name"] = "Alice"
+
+    assert document.map?
+    assert_equal "Alice", document["name"].value
+
+    assert_equal "---\nname: Alice\n", document.to_s
+  end
+
+  test "switching root from Map to Sequence with values" do
+    document = Yerba::Document.from({ name: "Alice" })
+    document.root = [{ id: "talk-1" }, { id: "talk-2" }]
+
+    assert document.sequence?
+    assert_equal 2, document.root.length
+
+    assert_equal <<~YAML, document.to_s
+      ---
+      - id: talk-1
+      - id: talk-2
+    YAML
+  end
+
+  test "switching root from Sequence to Map with values" do
+    document = Yerba::Document.from([{ id: "talk-1" }])
+    document.root = { name: "Alice", age: 30 }
+
+    assert document.map?
+    assert_equal "Alice", document["name"].value
+
+    assert_equal <<~YAML, document.to_s
+      ---
+      name: Alice
+      age: 30
+    YAML
   end
 
   test "document[]= with shortcut builds full document" do

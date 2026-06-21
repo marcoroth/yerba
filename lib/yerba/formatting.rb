@@ -79,9 +79,9 @@ module Yerba
     def self.to_yaml_document(value)
       case value
       when Array
-        value.empty? ? "--- []\n" : "---\n#{to_block_yaml_value(value)}\n"
+        value.empty? ? "---\n[]\n" : "---\n#{to_block_yaml_value(value)}\n"
       when Hash
-        value.empty? ? "--- {}\n" : "---\n#{to_block_yaml_value(value)}\n"
+        value.empty? ? "---\n{}\n" : "---\n#{to_block_yaml_value(value)}\n"
       else
         raise ArgumentError, "expected Array or Hash, got #{value.class}"
       end

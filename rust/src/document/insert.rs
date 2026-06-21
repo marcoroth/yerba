@@ -559,17 +559,17 @@ impl Document {
         .find(|descendant| descendant.kind() == SyntaxKind::FLOW_MAP)
         .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
-      let mut range = flow_map.text_range();
+      let range = flow_map.text_range();
 
-      if let Some(previous) = flow_map.prev_sibling_or_token().and_then(|element| element.into_token()) {
-        if previous.kind() == SyntaxKind::WHITESPACE && !previous.text().contains('\n') {
-          range = TextRange::new(previous.text_range().start(), range.end());
-        }
-      }
+      let source = self.to_string();
+      let start: usize = range.start().into();
+      let before = &source[..start];
+      let trimmed_length = before.trim_end_matches(|character: char| character == ' ' || character == '\n').len();
 
+      let adjusted_range = TextRange::new(rowan::TextSize::from(trimmed_length as u32), range.end());
       let replacement = format!("\n{}: {}", key, value);
 
-      return self.apply_edit(range, &replacement);
+      return self.apply_edit(adjusted_range, &replacement);
     }
 
     let (parent_path, map_key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
@@ -607,32 +607,35 @@ impl Document {
         .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
       let new_item = Self::format_sequence_item(value, "");
-      let mut range = flow_seq.text_range();
+      let range = flow_seq.text_range();
+      let source = self.to_string();
+      let start: usize = range.start().into();
+      let before = &source[..start];
 
-      if let Some(previous) = flow_seq.prev_sibling_or_token().and_then(|element| element.into_token()) {
-        if previous.kind() == SyntaxKind::WHITESPACE && !previous.text().contains('\n') {
-          range = TextRange::new(previous.text_range().start(), range.end());
-        }
-      }
+      let trimmed_length = before.trim_end_matches(|character: char| character == ' ' || character == '\n').len();
+      let adjusted_start = trimmed_length;
 
+      let adjusted_range = TextRange::new(rowan::TextSize::from(adjusted_start as u32), range.end());
       let replacement = format!("\n{}", new_item);
 
-      return self.apply_edit(range, &replacement);
+      return self.apply_edit(adjusted_range, &replacement);
     }
 
     let (parent_path, key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
     let parent_node = self.navigate(parent_path)?;
+
     let map = parent_node
       .descendants()
       .find_map(BlockMap::cast)
       .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
-    let entry = find_entry_by_key(&map, key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
+    let entry = find_entry_by_key(&map, key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
     let item_indent = format!("{}  ", preceding_whitespace_indent(entry.syntax()));
     let new_item = Self::format_sequence_item(value, &item_indent);
     let current_node = self.navigate(dot_path)?;
-    let mut range = current_node.text_range();
     let inline_comment = self.trailing_inline_comment(&current_node);
+
+    let mut range = current_node.text_range();
 
     if let Some(previous) = current_node.prev_sibling_or_token().and_then(|element| element.into_token()) {
       if previous.kind() == SyntaxKind::WHITESPACE && !previous.text().contains('\n') {

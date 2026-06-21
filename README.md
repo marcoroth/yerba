@@ -47,7 +47,7 @@ Use `yerba` as a library in your Rust project:
 
 ```toml
 [dependencies]
-yerba = "0.5"
+yerba = "0.6"
 ```
 
 ```rust
@@ -476,49 +476,58 @@ yerba check
 yerba check path/to/file.yml
 ```
 
-Each rule specifies a file glob and a list of steps to run in order:
+A Yerbafile supports a global `pipeline` that runs on all matching files, plus per-rule pipelines for file-specific steps. Global steps run first, then per-rule steps refine or override:
 
 ```yaml
+files: "data/**/*.yml"
+
+pipeline:
+  - directives:
+      max: 1
+      ensure: true
+
+  - collection_style:
+      style: block
+
+  - sequence_indent:
+      style: indented
+
+  - quote_style:
+      key_style: plain
+      value_style: double
+
 rules:
-  - files: "config/**/*.yml"
+  - files: "data/**/videos.yml"
     pipeline:
       - quote_style:
-          key_style: plain
-          value_style: double
+          path: "[].speakers"
+          value_style: plain
 
       - sort_keys:
-          path: ""
+          path: "[]"
           order:
             - id
             - title
-            - description
-
-      - blank_lines:
-          count: 1
+            - speakers
 
   - files: "data/speakers.yml"
     pipeline:
-      - quote_style:
-          key_style: plain
-          value_style: double
-
       - sort_keys:
-          path: ""
+          path: "[]"
           order:
             - name
             - slug
             - github
-            - twitter
-            - website
 
       - sort:
-          path: ""
           by: name
 ```
 
 Available pipeline steps:
 
 - `quote_style` Enforce quote style on keys and/or values, optionally scoped by path
+- `collection_style` Enforce flow or block style on collections
+- `sequence_indent` Enforce compact or indented sequence style
 - `sort_keys` Reorder keys to match a predefined list
 - `sort` Sort sequence items by field(s)
 - `blank_lines` Enforce blank lines between sequence entries
@@ -527,10 +536,9 @@ Available pipeline steps:
 - `delete` Remove a key (supports conditions)
 - `rename` Rename a key
 - `remove` Remove an item from a sequence
-- `directives` Add or remove the document start marker (`---`)
+- `directives` Add or remove the document start marker (`---`), with optional `max` validation
 - `unique` Find or remove duplicate items in a sequence
 - `schema` Validate against a JSON schema (with optional `path` for scoping)
-- `get` Read a value and store it as a variable for subsequent steps
 
 This makes it easy to enforce project-wide YAML conventions in CI:
 
@@ -639,6 +647,27 @@ Insert new keys with positional control:
 document["database"].insert("ssl", true, after: "host")
 ```
 
+Set arrays and hashes as values, they default to block style:
+
+```ruby
+document["database"]["tags"] = ["ruby", "rails"]
+# tags:
+#   - ruby
+#   - rails
+
+document["database"]["settings"] = { pool: 5, timeout: 30 }
+# settings:
+#   pool: 5
+#   timeout: 30
+```
+
+Use `set` with `style: :flow` for inline formatting:
+
+```ruby
+document.root.set("tags", ["ruby", "rails"], style: :flow)
+# tags: [ruby, rails]
+```
+
 Work with sequences using familiar Ruby patterns:
 
 ```ruby
@@ -721,6 +750,40 @@ Read and set the quote style on individual scalars:
 scalar = document["database"]["host"]
 scalar.quote_style # => :double
 scalar.quote_style = :single
+```
+
+### Collection Style
+
+Read and change how collections are rendered, flow (inline) or block (multi-line):
+
+```ruby
+document["tags"].collection_style          # => :block or :flow
+document["tags"].collection_style = :flow  # => tags: [ruby, rails]
+document["tags"].collection_style = :block # => tags:\n  - ruby\n  - rails
+```
+
+Works on both sequences and maps:
+
+```ruby
+document["database"].collection_style = :flow  # => database: {host: localhost, port: 5432}
+document["database"].collection_style = :block # => database:\n  host: localhost\n  port: 5432
+```
+
+### Sequence Indent
+
+Control whether sequence items are indented under their key or at the same level:
+
+```ruby
+document["tags"].sequence_indent             # => :indented or :compact
+document["tags"].sequence_indent = :compact  # compact style
+document["tags"].sequence_indent = :indented # indented style
+```
+
+```yaml
+# :compact               # :indented
+tags:                    tags:
+- ruby                     - ruby
+- rails                    - rails
 ```
 
 ### Location
@@ -833,6 +896,12 @@ Write changes back to the original file:
 
 ```ruby
 document.save!
+```
+
+Save to a new path:
+
+```ruby
+document.save_to!("output.yml")
 ```
 
 Or render the document as a string without writing to disk:

@@ -812,3 +812,48 @@ fn test_insert_with_wildcard_no_matches_is_ok() {
 
   assert!(result.is_ok());
 }
+
+#[test]
+fn test_insert_block_value_in_nested_map() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+      title: First Talk
+  "});
+
+  document.insert_into("[0].speakers", "- Alice\n- Bob", InsertPosition::Last).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: talk-1
+        title: First Talk
+        speakers:
+          - Alice
+          - Bob
+    "}
+  );
+}
+
+#[test]
+fn test_insert_block_value_in_deeply_nested_map() {
+  let mut document = parse(indoc! {"
+    app:
+      events:
+        - id: event-1
+          title: My Event
+  "});
+
+  document.insert_into("app.events[0].speakers", "- Alice", InsertPosition::Last).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      app:
+        events:
+          - id: event-1
+            title: My Event
+            speakers:
+              - Alice
+    "}
+  );
+}

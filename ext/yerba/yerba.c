@@ -299,6 +299,19 @@ static VALUE document_valid_selector_p(VALUE self, VALUE path) {
   return yerba_document_valid_selector(document, StringValueCStr(path)) ? Qtrue : Qfalse;
 }
 
+/* document.source(path) → raw YAML text of the node at path */
+static VALUE document_source(VALUE self, VALUE path) {
+  struct Document *document = get_document(self);
+  char *text = yerba_document_source(document, StringValueCStr(path));
+
+  if (!text) return Qnil;
+
+  VALUE result = make_utf8_string(text);
+  yerba_string_free(text);
+
+  return result;
+}
+
 /* document.get_value(path) → parsed Ruby object (Hash/Array/String/Integer/etc) */
 static VALUE document_get_value(VALUE self, VALUE path) {
   struct Document *document = get_document(self);
@@ -1093,6 +1106,7 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "blank_lines", document_blank_lines, 2);
   rb_define_method(rb_cDocument, "apply_yerbafile", document_apply_yerbafile, -1);
   rb_define_method(rb_cDocument, "validate_schema", document_validate_schema, -1);
+  rb_define_method(rb_cDocument, "source", document_source, 1);
   rb_define_method(rb_cDocument, "to_s", document_to_s, 0);
   rb_define_method(rb_cDocument, "write!", document_save, 0);
   rb_define_method(rb_cDocument, "changed?", document_changed_p, 0);

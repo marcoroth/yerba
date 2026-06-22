@@ -2182,4 +2182,101 @@ class DocumentTest < Minitest::Spec
 
     assert_nil document.fetch("[1].title")
   end
+
+  test "source returns YAML text for a map node" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Alice"
+        slug: "alice"
+      - name: "Bob"
+        slug: "bob"
+    YAML
+
+    assert_equal "- name: \"Alice\"\n  slug: \"alice\"", document.source("[0]")
+    assert_equal "- name: \"Bob\"\n  slug: \"bob\"", document.source("[1]")
+  end
+
+  test "source returns YAML text for a scalar" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: "Alice"
+      port: 5432
+    YAML
+
+    assert_equal "\"Alice\"", document.source("name")
+    assert_equal "5432", document.source("port")
+  end
+
+  test "source returns nil for missing path" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: "Alice"
+    YAML
+
+    assert_nil document.source("missing")
+  end
+
+  test "source reflects mutations" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Alice"
+        slug: "alice"
+    YAML
+
+    document.set("[0].name", "Bob")
+
+    assert_equal "- name: \"Bob\"\n  slug: \"alice\"", document.source("[0]")
+  end
+
+  test "Map#to_s returns YAML text from CST" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Alice"
+        slug: "alice"
+      - name: "Bob"
+        slug: "bob"
+    YAML
+
+    assert_equal "- name: \"Alice\"\n  slug: \"alice\"", document[0].to_s
+    assert_equal "- name: \"Bob\"\n  slug: \"bob\"", document[1].to_s
+  end
+
+  test "Sequence#to_s returns YAML text from CST" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rails
+    YAML
+
+    assert_equal "- ruby\n  - rails", document["tags"].to_s
+  end
+
+  test "Scalar#to_s returns the plain value" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: "Alice"
+    YAML
+
+    assert_equal "Alice", document["name"].to_s
+  end
+
+  test "Scalar#source returns the CST text with quotes" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: "Alice"
+    YAML
+
+    assert_equal "\"Alice\"", document["name"].source
+  end
+
+  test "Map#to_s reflects mutations" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: "Alice"
+        slug: "alice"
+    YAML
+
+    document.set("[0].name", "Updated")
+
+    assert_equal "- name: \"Updated\"\n  slug: \"alice\"", document[0].to_s
+  end
+
+  test "source for Document.from" do
+    document = Yerba::Document.from({ name: "Alice", age: 30 })
+
+    assert_equal "Alice", document.source("name")
+    assert_equal "30", document.source("age")
+  end
 end

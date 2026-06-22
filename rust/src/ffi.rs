@@ -280,6 +280,18 @@ fn location_to_ffi(location: crate::Location) -> YerbaLocation {
 
 /// Caller must free with yerba_string_free.
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_source(document: *const Document, path: *const c_char) -> *mut c_char {
+  let document = &*document;
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  match document.source(selector_string) {
+    Ok(text) => CString::new(text).unwrap_or_default().into_raw(),
+    Err(_) => ptr::null_mut(),
+  }
+}
+
+/// Caller must free with yerba_string_free.
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_get_value(document: *const Document, path: *const c_char) -> *mut c_char {
   let document = &*document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");

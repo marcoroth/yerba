@@ -159,6 +159,11 @@ impl Document {
     Ok(())
   }
 
+  pub fn source(&self, dot_path: &str) -> Result<String, YerbaError> {
+    let node = self.navigate(dot_path)?;
+    Ok(node.text().to_string())
+  }
+
   pub fn navigate(&self, dot_path: &str) -> Result<SyntaxNode, YerbaError> {
     Self::validate_path(dot_path)?;
 

@@ -281,6 +281,10 @@ module Yerba
       end.join("\n")
     end
 
+    def to_s
+      source || super
+    end
+
     def inspect
       list = items
       preview = list.first(5).map(&:inspect).join(", ")

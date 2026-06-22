@@ -161,6 +161,10 @@ module Yerba
     end
     alias to_hash to_h
 
+    def to_s
+      source || to_yaml
+    end
+
     def to_yaml
       to_hash.map do |key, val|
         formatted = format_value(val)

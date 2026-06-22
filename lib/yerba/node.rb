@@ -20,6 +20,12 @@ module Yerba
       !@document.nil? || !@file_path.nil?
     end
 
+    def source
+      return nil unless connected? && @selector
+
+      document.source(@selector)
+    end
+
     module ClassMethods
       def from_document(document, selector, location = nil, key = nil, **attributes)
         instance = allocate

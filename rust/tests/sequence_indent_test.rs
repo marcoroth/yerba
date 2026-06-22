@@ -247,6 +247,119 @@ fn test_enforce_sequence_indent_noop_when_all_already_indented() {
 }
 
 #[test]
+fn test_enforce_sequence_indent_root_list_with_nested_sequences() {
+  let mut document = parse(indoc! {"
+    - id: parent-1
+      talks:
+      - id: child-1
+        title: Talk 1
+      - id: child-2
+        title: Talk 2
+    - id: parent-2
+      talks:
+      - id: child-3
+        title: Talk 3
+      speakers:
+      - Alice
+  "});
+
+  document.enforce_sequence_indent("indented", None).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: parent-1
+        talks:
+          - id: child-1
+            title: Talk 1
+          - id: child-2
+            title: Talk 2
+      - id: parent-2
+        talks:
+          - id: child-3
+            title: Talk 3
+        speakers:
+          - Alice
+    "}
+  );
+}
+
+#[test]
+fn test_enforce_sequence_indent_deeply_nested() {
+  let mut document = parse(indoc! {"
+    - id: parent
+      talks:
+      - id: child
+        additional_resources:
+        - name: Resource 1
+        - name: Resource 2
+  "});
+
+  document.enforce_sequence_indent("indented", None).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: parent
+        talks:
+          - id: child
+            additional_resources:
+              - name: Resource 1
+              - name: Resource 2
+    "}
+  );
+}
+
+#[test]
+fn test_enforce_sequence_indent_mixed_correct_and_incorrect() {
+  let mut document = parse(indoc! {"
+    - id: parent-1
+      talks:
+        - id: already-indented
+      speakers:
+      - needs-indent
+    - id: parent-2
+      talks:
+      - also-needs-indent
+  "});
+
+  document.enforce_sequence_indent("indented", None).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: parent-1
+        talks:
+          - id: already-indented
+        speakers:
+          - needs-indent
+      - id: parent-2
+        talks:
+          - also-needs-indent
+    "}
+  );
+}
+
+#[test]
+fn test_enforce_sequence_indent_noop_when_all_nested_already_correct() {
+  let mut document = parse(indoc! {"
+    - id: parent-1
+      talks:
+        - id: child-1
+          speakers:
+            - Alice
+    - id: parent-2
+      talks:
+        - id: child-2
+  "});
+
+  let original = document.to_string();
+  document.enforce_sequence_indent("indented", None).unwrap();
+
+  assert_eq!(document.to_string(), original);
+}
+
+#[test]
 fn test_set_sequence_indent_invalid_style_returns_error() {
   let mut document = parse(indoc! {"
     tags:

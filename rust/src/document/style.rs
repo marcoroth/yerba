@@ -406,42 +406,120 @@ impl Document {
     }
 
     loop {
-      let value = match self.get_value(scope_path) {
-        Some(value) => value,
-        None => return Ok(()),
+      let source = self.root.text().to_string();
+
+      let scope_node = if scope_path.is_empty() {
+        self.root.clone()
+      } else {
+        match self.navigate(scope_path) {
+          Ok(node) => node,
+          Err(_) => return Ok(()),
+        }
       };
 
-      let mut selectors = Vec::new();
+      let mut mismatch_ranges: Vec<TextRange> = Vec::new();
 
-      if !scope_path.is_empty() {
-        selectors.push(scope_path.to_string());
+      for descendant in scope_node.descendants() {
+        if !BlockSeq::can_cast(descendant.kind()) {
+          continue;
+        }
+
+        let parent_entry = match descendant.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY) {
+          Some(entry) => entry,
+          None => continue,
+        };
+
+        let first_entry = match BlockSeq::cast(descendant.clone()).and_then(|sequence| sequence.entries().next()) {
+          Some(entry) => entry,
+          None => continue,
+        };
+
+        let key_indent = preceding_whitespace_indent(&parent_entry).len();
+        let entry_indent = preceding_whitespace_indent(first_entry.syntax()).len();
+        let is_indented = entry_indent > key_indent;
+
+        if (style == "indented" && !is_indented) || (style == "compact" && is_indented) {
+          mismatch_ranges.push(descendant.text_range());
+        }
       }
 
-      collect_selectors(&value, scope_path, &mut selectors);
-
-      let concrete_selectors: Vec<String> = selectors
-        .into_iter()
-        .flat_map(|selector| {
-          if selector.contains("[]") {
-            self.resolve_selectors(&selector)
-          } else {
-            vec![selector]
-          }
-        })
-        .collect();
-
-      let mut sequence_selectors: Vec<String> = concrete_selectors
-        .into_iter()
-        .filter(|selector| self.get_sequence_indent(selector).is_some_and(|current_style| current_style != style))
-        .collect();
-
-      if sequence_selectors.is_empty() {
+      if mismatch_ranges.is_empty() {
         return Ok(());
       }
 
-      sequence_selectors.sort_by_key(|selector| std::cmp::Reverse(selector.len()));
+      let mut edits: Vec<(TextRange, String)> = Vec::new();
 
-      self.set_sequence_indent(&sequence_selectors[0], style)?;
+      for range in &mismatch_ranges {
+        if mismatch_ranges.iter().any(|other| other != range && range.contains_range(*other)) {
+          continue;
+        }
+
+        let node = match scope_node
+          .descendants()
+          .find(|descendant| BlockSeq::can_cast(descendant.kind()) && descendant.text_range() == *range)
+        {
+          Some(node) => node,
+          None => continue,
+        };
+        let parent_entry = match node.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY) {
+          Some(entry) => entry,
+          None => continue,
+        };
+        let first_entry = match BlockSeq::cast(node).and_then(|seq| seq.entries().next()) {
+          Some(entry) => entry,
+          None => continue,
+        };
+
+        let key_indent = preceding_whitespace_indent(&parent_entry).len();
+        let entry_indent = preceding_whitespace_indent(first_entry.syntax()).len();
+
+        let indent_diff: i32 = match style {
+          "indented" => (key_indent as i32 + 2) - entry_indent as i32,
+          "compact" => key_indent as i32 - entry_indent as i32,
+          _ => continue,
+        };
+
+        if indent_diff == 0 {
+          continue;
+        }
+
+        let seq_start: usize = range.start().into();
+        let line_start = source[..seq_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
+        let full_text = &source[line_start..usize::from(range.end())];
+
+        let reindented: String = full_text
+          .lines()
+          .map(|line| {
+            if line.trim().is_empty() {
+              String::new()
+            } else {
+              let current_indent = line.len() - line.trim_start().len();
+              let new_indent = (current_indent as i32 + indent_diff).max(0) as usize;
+              format!("{}{}", " ".repeat(new_indent), line.trim_start())
+            }
+          })
+          .collect::<Vec<_>>()
+          .join("\n");
+
+        edits.push((TextRange::new(rowan::TextSize::from(line_start as u32), range.end()), reindented));
+      }
+
+      if edits.is_empty() {
+        return Ok(());
+      }
+
+      edits.sort_by_key(|edit| std::cmp::Reverse(edit.0.start()));
+
+      let mut new_source = source;
+      for (range, replacement) in edits {
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        new_source.replace_range(start..end, &replacement);
+      }
+
+      let path = self.path.take();
+      *self = Self::parse(&new_source)?;
+      self.path = path;
     }
   }
 

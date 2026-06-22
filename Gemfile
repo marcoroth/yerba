@@ -5,7 +5,7 @@ source "https://rubygems.org"
 gemspec
 
 gem "irb", "~> 1.16"
-gem "maxitest", "~> 6.0"
+gem "maxitest", "~> 7.0"
 gem "parallel", "~> 1.20"
 gem "rake", "~> 13.2"
 gem "rake-compiler", "~> 1.3"

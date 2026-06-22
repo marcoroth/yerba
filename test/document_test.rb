@@ -486,6 +486,75 @@ class DocumentTest < Minitest::Spec
     assert_equal expected, document.to_s
   end
 
+  test "stale? returns false for freshly loaded document" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("name: Alice\n")
+    file.close
+
+    document = Yerba::Document.new(file.path)
+
+    refute document.stale?
+  ensure
+    file&.unlink
+  end
+
+  test "stale? returns true when file modified externally" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("name: Alice\n")
+    file.close
+
+    document = Yerba::Document.new(file.path)
+
+    sleep 0.1
+    File.write(file.path, "name: Bob\n")
+
+    assert document.stale?
+  ensure
+    file&.unlink
+  end
+
+  test "stale? returns false for parsed document without path" do
+    document = Yerba::Document.parse("name: Alice\n")
+
+    refute document.stale?
+  end
+
+  test "save! raises StaleFileError when file modified externally" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("name: Alice\n")
+    file.close
+
+    document = Yerba::Document.new(file.path)
+
+    sleep 0.1
+    File.write(file.path, "name: Bob\n")
+
+    assert_raises(Yerba::StaleFileError) do
+      document.save!
+    end
+  ensure
+    file&.unlink
+  end
+
+  test "save! updates mtime after successful write" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("name: Alice\n")
+    file.close
+
+    document = Yerba::Document.new(file.path)
+    document.set("name", "Updated")
+    document.save!
+
+    refute document.stale?
+
+    document.set("name", "Again")
+    document.save!
+
+    refute document.stale?
+  ensure
+    file&.unlink
+  end
+
   test "save! writes content to file" do
     require "tempfile"
 

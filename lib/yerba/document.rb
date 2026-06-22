@@ -64,7 +64,14 @@ module Yerba
 
     def save_to!(path)
       @path = path
+      @loaded_mtime = nil
       save!
+    end
+
+    def stale?
+      return false unless @path && @loaded_mtime
+
+      File.mtime(@path) != @loaded_mtime
     end
 
     def dig(*keys)
@@ -106,15 +113,18 @@ module Yerba
     end
 
     def save!(apply: false)
+      check_stale!
       Yerbafile.apply!(self, apply) if apply
       write!
-
+      @loaded_mtime = File.mtime(@path) if @path
       self
     end
 
     def apply!(yerbafile = nil)
+      check_stale!
       apply(yerbafile)
       write! if changed?
+      @loaded_mtime = File.mtime(@path) if @path
 
       self
     end
@@ -156,6 +166,16 @@ module Yerba
 
       raise Yerba::SelectorNotFoundError, message
     end
+
+    private
+
+    def check_stale!
+      return unless stale?
+
+      raise Yerba::StaleFileError, "#{@path} was modified externally since it was loaded"
+    end
+
+    public
 
     def inspect
       if path

@@ -119,10 +119,12 @@ static VALUE document_initialize(int argc, VALUE *argv, VALUE self) {
   if (NIL_P(path)) {
     result = yerba_document_parse("---\n");
     rb_iv_set(self, "@path", Qnil);
+    rb_iv_set(self, "@loaded_mtime", Qnil);
   } else {
     const char *file_path = StringValueCStr(path);
     result = yerba_document_parse_file(file_path);
     rb_iv_set(self, "@path", path);
+    rb_iv_set(self, "@loaded_mtime", rb_funcall(rb_cFile, rb_intern("mtime"), 1, path));
   }
 
   if (!result.document) {

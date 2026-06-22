@@ -30,6 +30,7 @@ module Yerba
   class ExecutableNotFoundError < StandardError; end
   class CompilationError < StandardError; end
   class SelectorNotFoundError < StandardError; end
+  class StaleFileError < StandardError; end
 
   GEM_NAME = "yerba"
   EXECUTABLE_NAME = "yerba"

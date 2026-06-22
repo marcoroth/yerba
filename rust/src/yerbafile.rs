@@ -439,6 +439,24 @@ impl Yerbafile {
     results
   }
 
+  fn relativize_path(&self, file_path: &str) -> Option<String> {
+    let path = Path::new(file_path);
+
+    if !path.is_absolute() {
+      return None;
+    }
+
+    if let Some(directory) = &self.directory {
+      if let Ok(relative) = path.strip_prefix(directory) {
+        return Some(relative.to_string_lossy().to_string());
+      }
+    }
+
+    std::env::current_dir()
+      .ok()
+      .and_then(|cwd| path.strip_prefix(&cwd).ok().map(|relative| relative.to_string_lossy().to_string()))
+  }
+
   fn should_run_global_pipeline(&self, file_path: &str) -> bool {
     if self.pipeline.is_empty() {
       return false;
@@ -454,15 +472,17 @@ impl Yerbafile {
 
   pub fn apply_to_document(&self, document: &mut Document, file_path: &str) -> Result<bool, YerbaError> {
     let original = document.to_string();
+    let relative_path = self.relativize_path(file_path);
+    let match_path = relative_path.as_deref().unwrap_or(file_path);
 
-    if self.should_run_global_pipeline(file_path) {
+    if self.should_run_global_pipeline(match_path) {
       execute_pipeline(document, &self.pipeline, None, file_path, self)?;
     }
 
     for rule in &self.rules {
-      if !file_path.is_empty() {
+      if !match_path.is_empty() {
         if let Ok(pattern) = glob::Pattern::new(&rule.files) {
-          if !pattern.matches(file_path) && !pattern.matches_path(Path::new(file_path)) {
+          if !pattern.matches(match_path) && !pattern.matches_path(Path::new(match_path)) {
             continue;
           }
         } else {

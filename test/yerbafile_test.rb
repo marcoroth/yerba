@@ -207,6 +207,55 @@ class YerbafileTest < Minitest::Spec
     FileUtils.rm_rf(dir)
   end
 
+  test "apply_yerbafile works with absolute file paths" do
+    dir = Dir.mktmpdir
+    data_dir = File.join(dir, "data")
+    FileUtils.mkdir_p(data_dir)
+
+    File.write(File.join(dir, "Yerbafile"), <<~YAML)
+      files: "data/**/*.yml"
+
+      pipeline:
+        - sequence_indent:
+            style: indented
+
+        - quote_style:
+            key_style: plain
+            value_style: double
+
+      rules:
+        - files: "data/speakers.yml"
+          pipeline:
+            - sort_keys:
+                path: "[]"
+                order:
+                  - name
+                  - github
+                  - slug
+    YAML
+
+    yaml_path = File.join(data_dir, "speakers.yml")
+    File.write(yaml_path, <<~YAML)
+      - slug: alice
+        name: Alice
+        github: alice
+    YAML
+
+    document = Yerba.parse_file(yaml_path)
+    yerbafile_path = File.join(dir, "Yerbafile")
+
+    document.apply_yerbafile(yerbafile_path)
+
+    assert document.changed?
+    assert_equal <<~YAML, document.to_s
+      - name: "Alice"
+        github: "alice"
+        slug: "alice"
+    YAML
+  ensure
+    FileUtils.rm_rf(dir)
+  end
+
   test "Yerbafile.resolve with Yerbafile instance passes through" do
     dir = Dir.mktmpdir
     File.write(File.join(dir, "Yerbafile"), "rules: []")

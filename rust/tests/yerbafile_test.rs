@@ -1396,3 +1396,55 @@ fn test_delete_with_wildcard_no_matches() {
 
   assert!(!changed);
 }
+
+#[test]
+fn test_apply_to_document_with_absolute_file_path() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    files: "data/**/*.yml"
+
+    pipeline:
+      - sequence_indent:
+          style: indented
+
+      - quote_style:
+          key_style: plain
+          value_style: double
+
+    rules:
+      - files: "data/speakers.yml"
+        pipeline:
+          - sort_keys:
+              path: "[]"
+              order:
+                - name
+                - github
+                - slug
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    - slug: alice
+      name: Alice
+      github: alice
+  "})
+  .unwrap();
+
+  let absolute_path = dir.path().join("data/speakers.yml").to_string_lossy().to_string();
+  let changed = yerbafile.apply_to_document(&mut document, &absolute_path).unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    - name: "Alice"
+      github: "alice"
+      slug: "alice"
+  "#}
+  );
+}

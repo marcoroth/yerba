@@ -174,6 +174,23 @@ fn test_delete_nested_sequence_item_by_index() {
 }
 
 #[test]
+fn test_delete_only_sequence_item_replaces_with_empty_sequence() {
+  let mut document = parse(indoc! {"
+    tags:
+      - ruby
+  "});
+
+  document.delete("tags[0]").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tags: []
+    "}
+  );
+}
+
+#[test]
 fn test_delete_wildcard_removes_key_from_all_entries() {
   let mut document = parse(indoc! {r#"
     - name: "Alice"

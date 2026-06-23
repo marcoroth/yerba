@@ -402,6 +402,17 @@ class DocumentTest < Minitest::Spec
     assert_equal expected, document.to_s
   end
 
+  test "delete removes only entry in array and replaces sequence with []" do
+    document = Yerba::Document.parse(<<~YAML)
+      tier:
+        sponsors:
+          - name: "Typesense"
+    YAML
+    document["tier.sponsors[0]"].delete
+
+    assert_equal [], document["tier.sponsors"].value
+  end
+
   test "delete removes a key from indexed entry keeping other keys" do
     document = Yerba::Document.parse(<<~YAML)
       - name: "Alice"

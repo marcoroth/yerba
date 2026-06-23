@@ -265,6 +265,18 @@ class SequenceTest < Minitest::Spec
     assert_equal "Rust", document.value_at("items[1].name")
   end
 
+  test "delete removes sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      languages:
+        - name: Ruby
+        - name: Rust
+        - name: Go
+    YAML
+    document["languages"].delete
+
+    assert_nil document["languages"]
+  end
+
   test "delete_at removes item by index" do
     document = Yerba::Document.parse(<<~YAML)
       items:

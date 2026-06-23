@@ -104,6 +104,10 @@ impl Document {
       })
       .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", dot_path, value)))?;
 
+    if sequence.entries().count() == 1 {
+      return self.collapse_to_empty_flow_sequence(&current_node);
+    }
+
     self.remove_node(target_entry.syntax())
   }
 
@@ -120,6 +124,23 @@ impl Document {
       return Err(YerbaError::IndexOutOfBounds(index, entries.len()));
     }
 
+    if entries.len() == 1 {
+      return self.collapse_to_empty_flow_sequence(&current_node);
+    }
+
     self.remove_node(entries[index].syntax())
+  }
+
+  fn collapse_to_empty_flow_sequence(&mut self, current_node: &SyntaxNode) -> Result<(), YerbaError> {
+    if current_node.kind() == SyntaxKind::BLOCK_MAP_VALUE {
+      return self.apply_edit(current_node.text_range(), " []");
+    }
+
+    let sequence = current_node
+      .descendants()
+      .find_map(BlockSeq::cast)
+      .ok_or_else(|| YerbaError::InvalidOperation("Expected a sequence".to_string()))?;
+
+    self.apply_edit(sequence.syntax().text_range(), "[]")
   }
 }

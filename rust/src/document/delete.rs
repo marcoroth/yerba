@@ -38,10 +38,13 @@ impl Document {
     let parent_path = selector.parent_path();
 
     match last_segment {
+      // Last segement is a key
       crate::selector::SelectorSegment::Key(last_key) => {
-        let has_wildcard = selector.has_wildcard() || selector.has_brackets();
+        let has_wildcard = selector.has_wildcard();
+        let has_brackets = selector.has_brackets(); // Brackets indicate the sequence is being deleted.
 
-        if parent_path.is_empty() && !has_wildcard {
+        // If there's no wildcard nor brackets, we can directly navigate to the parent node and remove the entry.
+        if parent_path.is_empty() && (!has_wildcard || !has_brackets) {
           let parent_node = self.navigate(&parent_path)?;
           let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
@@ -50,8 +53,11 @@ impl Document {
           return self.remove_map_entry(&entry);
         }
 
+        // Return all the children of the parent node - siblings of the last segment.
         let parent_nodes = self.navigate_all_compact(&parent_path);
 
+        // If there are no parent nodes, return an error - our selector was invalid.
+        // But if there's a wildcard, it's okay to not find any matches.
         if parent_nodes.is_empty() {
           if has_wildcard {
             return Ok(());
@@ -60,7 +66,7 @@ impl Document {
           return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
         }
 
-        if parent_nodes.len() == 1 && !has_wildcard {
+        if parent_nodes.len() == 1 && (!has_wildcard || !has_brackets) {
           let map = find_block_map(&parent_nodes[0]).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
           let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
@@ -82,8 +88,9 @@ impl Document {
 
         self.apply_edits(edits)
       }
-
+      // Last segment is an index
       crate::selector::SelectorSegment::Index(index) => self.remove_at(&parent_path, *index),
+      // Any sequence not already matched
       crate::selector::SelectorSegment::AllItems => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
     }
   }
@@ -133,13 +140,13 @@ impl Document {
 
   fn collapse_to_empty_flow_sequence(&mut self, current_node: &SyntaxNode) -> Result<(), YerbaError> {
     if current_node.kind() == SyntaxKind::BLOCK_MAP_VALUE {
-      return self.apply_edit(current_node.text_range(), " []");
+      return self.apply_edit(current_node.text_range(), "[]");
     }
 
     let sequence = current_node
       .descendants()
       .find_map(BlockSeq::cast)
-      .ok_or_else(|| YerbaError::InvalidOperation("Expected a sequence".to_string()))?;
+      .ok_or_else(|| YerbaError::NotASequence("Expected a sequence".to_string()))?;
 
     self.apply_edit(sequence.syntax().text_range(), "[]")
   }

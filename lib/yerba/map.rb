@@ -123,6 +123,28 @@ module Yerba
       end
     end
 
+    # Deletes a key from the map, or deletes the entire map node from the document.
+    #
+    # When +key+ is given and the map is connected to a document, deletes that key
+    # from the map in the YAML document. When no +key+ is given and the map is
+    # connected, removes the entire map node at its selector path. When not connected
+    # to a document, delegates to the underlying Hash.
+    #
+    # Returns +self+.
+    #
+    #   # Delete a specific key from a connected map:
+    #   document = Yerba::Document.parse(<<~YAML)
+    #     database:
+    #       host: localhost
+    #       pool: 10
+    #   YAML
+    #
+    #   document["database"].delete("pool")
+    #   document.to_s # => "database:\n  host: localhost\n"
+    #
+    #   # Delete the entire map node:
+    #   document["database"].delete
+    #   document.to_s # => "{}\n"
     def delete(key = nil)
       if key && connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"

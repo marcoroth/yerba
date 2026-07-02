@@ -5,35 +5,10 @@ impl Document {
     let current_node = self.navigate(dot_path)?;
 
     if let Some(block_scalar) = current_node.descendants().find(|node| node.kind() == SyntaxKind::BLOCK_SCALAR) {
-      let new_text = if value.is_empty() {
-        "\"\"".to_string()
-      } else if value.contains('\n') {
-        let source = self.to_string();
-        let offset: usize = block_scalar.text_range().start().into();
-        let line_start = source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0);
-        let key_indent = source[line_start..offset].len() - source[line_start..offset].trim_start().len();
-        let indent = " ".repeat(key_indent + 2);
+      let source = self.to_string();
+      let new_text = Self::block_scalar_replacement(&source, &block_scalar, value);
 
-        let indented_lines: Vec<String> = value
-          .split('\n')
-          .enumerate()
-          .map(|(index, line)| {
-            if line.is_empty() && index > 0 {
-              String::new()
-            } else {
-              format!("{}{}", indent, line)
-            }
-          })
-          .collect();
-
-        format!("|-\n{}", indented_lines.join("\n"))
-      } else {
-        format!("\"{}\"", value.replace('"', "\\\""))
-      };
-
-      let range = block_scalar.text_range();
-
-      return self.apply_edit(range, &new_text);
+      return self.apply_edit(block_scalar.text_range(), &new_text);
     }
 
     let scalar_token = find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
@@ -55,32 +30,7 @@ impl Document {
 
     for node in nodes {
       if let Some(block_scalar) = node.descendants().find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR) {
-        let new_text = if value.is_empty() {
-          "\"\"".to_string()
-        } else if value.contains('\n') {
-          let offset: usize = block_scalar.text_range().start().into();
-          let line_start = source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0);
-          let key_indent = source[line_start..offset].len() - source[line_start..offset].trim_start().len();
-          let indent = " ".repeat(key_indent + 2);
-
-          let indented_lines: Vec<String> = value
-            .split('\n')
-            .enumerate()
-            .map(|(index, line)| {
-              if line.is_empty() && index > 0 {
-                String::new()
-              } else {
-                format!("{}{}", indent, line)
-              }
-            })
-            .collect();
-
-          format!("|-\n{}", indented_lines.join("\n"))
-        } else {
-          format!("\"{}\"", value.replace('"', "\\\""))
-        };
-
-        edits.push((block_scalar.text_range(), new_text));
+        edits.push((block_scalar.text_range(), Self::block_scalar_replacement(&source, &block_scalar, value)));
       } else if let Some(scalar_token) = find_scalar_token(&node) {
         edits.push((scalar_token.text_range(), format_scalar_value(value, scalar_token.kind())));
       }
@@ -132,5 +82,34 @@ impl Document {
     let scalar_token = find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     self.replace_token(&scalar_token, value)
+  }
+
+  fn block_scalar_replacement(source: &str, block_scalar: &SyntaxNode, value: &str) -> String {
+    if value.is_empty() {
+      return "\"\"".to_string();
+    }
+
+    if !value.contains('\n') {
+      return format!("\"{}\"", value.replace('"', "\\\""));
+    }
+
+    let offset: usize = block_scalar.text_range().start().into();
+    let line_start = source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0);
+    let key_indent = source[line_start..offset].len() - source[line_start..offset].trim_start().len();
+    let indent = " ".repeat(key_indent + 2);
+
+    let indented_lines: Vec<String> = value
+      .split('\n')
+      .enumerate()
+      .map(|(index, line)| {
+        if line.is_empty() && index > 0 {
+          String::new()
+        } else {
+          format!("{}{}", indent, line)
+        }
+      })
+      .collect();
+
+    format!("|-\n{}", indented_lines.join("\n"))
   }
 }

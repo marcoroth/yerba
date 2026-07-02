@@ -151,54 +151,10 @@ impl Document {
       None => return Ok(()),
     };
 
-    let entries: Vec<_> = map.entries().collect();
-
-    if entries.len() <= 1 {
-      return Ok(());
+    match sort_map_edit(&map, key_order) {
+      Some(edit) => self.apply_edits(vec![edit]),
+      None => Ok(()),
     }
-
-    let (groups, range) = collect_groups_with_range(map.syntax());
-
-    let mut keyed: Vec<(String, EntryGroup)> = entries
-      .iter()
-      .zip(groups)
-      .map(|(entry, group)| {
-        let key_name = entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())).unwrap_or_default();
-        (key_name, group)
-      })
-      .collect();
-
-    let original_keys: Vec<String> = keyed.iter().map(|(key, _)| key.clone()).collect();
-
-    keyed.sort_by(|(key_a, _), (key_b, _)| {
-      let position_a = key_order.iter().position(|&key| key == key_a);
-      let position_b = key_order.iter().position(|&key| key == key_b);
-
-      match (position_a, position_b) {
-        (Some(a), Some(b)) => a.cmp(&b),
-        (Some(_), None) => std::cmp::Ordering::Less,
-        (None, Some(_)) => std::cmp::Ordering::Greater,
-        (None, None) => {
-          let original_a = original_keys.iter().position(|key| key == key_a).unwrap();
-          let original_b = original_keys.iter().position(|key| key == key_b).unwrap();
-          original_a.cmp(&original_b)
-        }
-      }
-    });
-
-    let sorted_keys: Vec<&str> = keyed.iter().map(|(key, _)| key.as_str()).collect();
-    let orig_refs: Vec<&str> = original_keys.iter().map(|key| key.as_str()).collect();
-
-    if sorted_keys == orig_refs {
-      return Ok(());
-    }
-
-    let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
-
-    let sorted_groups: Vec<EntryGroup> = keyed.into_iter().map(|(_, group)| group).collect();
-    let map_text = rebuild_from_groups(&sorted_groups, &indent, false);
-
-    self.apply_edit(range, &map_text)
   }
 
   pub fn sort_each_keys(&mut self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
@@ -224,62 +180,14 @@ impl Document {
       };
 
       for entry in sequence.entries() {
-        let entry_node = entry.syntax();
-
-        let map = match entry_node.descendants().find_map(BlockMap::cast) {
+        let map = match entry.syntax().descendants().find_map(BlockMap::cast) {
           Some(map) => map,
           None => continue,
         };
 
-        let entries: Vec<_> = map.entries().collect();
-
-        if entries.len() <= 1 {
-          continue;
+        if let Some(edit) = sort_map_edit(&map, key_order) {
+          edits.push(edit);
         }
-
-        let (groups, group_range) = collect_groups_with_range(map.syntax());
-
-        let mut keyed: Vec<(String, EntryGroup)> = entries
-          .iter()
-          .zip(groups)
-          .map(|(entry, group)| {
-            let key_name = entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())).unwrap_or_default();
-            (key_name, group)
-          })
-          .collect();
-
-        let original_keys: Vec<String> = keyed.iter().map(|(key, _)| key.clone()).collect();
-
-        keyed.sort_by(|(key_a, _), (key_b, _)| {
-          let position_a = key_order.iter().position(|&key| key == key_a);
-          let position_b = key_order.iter().position(|&key| key == key_b);
-
-          match (position_a, position_b) {
-            (Some(a), Some(b)) => a.cmp(&b),
-            (Some(_), None) => std::cmp::Ordering::Less,
-            (None, Some(_)) => std::cmp::Ordering::Greater,
-
-            (None, None) => {
-              let original_a = original_keys.iter().position(|key| key == key_a).unwrap();
-              let original_b = original_keys.iter().position(|key| key == key_b).unwrap();
-
-              original_a.cmp(&original_b)
-            }
-          }
-        });
-
-        let sorted_keys: Vec<&str> = keyed.iter().map(|(key, _)| key.as_str()).collect();
-        let orig_refs: Vec<&str> = original_keys.iter().map(|key| key.as_str()).collect();
-
-        if sorted_keys == orig_refs {
-          continue;
-        }
-
-        let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
-
-        let sorted_groups: Vec<EntryGroup> = keyed.into_iter().map(|(_, group)| group).collect();
-        let map_text = rebuild_from_groups(&sorted_groups, &indent, false);
-        edits.push((group_range, map_text));
       }
     }
 
@@ -340,81 +248,10 @@ impl Document {
       None => return Ok(()),
     };
 
-    let entries: Vec<_> = sequence.entries().collect();
-
-    if entries.len() <= 1 {
-      return Ok(());
+    match sort_sequence_edit(&sequence, sort_fields, case_sensitive) {
+      Some(edit) => self.apply_edits(vec![edit]),
+      None => Ok(()),
     }
-
-    let (groups, range) = collect_groups_with_range(sequence.syntax());
-
-    let mut sortable: Vec<(Vec<String>, EntryGroup)> = entries
-      .iter()
-      .zip(groups)
-      .map(|(entry, group)| {
-        let sort_values = if sort_fields.is_empty() {
-          vec![entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default()]
-        } else {
-          sort_fields
-            .iter()
-            .map(|field| {
-              if field.path.is_empty() {
-                entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default()
-              } else {
-                let nodes = navigate_from_node(entry.syntax(), &field.path);
-                nodes.first().and_then(extract_scalar_text).unwrap_or_default()
-              }
-            })
-            .collect()
-        };
-
-        (sort_values, group)
-      })
-      .collect();
-
-    let original_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
-
-    sortable.sort_by(|(values_a, _), (values_b, _)| {
-      for (index, field) in sort_fields.iter().enumerate().take(values_a.len()) {
-        let value_a = &values_a[index];
-        let value_b = &values_b[index];
-
-        let ordering = if case_sensitive {
-          value_a.cmp(value_b)
-        } else {
-          value_a.to_lowercase().cmp(&value_b.to_lowercase())
-        };
-
-        let ordering = if field.ascending { ordering } else { ordering.reverse() };
-
-        if ordering != std::cmp::Ordering::Equal {
-          return ordering;
-        }
-      }
-
-      if sort_fields.is_empty() && !values_a.is_empty() && !values_b.is_empty() {
-        return if case_sensitive {
-          values_a[0].cmp(&values_b[0])
-        } else {
-          values_a[0].to_lowercase().cmp(&values_b[0].to_lowercase())
-        };
-      }
-
-      std::cmp::Ordering::Equal
-    });
-
-    let sorted_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
-
-    if sorted_bodies == original_bodies {
-      return Ok(());
-    }
-
-    let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
-
-    let sorted_groups: Vec<EntryGroup> = sortable.into_iter().map(|(_, group)| group).collect();
-    let sequence_text = rebuild_from_groups(&sorted_groups, &indent, true);
-
-    self.apply_edit(range, &sequence_text)
   }
 
   fn sort_each_items(&mut self, dot_path: &str, sort_fields: &[SortField], case_sensitive: bool) -> Result<(), YerbaError> {
@@ -440,80 +277,9 @@ impl Document {
           None => continue,
         };
 
-        let entries: Vec<_> = sequence.entries().collect();
-
-        if entries.len() <= 1 {
-          continue;
+        if let Some(edit) = sort_sequence_edit(&sequence, sort_fields, case_sensitive) {
+          edits.push(edit);
         }
-
-        let (groups, group_range) = collect_groups_with_range(sequence.syntax());
-
-        let mut sortable: Vec<(Vec<String>, EntryGroup)> = entries
-          .iter()
-          .zip(groups)
-          .map(|(entry, group)| {
-            let sort_values = if sort_fields.is_empty() {
-              vec![entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default()]
-            } else {
-              sort_fields
-                .iter()
-                .map(|field| {
-                  if field.path.is_empty() {
-                    entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default()
-                  } else {
-                    let nodes = navigate_from_node(entry.syntax(), &field.path);
-                    nodes.first().and_then(extract_scalar_text).unwrap_or_default()
-                  }
-                })
-                .collect()
-            };
-
-            (sort_values, group)
-          })
-          .collect();
-
-        let original_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
-
-        sortable.sort_by(|(values_a, _), (values_b, _)| {
-          for (index, field) in sort_fields.iter().enumerate().take(values_a.len()) {
-            let value_a = &values_a[index];
-            let value_b = &values_b[index];
-
-            let ordering = if case_sensitive {
-              value_a.cmp(value_b)
-            } else {
-              value_a.to_lowercase().cmp(&value_b.to_lowercase())
-            };
-
-            let ordering = if field.ascending { ordering } else { ordering.reverse() };
-
-            if ordering != std::cmp::Ordering::Equal {
-              return ordering;
-            }
-          }
-
-          if sort_fields.is_empty() && !values_a.is_empty() && !values_b.is_empty() {
-            return if case_sensitive {
-              values_a[0].cmp(&values_b[0])
-            } else {
-              values_a[0].to_lowercase().cmp(&values_b[0].to_lowercase())
-            };
-          }
-
-          std::cmp::Ordering::Equal
-        });
-
-        let sorted_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
-
-        if sorted_bodies == original_bodies {
-          continue;
-        }
-
-        let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
-        let sorted_groups: Vec<EntryGroup> = sortable.into_iter().map(|(_, group)| group).collect();
-        let sequence_text = rebuild_from_groups(&sorted_groups, &indent, true);
-
-        edits.push((group_range, sequence_text));
       }
     }
 
@@ -592,6 +358,132 @@ impl Document {
 
     Ok(())
   }
+}
+
+fn sort_map_edit(map: &BlockMap, key_order: &[&str]) -> Option<(TextRange, String)> {
+  let entries: Vec<_> = map.entries().collect();
+
+  if entries.len() <= 1 {
+    return None;
+  }
+
+  let (groups, range) = collect_groups_with_range(map.syntax());
+
+  let mut keyed: Vec<(String, EntryGroup)> = entries
+    .iter()
+    .zip(groups)
+    .map(|(entry, group)| {
+      let key_name = entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())).unwrap_or_default();
+      (key_name, group)
+    })
+    .collect();
+
+  let original_keys: Vec<String> = keyed.iter().map(|(key, _)| key.clone()).collect();
+
+  keyed.sort_by(|(key_a, _), (key_b, _)| {
+    let position_a = key_order.iter().position(|&key| key == key_a);
+    let position_b = key_order.iter().position(|&key| key == key_b);
+
+    match (position_a, position_b) {
+      (Some(a), Some(b)) => a.cmp(&b),
+      (Some(_), None) => std::cmp::Ordering::Less,
+      (None, Some(_)) => std::cmp::Ordering::Greater,
+      (None, None) => {
+        let original_a = original_keys.iter().position(|key| key == key_a).unwrap();
+        let original_b = original_keys.iter().position(|key| key == key_b).unwrap();
+
+        original_a.cmp(&original_b)
+      }
+    }
+  });
+
+  let sorted_keys: Vec<&str> = keyed.iter().map(|(key, _)| key.as_str()).collect();
+  let original_refs: Vec<&str> = original_keys.iter().map(|key| key.as_str()).collect();
+
+  if sorted_keys == original_refs {
+    return None;
+  }
+
+  let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
+  let sorted_groups: Vec<EntryGroup> = keyed.into_iter().map(|(_, group)| group).collect();
+
+  Some((range, rebuild_from_groups(&sorted_groups, &indent, false)))
+}
+
+fn sort_sequence_edit(sequence: &BlockSeq, sort_fields: &[SortField], case_sensitive: bool) -> Option<(TextRange, String)> {
+  let entries: Vec<_> = sequence.entries().collect();
+
+  if entries.len() <= 1 {
+    return None;
+  }
+
+  let (groups, range) = collect_groups_with_range(sequence.syntax());
+
+  let mut sortable: Vec<(Vec<String>, EntryGroup)> = entries
+    .iter()
+    .zip(groups)
+    .map(|(entry, group)| (entry_sort_values(entry, sort_fields), group))
+    .collect();
+
+  let original_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
+
+  sortable.sort_by(|(values_a, _), (values_b, _)| compare_sort_values(values_a, values_b, sort_fields, case_sensitive));
+
+  let sorted_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
+
+  if sorted_bodies == original_bodies {
+    return None;
+  }
+
+  let indent = entries.get(1).map(|entry| preceding_whitespace_indent(entry.syntax())).unwrap_or_default();
+  let sorted_groups: Vec<EntryGroup> = sortable.into_iter().map(|(_, group)| group).collect();
+
+  Some((range, rebuild_from_groups(&sorted_groups, &indent, true)))
+}
+
+fn entry_sort_values(entry: &yaml_parser::ast::BlockSeqEntry, sort_fields: &[SortField]) -> Vec<String> {
+  let scalar_value = || entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default();
+
+  if sort_fields.is_empty() {
+    return vec![scalar_value()];
+  }
+
+  sort_fields
+    .iter()
+    .map(|field| {
+      if field.path.is_empty() {
+        scalar_value()
+      } else {
+        let nodes = navigate_from_node(entry.syntax(), &field.path);
+        nodes.first().and_then(extract_scalar_text).unwrap_or_default()
+      }
+    })
+    .collect()
+}
+
+fn compare_sort_values(values_a: &[String], values_b: &[String], sort_fields: &[SortField], case_sensitive: bool) -> std::cmp::Ordering {
+  let compare = |value_a: &String, value_b: &String| {
+    if case_sensitive {
+      value_a.cmp(value_b)
+    } else {
+      value_a.to_lowercase().cmp(&value_b.to_lowercase())
+    }
+  };
+
+  for (index, field) in sort_fields.iter().enumerate().take(values_a.len()) {
+    let ordering = compare(&values_a[index], &values_b[index]);
+    let ordering = if field.ascending { ordering } else { ordering.reverse() };
+
+    if ordering != std::cmp::Ordering::Equal {
+      return ordering;
+    }
+  }
+
+  if sort_fields.is_empty() && !values_a.is_empty() && !values_b.is_empty() {
+    return compare(&values_a[0], &values_b[0]);
+  }
+
+  std::cmp::Ordering::Equal
 }
 
 fn strip_bracket_suffix(path: &str) -> Option<&str> {

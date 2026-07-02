@@ -81,38 +81,7 @@ impl Document {
 
     for json_value in json_values {
       let yaml_text = crate::yaml_writer::json_to_yaml_text(json_value, &quote_style, 0);
-
-      let new_item = if yaml_text.contains('\n') {
-        let item_indent = format!("{}  ", indent);
-        let lines: Vec<&str> = yaml_text.split('\n').collect();
-
-        let min_indent = lines
-          .iter()
-          .skip(1)
-          .filter(|line| !line.trim().is_empty())
-          .map(|line| line.len() - line.trim_start().len())
-          .min()
-          .unwrap_or(0);
-
-        let indented: Vec<String> = lines
-          .iter()
-          .enumerate()
-          .map(|(index, line)| {
-            if index == 0 {
-              line.to_string()
-            } else if line.trim().is_empty() {
-              String::new()
-            } else {
-              let relative = &line[min_indent..];
-              format!("{}{}", item_indent, relative)
-            }
-          })
-          .collect();
-
-        format!("- {}", indented.join("\n"))
-      } else {
-        format!("- {}", yaml_text)
-      };
+      let new_item = Self::format_sequence_item(&yaml_text, &indent);
 
       new_text.push_str(&format!("\n{}{}", indent, new_item));
     }
@@ -193,35 +162,7 @@ impl Document {
         };
 
         let indent = " ".repeat(start_col);
-
-        let is_block_value = value.contains('\n') || value.starts_with("- ");
-        let new_entry_text = if is_block_value {
-          let value_indent = format!("{}  ", indent);
-          let lines: Vec<&str> = value.lines().collect();
-
-          let min_indent = lines
-            .iter()
-            .filter(|line| !line.trim().is_empty())
-            .map(|line| line.len() - line.trim_start().len())
-            .min()
-            .unwrap_or(0);
-
-          let indented_lines: Vec<String> = lines
-            .iter()
-            .map(|line| {
-              if line.trim().is_empty() {
-                String::new()
-              } else {
-                let relative = &line[min_indent..];
-                format!("{}{}", value_indent, relative)
-              }
-            })
-            .collect();
-
-          format!("{}:\n{}", key, indented_lines.join("\n"))
-        } else {
-          format!("{}: {}", key, value)
-        };
+        let new_entry_text = Self::format_map_entry(key, value, &indent);
 
         match &position {
           InsertPosition::After(target_key) => {
@@ -285,37 +226,7 @@ impl Document {
       .map(|entry| preceding_whitespace_indent(entry.syntax()))
       .unwrap_or_default();
 
-    let new_item = if value.contains('\n') {
-      let item_indent = format!("{}  ", indent);
-      let lines: Vec<&str> = value.split('\n').collect();
-
-      let min_indent = lines
-        .iter()
-        .skip(1)
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.len() - line.trim_start().len())
-        .min()
-        .unwrap_or(0);
-
-      let indented: Vec<String> = lines
-        .iter()
-        .enumerate()
-        .map(|(index, line)| {
-          if index == 0 {
-            line.to_string()
-          } else if line.trim().is_empty() {
-            String::new()
-          } else {
-            let relative = &line[min_indent..];
-            format!("{}{}", item_indent, relative)
-          }
-        })
-        .collect();
-
-      format!("- {}", indented.join("\n"))
-    } else {
-      format!("- {}", value)
-    };
+    let new_item = Self::format_sequence_item(value, &indent);
 
     match position {
       InsertPosition::Last => {
@@ -449,34 +360,7 @@ impl Document {
       .map(|entry| preceding_whitespace_indent(entry.syntax()))
       .unwrap_or_default();
 
-    let is_block_value = value.contains('\n') || value.starts_with("- ");
-    let new_entry_text = if is_block_value {
-      let value_indent = format!("{}  ", indent);
-      let lines: Vec<&str> = value.lines().collect();
-
-      let min_indent = lines
-        .iter()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.len() - line.trim_start().len())
-        .min()
-        .unwrap_or(0);
-
-      let indented_lines: Vec<String> = lines
-        .iter()
-        .map(|line| {
-          if line.trim().is_empty() {
-            String::new()
-          } else {
-            let relative = &line[min_indent..];
-            format!("{}{}", value_indent, relative)
-          }
-        })
-        .collect();
-
-      format!("{}:\n{}", key, indented_lines.join("\n"))
-    } else {
-      format!("{}: {}", key, value)
-    };
+    let new_entry_text = Self::format_map_entry(key, value, &indent);
 
     match position {
       InsertPosition::Last => {
@@ -668,6 +552,38 @@ impl Document {
     }
 
     Some((trailing[comment_start..].to_string(), rowan::TextSize::from((start + line_end) as u32)))
+  }
+
+  fn format_map_entry(key: &str, value: &str, indent: &str) -> String {
+    let is_block_value = value.contains('\n') || value.starts_with("- ");
+
+    if !is_block_value {
+      return format!("{}: {}", key, value);
+    }
+
+    let value_indent = format!("{}  ", indent);
+    let lines: Vec<&str> = value.lines().collect();
+
+    let min_indent = lines
+      .iter()
+      .filter(|line| !line.trim().is_empty())
+      .map(|line| line.len() - line.trim_start().len())
+      .min()
+      .unwrap_or(0);
+
+    let indented_lines: Vec<String> = lines
+      .iter()
+      .map(|line| {
+        if line.trim().is_empty() {
+          String::new()
+        } else {
+          let relative = &line[min_indent..];
+          format!("{}{}", value_indent, relative)
+        }
+      })
+      .collect();
+
+    format!("{}:\n{}", key, indented_lines.join("\n"))
   }
 
   fn format_sequence_item(value: &str, indent: &str) -> String {

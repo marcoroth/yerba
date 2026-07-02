@@ -1,10 +1,8 @@
-use yaml_parser::ast::BlockSeq;
-
 use rowan::ast::AstNode;
 
 use crate::document::{extract_scalar_text, navigate_from_node, Document};
 use crate::error::YerbaError;
-use crate::syntax::line_at;
+use crate::syntax::{find_block_sequence, line_at};
 
 #[derive(Debug, Clone)]
 pub struct DuplicateInfo {
@@ -19,9 +17,9 @@ impl Document {
 
   pub fn unique_with_options(&mut self, dot_path: &str, by: &str, remove: bool, allow_blank_duplicates: bool) -> Result<Vec<DuplicateInfo>, YerbaError> {
     let current_node = self.navigate(dot_path)?;
-    let source = self.root.text().to_string();
+    let source = self.source_text();
 
-    let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+    let sequence = match find_block_sequence(&current_node) {
       Some(sequence) => sequence,
       None => return Ok(Vec::new()),
     };

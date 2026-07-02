@@ -87,9 +87,9 @@ impl Selector {
       .rposition(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::Index(_)));
 
     match last_bracket {
-      Some(pos) => {
-        let container = segments[..=pos].to_vec();
-        let field = segments[pos + 1..].to_vec();
+      Some(position) => {
+        let container = segments[..=position].to_vec();
+        let field = segments[position + 1..].to_vec();
 
         (Selector::Absolute(container), Selector::Relative(field))
       }

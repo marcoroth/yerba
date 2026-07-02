@@ -83,7 +83,7 @@ impl Document {
   }
 
   pub fn get_all_located(&self, dot_path: &str) -> Vec<LocatedNode> {
-    let source = self.root.text().to_string();
+    let source = self.source_text();
     let file_path = self.path.as_ref().map(|p| p.to_string_lossy().to_string());
 
     self
@@ -108,13 +108,8 @@ impl Document {
         let node_type = if is_scalar {
           "scalar"
         } else {
-          let map_pos = node.descendants().find_map(BlockMap::cast).map(|m| m.syntax().text_range().start());
-          let seq_pos = node.descendants().find_map(BlockSeq::cast).map(|s| s.syntax().text_range().start());
-
-          match (map_pos, seq_pos) {
-            (Some(m), Some(s)) if s < m => "sequence",
-            (Some(_), _) => "map",
-            (None, Some(_)) => "sequence",
+          match first_collection(node) {
+            Some(FirstCollection::Sequence(_)) => "sequence",
             _ => "map",
           }
         };
@@ -142,7 +137,7 @@ impl Document {
 
   pub fn get_node_info(&self, dot_path: &str) -> NodeInfo {
     let selector = crate::selector::Selector::parse(dot_path);
-    let source = self.root.text().to_string();
+    let source = self.source_text();
 
     let (location, key_name, key_location) = self.resolve_location(dot_path, &source);
 
@@ -364,7 +359,7 @@ impl Document {
       self.navigate(parent_path).ok()?
     };
 
-    let map = parent_node.descendants().find_map(BlockMap::cast)?;
+    let map = find_block_map(&parent_node)?;
 
     find_entry_by_key(&map, last_key).map(|entry| entry.syntax().clone())
   }
@@ -375,7 +370,7 @@ impl Document {
       Err(_) => return Vec::new(),
     };
 
-    let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+    let sequence = match find_block_sequence(&current_node) {
       Some(sequence) => sequence,
       None => return Vec::new(),
     };
@@ -403,14 +398,14 @@ impl Document {
   pub fn get_sequence_indent(&self, dot_path: &str) -> Option<&'static str> {
     let current_node = self.navigate(dot_path).ok()?;
 
-    let sequence = current_node.descendants().find_map(BlockSeq::cast)?;
+    let sequence = find_block_sequence(&current_node)?;
     let first_entry = sequence.entries().next()?;
 
     let entry_indent = preceding_whitespace_indent(first_entry.syntax());
 
     let entry_node = current_node.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY)?;
 
-    let source = self.root.text().to_string();
+    let source = self.source_text();
     let entry_start: usize = entry_node.text_range().start().into();
     let key_indent = &source[line_start_at(&source, entry_start)..entry_start];
 

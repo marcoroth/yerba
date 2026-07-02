@@ -8,10 +8,7 @@ impl Document {
 
     let current_node = self.navigate(dot_path)?;
 
-    let sequence = current_node
-      .descendants()
-      .find_map(BlockSeq::cast)
-      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
     let entries: Vec<_> = sequence.entries().collect();
 
@@ -25,10 +22,7 @@ impl Document {
 
     let current_node = self.navigate(dot_path)?;
 
-    let map = current_node
-      .descendants()
-      .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let map = find_block_map(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     let entries: Vec<_> = map.entries().collect();
 
@@ -38,10 +32,7 @@ impl Document {
   pub fn resolve_key_index(&self, dot_path: &str, reference: &str) -> Result<usize, YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
-    let map = current_node
-      .descendants()
-      .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let map = find_block_map(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     if let Ok(index) = reference.parse::<usize>() {
       let length = map.entries().count();
@@ -70,10 +61,7 @@ impl Document {
   pub fn resolve_sequence_index(&self, dot_path: &str, reference: &str) -> Result<usize, YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
-    let sequence = current_node
-      .descendants()
-      .find_map(BlockSeq::cast)
-      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
     if let Ok(index) = reference.parse::<usize>() {
       let length = sequence.entries().count();
@@ -118,7 +106,7 @@ impl Document {
       Err(_) => return Ok(()),
     };
 
-    let map = match current_node.descendants().find_map(BlockMap::cast) {
+    let map = match find_block_map(&current_node) {
       Some(map) => map,
       None => return Ok(()),
     };
@@ -146,7 +134,7 @@ impl Document {
       Err(_) => return Ok(()),
     };
 
-    let map = match current_node.descendants().find_map(BlockMap::cast) {
+    let map = match find_block_map(&current_node) {
       Some(map) => map,
       None => return Ok(()),
     };
@@ -174,13 +162,13 @@ impl Document {
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
     for current_node in &nodes {
-      let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+      let sequence = match find_block_sequence(current_node) {
         Some(sequence) => sequence,
         None => continue,
       };
 
       for entry in sequence.entries() {
-        let map = match entry.syntax().descendants().find_map(BlockMap::cast) {
+        let map = match find_block_map(entry.syntax()) {
           Some(map) => map,
           None => continue,
         };
@@ -211,13 +199,13 @@ impl Document {
     let mut all_unknown: Vec<String> = Vec::new();
 
     for current_node in &nodes {
-      let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+      let sequence = match find_block_sequence(current_node) {
         Some(sequence) => sequence,
         None => continue,
       };
 
       for entry in sequence.entries() {
-        if let Some(map) = entry.syntax().descendants().find_map(BlockMap::cast) {
+        if let Some(map) = find_block_map(entry.syntax()) {
           for map_entry in map.entries() {
             if let Some(key_name) = map_entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())) {
               if !key_order.contains(&key_name.as_str()) && !all_unknown.contains(&key_name) {
@@ -243,7 +231,7 @@ impl Document {
 
     let current_node = self.navigate(dot_path)?;
 
-    let sequence = match current_node.descendants().find_map(BlockSeq::cast) {
+    let sequence = match find_block_sequence(&current_node) {
       Some(sequence) => sequence,
       None => return Ok(()),
     };
@@ -272,7 +260,7 @@ impl Document {
       };
 
       for child_node in &child_nodes {
-        let sequence = match child_node.descendants().find_map(BlockSeq::cast) {
+        let sequence = match find_block_sequence(child_node) {
           Some(sequence) => sequence,
           None => continue,
         };

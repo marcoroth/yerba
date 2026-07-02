@@ -60,10 +60,7 @@ impl Document {
     let quote_style = self.detect_sequence_quote_style(dot_path);
     let current_node = self.navigate(dot_path)?;
 
-    let sequence = current_node
-      .descendants()
-      .find_map(BlockSeq::cast)
-      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
     let entries: Vec<_> = sequence.entries().collect();
 
@@ -95,7 +92,7 @@ impl Document {
     Self::validate_path(dot_path)?;
 
     if let Ok(current_node) = self.navigate(dot_path) {
-      if current_node.descendants().find_map(BlockSeq::cast).is_some()
+      if find_block_sequence(&current_node).is_some()
         || matches!(self.get_value(dot_path).as_ref(), Some(yaml_serde::Value::Sequence(sequence)) if sequence.is_empty())
       {
         return self.insert_sequence_item(dot_path, value, position);
@@ -121,7 +118,7 @@ impl Document {
           None => continue,
         };
 
-        let map = match node.descendants().find_map(BlockMap::cast) {
+        let map = match find_block_map(&node) {
           Some(map) => map,
           None => {
             let has_empty_flow_map = node
@@ -155,7 +152,7 @@ impl Document {
 
         let start_col = {
           let offset: usize = first_entry.syntax().text_range().start().into();
-          let source = self.to_string();
+          let source = self.source_text();
 
           column_at(&source, offset)
         };
@@ -205,7 +202,7 @@ impl Document {
   fn insert_sequence_item(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
-    let Some(sequence) = current_node.descendants().find_map(BlockSeq::cast) else {
+    let Some(sequence) = find_block_sequence(&current_node) else {
       if matches!(self.get_value(dot_path).as_ref(), Some(yaml_serde::Value::Sequence(sequence)) if sequence.is_empty()) {
         return self.replace_empty_inline_sequence(dot_path, value);
       }
@@ -323,7 +320,7 @@ impl Document {
   fn insert_map_key(&mut self, dot_path: &str, key: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
-    let map = match current_node.descendants().find_map(BlockMap::cast) {
+    let map = match find_block_map(&current_node) {
       Some(map) => map,
       None => {
         let flow_map = current_node.descendants().find(|descendant| descendant.kind() == SyntaxKind::FLOW_MAP);
@@ -444,7 +441,7 @@ impl Document {
 
       let range = flow_map.text_range();
 
-      let source = self.to_string();
+      let source = self.source_text();
       let start: usize = range.start().into();
       let before = &source[..start];
       let trimmed_length = before.trim_end_matches([' ', '\n']).len();
@@ -458,10 +455,7 @@ impl Document {
     let (parent_path, map_key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
     let parent_node = self.navigate(parent_path)?;
 
-    let map = parent_node
-      .descendants()
-      .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
     let entry = find_entry_by_key(&map, map_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
     let entry_indent = preceding_whitespace_indent(entry.syntax());
@@ -484,14 +478,14 @@ impl Document {
   fn replace_empty_inline_sequence(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
     if dot_path.is_empty() {
       let current_node = self.navigate(dot_path)?;
-      let flow_seq = current_node
+      let flow_sequence = current_node
         .descendants()
         .find(|descendant| descendant.kind() == SyntaxKind::FLOW_SEQ)
         .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
       let new_item = Self::format_sequence_item(value, "");
-      let range = flow_seq.text_range();
-      let source = self.to_string();
+      let range = flow_sequence.text_range();
+      let source = self.source_text();
       let start: usize = range.start().into();
       let before = &source[..start];
 
@@ -507,10 +501,7 @@ impl Document {
     let (parent_path, key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
     let parent_node = self.navigate(parent_path)?;
 
-    let map = parent_node
-      .descendants()
-      .find_map(BlockMap::cast)
-      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
     let entry = find_entry_by_key(&map, key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
     let item_indent = format!("{}  ", preceding_whitespace_indent(entry.syntax()));
@@ -539,7 +530,7 @@ impl Document {
   }
 
   fn trailing_inline_comment(&self, node: &SyntaxNode) -> Option<(String, rowan::TextSize)> {
-    let source = self.root.text().to_string();
+    let source = self.source_text();
     let start: usize = node.text_range().end().into();
     let rest = &source[start..];
     let line_end = rest.find('\n').unwrap_or(rest.len());

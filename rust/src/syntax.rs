@@ -1,7 +1,7 @@
 use rowan::ast::AstNode;
 use rowan::{TextRange, TextSize};
 
-use yaml_parser::ast::{BlockMap, BlockMapEntry};
+use yaml_parser::ast::{BlockMap, BlockMapEntry, BlockSeq};
 use yaml_parser::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -72,6 +72,35 @@ pub fn extract_scalar(node: &SyntaxNode) -> Option<ScalarValue> {
     selector: None,
     line: None,
   })
+}
+
+pub fn find_block_map(node: &SyntaxNode) -> Option<BlockMap> {
+  node.descendants().find_map(BlockMap::cast)
+}
+
+pub fn find_block_sequence(node: &SyntaxNode) -> Option<BlockSeq> {
+  node.descendants().find_map(BlockSeq::cast)
+}
+
+pub enum FirstCollection {
+  Map(BlockMap),
+  Sequence(BlockSeq),
+}
+
+pub fn first_collection(node: &SyntaxNode) -> Option<FirstCollection> {
+  match (find_block_map(node), find_block_sequence(node)) {
+    (Some(map), Some(sequence)) => {
+      if sequence.syntax().text_range().start() <= map.syntax().text_range().start() {
+        Some(FirstCollection::Sequence(sequence))
+      } else {
+        Some(FirstCollection::Map(map))
+      }
+    }
+
+    (Some(map), None) => Some(FirstCollection::Map(map)),
+    (None, Some(sequence)) => Some(FirstCollection::Sequence(sequence)),
+    (None, None) => None,
+  }
 }
 
 pub fn is_map_key(token: &SyntaxToken) -> bool {

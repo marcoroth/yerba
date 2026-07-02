@@ -34,8 +34,9 @@ use crate::error::YerbaError;
 use crate::QuoteStyle;
 
 use crate::syntax::{
-  column_at, dedent_block_scalar, extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
-  is_yaml_non_string, line_at, line_start_at, preceding_whitespace_indent, preceding_whitespace_token, raw_scalar_value, removal_range, ScalarValue,
+  column_at, dedent_block_scalar, extract_scalar, extract_scalar_text, find_block_map, find_block_sequence, find_entry_by_key, find_scalar_token,
+  first_collection, format_scalar_value, is_map_key, is_yaml_non_string, line_at, line_start_at, preceding_whitespace_indent, preceding_whitespace_token,
+  raw_scalar_value, removal_range, FirstCollection, ScalarValue,
 };
 
 #[derive(Debug, Clone)]
@@ -148,13 +149,13 @@ impl Document {
       .as_ref()
       .ok_or_else(|| YerbaError::IoError(std::io::Error::new(std::io::ErrorKind::NotFound, "no file path associated with this document")))?;
 
-    fs::write(path, self.to_string())?;
+    fs::write(path, self.source_text())?;
 
     Ok(())
   }
 
   pub fn save_to(&self, path: impl AsRef<Path>) -> Result<(), YerbaError> {
-    fs::write(path, self.to_string())?;
+    fs::write(path, self.source_text())?;
 
     Ok(())
   }
@@ -208,7 +209,7 @@ impl Document {
     let mut current_nodes: Vec<Option<SyntaxNode>> = vec![Some(document.syntax().clone())];
 
     if parsed.is_empty() {
-      if let Some(sequence) = document.syntax().descendants().find_map(BlockSeq::cast) {
+      if let Some(sequence) = find_block_sequence(document.syntax()) {
         current_nodes = sequence.entries().map(|entry| Some(entry.syntax().clone())).collect();
       }
 
@@ -297,7 +298,7 @@ impl Document {
 
   fn insert_after_node(&mut self, node: &SyntaxNode, text: &str) -> Result<(), YerbaError> {
     let end: usize = node.text_range().end().into();
-    let source = self.to_string();
+    let source = self.source_text();
 
     let rest = &source[end..];
     let line_end = rest.find('\n').unwrap_or(rest.len());
@@ -435,7 +436,7 @@ impl Document {
 
     edits.sort_by_key(|(range, _)| std::cmp::Reverse(range.start()));
 
-    let mut new_source = self.root.text().to_string();
+    let mut new_source = self.source_text();
 
     for (range, replacement) in edits {
       let start: usize = range.start().into();
@@ -445,6 +446,10 @@ impl Document {
     }
 
     self.reparse(&new_source)
+  }
+
+  fn source_text(&self) -> String {
+    self.root.text().to_string()
   }
 
   fn reparse(&mut self, new_source: &str) -> Result<(), YerbaError> {
@@ -543,39 +548,31 @@ pub fn collect_selectors(value: &yaml_serde::Value, prefix: &str, selectors: &mu
 }
 
 pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> yaml_serde::Value {
-  if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
-    let map_position = node.descendants().find_map(BlockMap::cast).map(|map| map.syntax().text_range().start());
-
-    let sequence_position = sequence.syntax().text_range().start();
-
-    if map_position.is_none() || sequence_position <= map_position.unwrap() {
+  match first_collection(node) {
+    Some(FirstCollection::Sequence(sequence)) => {
       let values: Vec<yaml_serde::Value> = sequence.entries().map(|entry| node_to_yaml_value(entry.syntax())).collect();
 
       return yaml_serde::Value::Sequence(values);
     }
-  }
 
-  if let Some(map) = node.descendants().find_map(BlockMap::cast) {
-    let mut mapping = yaml_serde::Mapping::new();
+    Some(FirstCollection::Map(map)) => {
+      let mut mapping = yaml_serde::Mapping::new();
 
-    for entry in map.entries() {
-      let key = entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())).unwrap_or_default();
+      for entry in map.entries() {
+        let key = entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())).unwrap_or_default();
 
-      let value = entry
-        .value()
-        .map(|value_node| node_to_yaml_value(value_node.syntax()))
-        .unwrap_or(yaml_serde::Value::Null);
+        let value = entry
+          .value()
+          .map(|value_node| node_to_yaml_value(value_node.syntax()))
+          .unwrap_or(yaml_serde::Value::Null);
 
-      mapping.insert(yaml_serde::Value::String(key), value);
+        mapping.insert(yaml_serde::Value::String(key), value);
+      }
+
+      return yaml_serde::Value::Mapping(mapping);
     }
 
-    return yaml_serde::Value::Mapping(mapping);
-  }
-
-  if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
-    let values: Vec<yaml_serde::Value> = sequence.entries().map(|entry| node_to_yaml_value(entry.syntax())).collect();
-
-    return yaml_serde::Value::Sequence(values);
+    None => {}
   }
 
   if let Some(block_scalar) = node.descendants().find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR) {
@@ -631,17 +628,13 @@ pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> yaml_serde::Value {
 }
 
 pub(crate) fn parse_condition(condition: &str) -> Option<(String, &str, String)> {
-  let (left, operator, right) = if let Some(index) = condition.find(" not_contains ") {
-    (condition[..index].trim(), "not_contains", condition[index + 14..].trim())
-  } else if let Some(index) = condition.find(" contains ") {
-    (condition[..index].trim(), "contains", condition[index + 10..].trim())
-  } else if let Some(index) = condition.find("!=") {
-    (condition[..index].trim(), "!=", condition[index + 2..].trim())
-  } else if let Some(index) = condition.find("==") {
-    (condition[..index].trim(), "==", condition[index + 2..].trim())
-  } else {
-    return None;
-  };
+  const OPERATORS: [(&str, &str); 4] = [(" not_contains ", "not_contains"), (" contains ", "contains"), ("!=", "!="), ("==", "==")];
+
+  let (left, operator, right) = OPERATORS.iter().find_map(|(pattern, operator)| {
+    condition
+      .find(pattern)
+      .map(|index| (condition[..index].trim(), *operator, condition[index + pattern.len()..].trim()))
+  })?;
 
   let right = right
     .trim_start_matches('"')
@@ -677,7 +670,7 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
 
   match segment {
     SelectorSegment::AllItems => {
-      if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+      if let Some(sequence) = find_block_sequence(node) {
         sequence.entries().map(|entry| entry.syntax().clone()).collect()
       } else {
         Vec::new()
@@ -685,7 +678,7 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
     }
 
     SelectorSegment::Index(index) => {
-      if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+      if let Some(sequence) = find_block_sequence(node) {
         sequence.entries().nth(*index).map(|entry| vec![entry.syntax().clone()]).unwrap_or_default()
       } else {
         Vec::new()
@@ -693,7 +686,7 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
     }
 
     SelectorSegment::Key(key) => {
-      if let Some(map) = node.descendants().find_map(BlockMap::cast) {
+      if let Some(map) = find_block_map(node) {
         if let Some(entry) = find_entry_by_key(&map, key) {
           if let Some(value) = entry.value() {
             return vec![value.syntax().clone()];
@@ -708,23 +701,8 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
 
 pub(crate) fn navigate_from_node(node: &SyntaxNode, path: &str) -> Vec<SyntaxNode> {
   let parsed = crate::selector::Selector::parse(path);
-  let mut current_nodes = vec![node.clone()];
 
-  for segment in parsed.segments() {
-    let mut next_nodes = Vec::new();
-
-    for current in &current_nodes {
-      next_nodes.extend(resolve_segment(current, segment));
-    }
-
-    current_nodes = next_nodes;
-
-    if current_nodes.is_empty() {
-      break;
-    }
-  }
-
-  current_nodes
+  navigate_remaining(node, parsed.segments())
 }
 
 #[derive(Debug, Clone)]

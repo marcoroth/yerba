@@ -31,7 +31,7 @@ impl Document {
       crate::schema::validate_value(&value, schema)
     };
 
-    let source = self.to_string();
+    let source = self.source_text();
 
     for error in &mut errors {
       if !error.path.is_empty() {

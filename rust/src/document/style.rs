@@ -9,7 +9,7 @@ pub struct StyleEnforcement {
 
 impl Document {
   pub fn enforce_styles(&mut self, enforcement: &StyleEnforcement) -> Result<(), YerbaError> {
-    let source = self.root.text().to_string();
+    let source = self.source_text();
     let mut edits: Vec<(TextRange, String)> = Vec::new();
     let mut converted_ranges: Vec<TextRange> = Vec::new();
 
@@ -324,7 +324,7 @@ impl Document {
     }
 
     loop {
-      let source = self.root.text().to_string();
+      let source = self.source_text();
 
       let scope_node = if scope_path.is_empty() {
         self.root.clone()
@@ -383,7 +383,7 @@ impl Document {
           Some(entry) => entry,
           None => continue,
         };
-        let first_entry = match BlockSeq::cast(node).and_then(|seq| seq.entries().next()) {
+        let first_entry = match BlockSeq::cast(node).and_then(|sequence| sequence.entries().next()) {
           Some(entry) => entry,
           None => continue,
         };
@@ -401,8 +401,8 @@ impl Document {
           continue;
         }
 
-        let seq_start: usize = range.start().into();
-        let line_start = line_start_at(&source, seq_start);
+        let sequence_start: usize = range.start().into();
+        let line_start = line_start_at(&source, sequence_start);
         let full_text = &source[line_start..usize::from(range.end())];
 
         let reindented: String = full_text
@@ -447,7 +447,7 @@ impl Document {
     }
 
     let current_node = self.navigate(dot_path)?;
-    let source = self.to_string();
+    let source = self.source_text();
 
     let entry_node = current_node
       .ancestors()
@@ -457,10 +457,7 @@ impl Document {
     let entry_start: usize = entry_node.text_range().start().into();
     let key_indent_length = column_at(&source, entry_start);
 
-    let sequence = current_node
-      .descendants()
-      .find_map(BlockSeq::cast)
-      .ok_or_else(|| YerbaError::ParseError("could not find block sequence".to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::ParseError("could not find block sequence".to_string()))?;
 
     let first_entry = sequence.entries().next();
 
@@ -524,7 +521,7 @@ impl Document {
       _ => {}
     }
 
-    let source = self.to_string();
+    let source = self.source_text();
 
     let entry_node = current_node.ancestors().find(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_MAP_ENTRY);
 
@@ -600,32 +597,14 @@ impl Document {
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
     for current_node in &nodes {
-      let sequence = current_node.descendants().find_map(BlockSeq::cast);
-      let map = current_node.descendants().find_map(BlockMap::cast);
-
-      let use_sequence = match (&sequence, &map) {
-        (Some(sequence), Some(map)) => sequence.syntax().text_range().start() <= map.syntax().text_range().start(),
-        (Some(_), None) => true,
-        (None, Some(_)) => false,
-        (None, None) => continue,
+      let entry_nodes: Vec<SyntaxNode> = match first_collection(current_node) {
+        Some(FirstCollection::Sequence(sequence)) => sequence.entries().map(|entry| entry.syntax().clone()).collect(),
+        Some(FirstCollection::Map(map)) => map.entries().map(|entry| entry.syntax().clone()).collect(),
+        None => continue,
       };
 
-      if use_sequence {
-        let entries: Vec<_> = sequence.unwrap().entries().collect();
-
-        if entries.len() > 1 {
-          for entry in entries.iter().skip(1) {
-            collect_blank_line_edits(entry.syntax(), blank_lines, &mut edits);
-          }
-        }
-      } else {
-        let entries: Vec<_> = map.unwrap().entries().collect();
-
-        if entries.len() > 1 {
-          for entry in entries.iter().skip(1) {
-            collect_blank_line_edits(entry.syntax(), blank_lines, &mut edits);
-          }
-        }
+      for entry_node in entry_nodes.iter().skip(1) {
+        collect_blank_line_edits(entry_node, blank_lines, &mut edits);
       }
     }
 
@@ -637,7 +616,7 @@ impl Document {
   }
 
   pub fn directive_locations(&self) -> Vec<(usize, usize)> {
-    let source = self.root.text().to_string();
+    let source = self.source_text();
 
     self
       .root
@@ -656,7 +635,7 @@ impl Document {
       return Ok(());
     }
 
-    let source = self.root.text().to_string();
+    let source = self.source_text();
     let new_source = format!("---\n{}", source);
 
     self.reparse(&new_source)
@@ -667,7 +646,7 @@ impl Document {
       return Ok(());
     }
 
-    let source = self.root.text().to_string();
+    let source = self.source_text();
     let new_source = source
       .strip_prefix("---\n")
       .or_else(|| source.strip_prefix("---"))
@@ -748,7 +727,7 @@ impl Document {
   }
 
   pub fn enforce_quotes_at(&mut self, style: &QuoteStyle, dot_path: Option<&str>) -> Result<Vec<String>, YerbaError> {
-    let source = self.root.text().to_string();
+    let source = self.source_text();
 
     let scope_ranges: Vec<TextRange> = match dot_path {
       Some(path) if !path.is_empty() => self.navigate_all_compact(path).iter().map(|node| node.text_range()).collect(),

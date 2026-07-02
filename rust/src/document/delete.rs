@@ -13,10 +13,7 @@ impl Document {
       let (parent_path, source_key) = source_path.rsplit_once('.').unwrap_or(("", source_path));
       let parent_node = self.navigate(parent_path)?;
 
-      let map = parent_node
-        .descendants()
-        .find_map(BlockMap::cast)
-        .ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
+      let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
 
       let entry = find_entry_by_key(&map, source_key).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
       let key_node = entry.key().ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
@@ -46,10 +43,7 @@ impl Document {
 
         if parent_path.is_empty() && !has_wildcard {
           let parent_node = self.navigate(&parent_path)?;
-          let map = parent_node
-            .descendants()
-            .find_map(BlockMap::cast)
-            .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+          let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
           let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
@@ -67,10 +61,7 @@ impl Document {
         }
 
         if parent_nodes.len() == 1 && !has_wildcard {
-          let map = parent_nodes[0]
-            .descendants()
-            .find_map(BlockMap::cast)
-            .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+          let map = find_block_map(&parent_nodes[0]).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
           let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
@@ -80,7 +71,7 @@ impl Document {
         let mut ranges: Vec<TextRange> = Vec::new();
 
         for parent_node in &parent_nodes {
-          if let Some(map) = parent_node.descendants().find_map(BlockMap::cast) {
+          if let Some(map) = find_block_map(parent_node) {
             if let Some(entry) = find_entry_by_key(&map, last_key) {
               ranges.push(removal_range(entry.syntax()));
             }
@@ -100,10 +91,7 @@ impl Document {
   pub fn remove(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
-    let sequence = current_node
-      .descendants()
-      .find_map(BlockSeq::cast)
-      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
     let target_entry = sequence
       .entries()
@@ -124,10 +112,7 @@ impl Document {
 
     let current_node = self.navigate(dot_path)?;
 
-    let sequence = current_node
-      .descendants()
-      .find_map(BlockSeq::cast)
-      .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 
     let entries: Vec<_> = sequence.entries().collect();
 

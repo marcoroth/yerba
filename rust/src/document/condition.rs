@@ -11,7 +11,7 @@ impl Document {
   }
 
   pub fn filter_with_selectors(&self, dot_path: &str, condition: &str) -> Vec<(yaml_serde::Value, String, usize)> {
-    let source = self.root.text().to_string();
+    let source = self.source_text();
 
     self
       .navigate_all_compact(dot_path)
@@ -52,7 +52,7 @@ impl Document {
         }
 
         for node in &target_nodes {
-          if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+          if let Some(sequence) = find_block_sequence(node) {
             for entry in sequence.entries() {
               if let Some(text) = entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())) {
                 if text == right {
@@ -67,7 +67,7 @@ impl Document {
       }
       "not_contains" => {
         for node in &target_nodes {
-          if let Some(sequence) = node.descendants().find_map(BlockSeq::cast) {
+          if let Some(sequence) = find_block_sequence(node) {
             for entry in sequence.entries() {
               if let Some(text) = entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())) {
                 if text == right {

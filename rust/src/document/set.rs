@@ -5,7 +5,7 @@ impl Document {
     let current_node = self.navigate(dot_path)?;
 
     if let Some(block_scalar) = current_node.descendants().find(|node| node.kind() == SyntaxKind::BLOCK_SCALAR) {
-      let source = self.to_string();
+      let source = self.source_text();
       let new_text = Self::block_scalar_replacement(&source, &block_scalar, value);
 
       return self.apply_edit(block_scalar.text_range(), &new_text);
@@ -25,7 +25,7 @@ impl Document {
       return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
     }
 
-    let source = self.to_string();
+    let source = self.source_text();
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
     for node in nodes {

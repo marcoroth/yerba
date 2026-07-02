@@ -34,8 +34,8 @@ use crate::error::YerbaError;
 use crate::QuoteStyle;
 
 use crate::syntax::{
-  dedent_block_scalar, extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key, is_yaml_non_string,
-  preceding_whitespace_indent, preceding_whitespace_token, raw_scalar_value, removal_range, ScalarValue,
+  column_at, dedent_block_scalar, extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key,
+  is_yaml_non_string, line_at, line_start_at, preceding_whitespace_indent, preceding_whitespace_token, raw_scalar_value, removal_range, ScalarValue,
 };
 
 #[derive(Debug, Clone)]
@@ -476,8 +476,8 @@ fn check_duplicate_keys(root: &SyntaxNode) -> Result<(), YerbaError> {
 
             if let Some(&first_offset) = seen.get(&key_text) {
               let source = root.text().to_string();
-              let first_line = source[..first_offset.into()].matches('\n').count() + 1;
-              let duplicate_line = source[..usize::from(offset)].matches('\n').count() + 1;
+              let first_line = line_at(&source, first_offset.into());
+              let duplicate_line = line_at(&source, offset.into());
               let line_content = source.lines().nth(duplicate_line - 1).unwrap_or("").to_string();
 
               return Err(YerbaError::DuplicateKey {
@@ -502,21 +502,13 @@ pub(crate) fn compute_location(source: &str, start_offset: usize, end_offset: us
   let start = start_offset.min(source.len());
   let end = end_offset.min(source.len());
 
-  let before_start = &source[..start];
-  let start_line = before_start.chars().filter(|c| *c == '\n').count() + 1;
-  let start_column = start - before_start.rfind('\n').map(|p| p + 1).unwrap_or(0);
-
-  let before_end = &source[..end];
-  let end_line = before_end.chars().filter(|c| *c == '\n').count() + 1;
-  let end_column = end - before_end.rfind('\n').map(|p| p + 1).unwrap_or(0);
-
   Location {
     start_offset: start,
     end_offset: end,
-    start_line,
-    start_column,
-    end_line,
-    end_column,
+    start_line: line_at(source, start),
+    start_column: column_at(source, start),
+    end_line: line_at(source, end),
+    end_column: column_at(source, end),
   }
 }
 

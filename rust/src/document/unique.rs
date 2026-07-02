@@ -4,6 +4,7 @@ use rowan::ast::AstNode;
 
 use crate::document::{extract_scalar_text, navigate_from_node, Document};
 use crate::error::YerbaError;
+use crate::syntax::line_at;
 
 #[derive(Debug, Clone)]
 pub struct DuplicateInfo {
@@ -37,7 +38,7 @@ impl Document {
       .iter()
       .map(|entry| {
         let offset: usize = entry.syntax().text_range().start().into();
-        let line = source[..offset].matches('\n').count() + 1;
+        let line = line_at(&source, offset);
 
         let value = if by_is_scalar {
           Some(entry.flow().and_then(|flow| extract_scalar_text(flow.syntax())).unwrap_or_default())

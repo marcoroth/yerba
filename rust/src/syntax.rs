@@ -182,6 +182,18 @@ pub fn unescape_single_quoted(text: &str) -> String {
   text.replace("''", "'")
 }
 
+pub fn line_at(source: &str, offset: usize) -> usize {
+  source[..offset].matches('\n').count() + 1
+}
+
+pub fn line_start_at(source: &str, offset: usize) -> usize {
+  source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0)
+}
+
+pub fn column_at(source: &str, offset: usize) -> usize {
+  offset - line_start_at(source, offset)
+}
+
 pub fn preceding_whitespace_indent(node: &SyntaxNode) -> String {
   if let Some(token) = preceding_whitespace_token(node) {
     let text = token.text();
@@ -196,10 +208,10 @@ pub fn preceding_whitespace_indent(node: &SyntaxNode) -> String {
   let source = root.text().to_string();
 
   if start_offset > 0 {
-    let before = &source[..start_offset];
+    let line_start = line_start_at(&source, start_offset);
 
-    if let Some(newline_position) = before.rfind('\n') {
-      return before[newline_position + 1..].to_string();
+    if line_start > 0 {
+      return source[line_start..start_offset].to_string();
     }
   }
 

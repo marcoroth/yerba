@@ -83,7 +83,7 @@ impl Document {
     }
 
     let offset: usize = block_scalar.text_range().start().into();
-    let line_start = source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0);
+    let line_start = line_start_at(source, offset);
     let key_indent = source[line_start..offset].len() - source[line_start..offset].trim_start().len();
     let indent = " ".repeat(key_indent + 2);
 

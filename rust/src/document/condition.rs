@@ -19,7 +19,7 @@ impl Document {
       .filter(|node| self.evaluate_condition_on_node(node, condition))
       .map(|node| {
         let offset: usize = node.text_range().start().into();
-        let line = source[..offset].matches('\n').count() + 1;
+        let line = line_at(&source, offset);
 
         (node_to_yaml_value(node), super::get::node_selector(node), line)
       })

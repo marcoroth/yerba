@@ -156,9 +156,8 @@ impl Document {
         let start_col = {
           let offset: usize = first_entry.syntax().text_range().start().into();
           let source = self.to_string();
-          let before = &source[..offset];
 
-          offset - before.rfind('\n').map(|p| p + 1).unwrap_or(0)
+          column_at(&source, offset)
         };
 
         let indent = " ".repeat(start_col);

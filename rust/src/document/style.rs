@@ -41,8 +41,7 @@ impl Document {
 
             if let Some(ref entry) = entry_node {
               let entry_start: usize = entry.text_range().start().into();
-              let entry_line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
-              let key_indent = entry_start - entry_line_start;
+              let key_indent = column_at(&source, entry_start);
               let entry_text = entry.text().to_string();
 
               if let Some(colon_offset) = entry_text.find(':') {
@@ -78,8 +77,7 @@ impl Document {
             };
 
             let entry_start: usize = parent_entry.text_range().start().into();
-            let line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
-            let key_indent_length = entry_start - line_start;
+            let key_indent_length = column_at(&source, entry_start);
             let entry_indent_length = preceding_whitespace_indent(first_entry.syntax()).len();
             let is_indented = entry_indent_length > key_indent_length;
             let needs_change = (want_indented && !is_indented) || (want_compact && is_indented);
@@ -101,8 +99,7 @@ impl Document {
               let sequence_start: usize = sequence_range.start().into();
               let sequence_end: usize = sequence_range.end().into();
 
-              let before_sequence = &source[..sequence_start];
-              let line_start_of_first_entry = before_sequence.rfind('\n').map(|position| position + 1).unwrap_or(0);
+              let line_start_of_first_entry = line_start_at(&source, sequence_start);
               let full_text = &source[line_start_of_first_entry..sequence_end];
 
               let reindented: String = full_text
@@ -405,7 +402,7 @@ impl Document {
         }
 
         let seq_start: usize = range.start().into();
-        let line_start = source[..seq_start].rfind('\n').map(|pos| pos + 1).unwrap_or(0);
+        let line_start = line_start_at(&source, seq_start);
         let full_text = &source[line_start..usize::from(range.end())];
 
         let reindented: String = full_text
@@ -458,8 +455,7 @@ impl Document {
       .ok_or_else(|| YerbaError::ParseError("could not find parent map entry".to_string()))?;
 
     let entry_start: usize = entry_node.text_range().start().into();
-    let line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
-    let key_indent_length = entry_start - line_start;
+    let key_indent_length = column_at(&source, entry_start);
 
     let sequence = current_node
       .descendants()
@@ -488,8 +484,7 @@ impl Document {
     let sequence_start: usize = sequence_range.start().into();
     let sequence_end: usize = sequence_range.end().into();
 
-    let before_sequence = &source[..sequence_start];
-    let line_start_of_first_entry = before_sequence.rfind('\n').map(|position| position + 1).unwrap_or(0);
+    let line_start_of_first_entry = line_start_at(&source, sequence_start);
     let full_text = &source[line_start_of_first_entry..sequence_end];
 
     let reindented: String = full_text
@@ -535,8 +530,7 @@ impl Document {
 
     let (key_indent, colon_in_line) = if let Some(ref entry) = entry_node {
       let entry_start: usize = entry.text_range().start().into();
-      let entry_line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
-      let indent = entry_start - entry_line_start;
+      let indent = column_at(&source, entry_start);
 
       let entry_text = entry.text().to_string();
       let colon_offset = entry_text.find(':').map(|offset| entry_start + offset);
@@ -651,10 +645,8 @@ impl Document {
       .filter(|element| element.kind() == SyntaxKind::DIRECTIVES_END)
       .map(|element| {
         let offset: usize = element.text_range().start().into();
-        let line = source[..offset].matches('\n').count() + 1;
-        let column = offset - source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0) + 1;
 
-        (line, column)
+        (line_at(&source, offset), column_at(&source, offset) + 1)
       })
       .collect()
   }
@@ -845,7 +837,7 @@ impl Document {
                 QuoteStyle::Single => {
                   if is_multiline {
                     let offset: usize = token.text_range().start().into();
-                    let line = source[..offset].matches('\n').count() + 1;
+                    let line = line_at(&source, offset);
 
                     warnings.push(format!(
                       "line {}: skipped block scalar → single (multiline content can't be single-quoted)",
@@ -863,7 +855,7 @@ impl Document {
                 QuoteStyle::Plain => {
                   if is_multiline || trimmed.contains(':') || trimmed.contains('#') || trimmed.contains('"') || trimmed.contains('\'') {
                     let offset: usize = token.text_range().start().into();
-                    let line = source[..offset].matches('\n').count() + 1;
+                    let line = line_at(&source, offset);
                     let reason = if is_multiline { "multiline content" } else { "special characters" };
 
                     warnings.push(format!("line {}: skipped block scalar → plain ({} can't be plain)", line, reason));
@@ -895,8 +887,7 @@ impl Document {
           }
 
           let offset: usize = token.text_range().start().into();
-          let line_start = source[..offset].rfind('\n').map(|p| p + 1).unwrap_or(0);
-          let line_prefix = &source[line_start..offset];
+          let line_prefix = &source[line_start_at(&source, offset)..offset];
           let indent = line_prefix.len() - line_prefix.trim_start().len() + 2;
           let indent_str = " ".repeat(indent);
           let header = style.block_header();

@@ -91,7 +91,7 @@ impl Document {
       .iter()
       .map(|node| {
         let offset: usize = node.text_range().start().into();
-        let line = source[..offset].matches('\n').count() + 1;
+        let line = line_at(&source, offset);
         let selector = node_selector(node);
         let is_scalar = !node
           .descendants()
@@ -412,8 +412,7 @@ impl Document {
 
     let source = self.root.text().to_string();
     let entry_start: usize = entry_node.text_range().start().into();
-    let line_start = source[..entry_start].rfind('\n').map(|position| position + 1).unwrap_or(0);
-    let key_indent = &source[line_start..entry_start];
+    let key_indent = &source[line_start_at(&source, entry_start)..entry_start];
 
     if entry_indent.len() > key_indent.len() {
       Some("indented")

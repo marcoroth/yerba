@@ -31,25 +31,27 @@ pub fn detect_yaml_type(scalar: &ScalarValue) -> YerbaValueType {
   detect_yaml_type_from_plain(&scalar.text)
 }
 
+pub fn raw_scalar_value(token: &SyntaxToken) -> Option<String> {
+  match token.kind() {
+    SyntaxKind::PLAIN_SCALAR => Some(token.text().to_string()),
+
+    SyntaxKind::DOUBLE_QUOTED_SCALAR => {
+      let text = token.text();
+      Some(unescape_double_quoted(&text[1..text.len() - 1]))
+    }
+
+    SyntaxKind::SINGLE_QUOTED_SCALAR => {
+      let text = token.text();
+      Some(unescape_single_quoted(&text[1..text.len() - 1]))
+    }
+
+    _ => None,
+  }
+}
+
 pub fn extract_scalar(node: &SyntaxNode) -> Option<ScalarValue> {
   if let Some(token) = find_scalar_token(node) {
-    let text = match token.kind() {
-      SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
-
-      SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-        let raw = token.text();
-        unescape_double_quoted(&raw[1..raw.len() - 1])
-      }
-
-      SyntaxKind::SINGLE_QUOTED_SCALAR => {
-        let raw = token.text();
-        unescape_single_quoted(&raw[1..raw.len() - 1])
-      }
-
-      _ => return None,
-    };
-
-    return Some(ScalarValue {
+    return raw_scalar_value(&token).map(|text| ScalarValue {
       text,
       kind: token.kind(),
       file_path: None,
@@ -120,34 +122,7 @@ pub fn quote_if_needed(value: &str) -> String {
 }
 
 pub fn extract_scalar_text(node: &SyntaxNode) -> Option<String> {
-  if let Some(token) = find_scalar_token(node) {
-    return match token.kind() {
-      SyntaxKind::PLAIN_SCALAR => Some(token.text().to_string()),
-
-      SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-        let text = token.text();
-        let inner = &text[1..text.len() - 1];
-
-        Some(unescape_double_quoted(inner))
-      }
-
-      SyntaxKind::SINGLE_QUOTED_SCALAR => {
-        let text = token.text();
-        let inner = &text[1..text.len() - 1];
-
-        Some(unescape_single_quoted(inner))
-      }
-
-      _ => None,
-    };
-  }
-
-  let block_scalar_text = node
-    .descendants_with_tokens()
-    .filter_map(|element| element.into_token())
-    .find(|token| token.kind() == SyntaxKind::BLOCK_SCALAR_TEXT)?;
-
-  Some(dedent_block_scalar(block_scalar_text.text()))
+  extract_scalar(node).map(|scalar| scalar.text)
 }
 
 pub fn dedent_block_scalar(text: &str) -> String {

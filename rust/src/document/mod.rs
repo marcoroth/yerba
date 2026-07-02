@@ -35,7 +35,7 @@ use crate::QuoteStyle;
 
 use crate::syntax::{
   dedent_block_scalar, extract_scalar, extract_scalar_text, find_entry_by_key, find_scalar_token, format_scalar_value, is_map_key, is_yaml_non_string,
-  preceding_whitespace_indent, preceding_whitespace_token, removal_range, unescape_double_quoted, unescape_single_quoted, ScalarValue,
+  preceding_whitespace_indent, preceding_whitespace_token, raw_scalar_value, removal_range, ScalarValue,
 };
 
 #[derive(Debug, Clone)]

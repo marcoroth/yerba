@@ -50,20 +50,9 @@ impl Document {
       return Ok(());
     }
 
-    let raw_value = match current_kind {
-      SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-        let text = scalar_token.text();
-        unescape_double_quoted(&text[1..text.len() - 1])
-      }
-
-      SyntaxKind::SINGLE_QUOTED_SCALAR => {
-        let text = scalar_token.text();
-        unescape_single_quoted(&text[1..text.len() - 1])
-      }
-
-      SyntaxKind::PLAIN_SCALAR => scalar_token.text().to_string(),
-
-      _ => return Ok(()),
+    let raw_value = match raw_scalar_value(&scalar_token) {
+      Some(value) => value,
+      None => return Ok(()),
     };
 
     let new_text = format_scalar_value(&raw_value, target_kind);

@@ -143,39 +143,12 @@ impl Document {
               let target_kind = key_style.to_syntax_kind();
 
               if current_kind != target_kind {
-                let raw_value = match current_kind {
-                  SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-                    let text = token.text();
-
-                    unescape_double_quoted(&text[1..text.len() - 1])
-                  }
-
-                  SyntaxKind::SINGLE_QUOTED_SCALAR => {
-                    let text = token.text();
-
-                    unescape_single_quoted(&text[1..text.len() - 1])
-                  }
-
-                  SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
-
-                  _ => continue,
+                let raw_value = match raw_scalar_value(token) {
+                  Some(value) => value,
+                  None => continue,
                 };
 
-                let new_text = match key_style {
-                  crate::KeyStyle::Double => {
-                    let escaped = raw_value.replace('\\', "\\\\").replace('"', "\\\"");
-
-                    format!("\"{}\"", escaped)
-                  }
-
-                  crate::KeyStyle::Single => {
-                    let escaped = raw_value.replace('\'', "''");
-
-                    format!("'{}'", escaped)
-                  }
-
-                  crate::KeyStyle::Plain => raw_value,
-                };
+                let new_text = format_scalar_value(&raw_value, target_kind);
 
                 if new_text != token.text() {
                   edits.push((token.text_range(), new_text));
@@ -210,51 +183,18 @@ impl Document {
               continue;
             }
 
-            let raw_value = match current_kind {
-              SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-                let text = token.text();
-                unescape_double_quoted(&text[1..text.len() - 1])
-              }
-
-              SyntaxKind::SINGLE_QUOTED_SCALAR => {
-                let text = token.text();
-                unescape_single_quoted(&text[1..text.len() - 1])
-              }
-
-              SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
-
-              _ => continue,
+            let raw_value = match raw_scalar_value(token) {
+              Some(value) => value,
+              None => continue,
             };
 
             if current_kind == SyntaxKind::PLAIN_SCALAR && is_yaml_non_string(&raw_value) {
               continue;
             }
 
-            let new_text = match value_style {
-              QuoteStyle::Double => {
-                if raw_value.contains('"') && current_kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
-                  continue;
-                }
-
-                let escaped = raw_value.replace('\\', "\\\\").replace('"', "\\\"");
-
-                format!("\"{}\"", escaped)
-              }
-
-              QuoteStyle::Single => {
-                let escaped = raw_value.replace('\'', "''");
-                format!("'{}'", escaped)
-              }
-
-              QuoteStyle::Plain => {
-                if raw_value.contains('"') || raw_value.contains('\'') || raw_value.contains(':') || raw_value.contains('#') {
-                  continue;
-                }
-
-                raw_value
-              }
-
-              _ => continue,
+            let new_text = match inline_quote_replacement(&raw_value, current_kind, value_style) {
+              Some(new_text) => new_text,
+              None => continue,
             };
 
             if new_text != token.text() {
@@ -778,35 +718,12 @@ impl Document {
           continue;
         }
 
-        let raw_value = match current_kind {
-          SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-            let text = token.text();
-            unescape_double_quoted(&text[1..text.len() - 1])
-          }
-
-          SyntaxKind::SINGLE_QUOTED_SCALAR => {
-            let text = token.text();
-            unescape_single_quoted(&text[1..text.len() - 1])
-          }
-
-          SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
-
-          _ => continue,
+        let raw_value = match raw_scalar_value(&token) {
+          Some(value) => value,
+          None => continue,
         };
 
-        let new_text = match style {
-          crate::KeyStyle::Double => {
-            let escaped = raw_value.replace('\\', "\\\\").replace('"', "\\\"");
-            format!("\"{}\"", escaped)
-          }
-
-          crate::KeyStyle::Single => {
-            let escaped = raw_value.replace('\'', "''");
-            format!("'{}'", escaped)
-          }
-
-          crate::KeyStyle::Plain => raw_value,
-        };
+        let new_text = format_scalar_value(&raw_value, target_kind);
 
         if new_text != token.text() {
           edits.push((token.text_range(), new_text));
@@ -968,22 +885,9 @@ impl Document {
         }
 
         if is_inline_scalar && is_block_scalar_target {
-          let raw_value = match current_kind {
-            SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-              let text = token.text();
-
-              unescape_double_quoted(&text[1..text.len() - 1])
-            }
-
-            SyntaxKind::SINGLE_QUOTED_SCALAR => {
-              let text = token.text();
-
-              unescape_single_quoted(&text[1..text.len() - 1])
-            }
-
-            SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
-
-            _ => continue,
+          let raw_value = match raw_scalar_value(&token) {
+            Some(value) => value,
+            None => continue,
           };
 
           if is_yaml_non_string(&raw_value) {
@@ -1020,50 +924,18 @@ impl Document {
           continue;
         }
 
-        let raw_value = match current_kind {
-          SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-            let text = token.text();
-            unescape_double_quoted(&text[1..text.len() - 1])
-          }
-
-          SyntaxKind::SINGLE_QUOTED_SCALAR => {
-            let text = token.text();
-            unescape_single_quoted(&text[1..text.len() - 1])
-          }
-
-          SyntaxKind::PLAIN_SCALAR => token.text().to_string(),
-
-          _ => continue,
+        let raw_value = match raw_scalar_value(&token) {
+          Some(value) => value,
+          None => continue,
         };
 
         if current_kind == SyntaxKind::PLAIN_SCALAR && is_yaml_non_string(&raw_value) {
           continue;
         }
 
-        let new_text = match style {
-          QuoteStyle::Double => {
-            if raw_value.contains('"') && current_kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
-              continue;
-            }
-
-            let escaped = raw_value.replace('\\', "\\\\").replace('"', "\\\"");
-            format!("\"{}\"", escaped)
-          }
-
-          QuoteStyle::Single => {
-            let escaped = raw_value.replace('\'', "''");
-            format!("'{}'", escaped)
-          }
-
-          QuoteStyle::Plain => {
-            if raw_value.contains('"') || raw_value.contains('\'') || raw_value.contains(':') || raw_value.contains('#') {
-              continue;
-            }
-
-            raw_value
-          }
-
-          _ => continue,
+        let new_text = match inline_quote_replacement(&raw_value, current_kind, style) {
+          Some(new_text) => new_text,
+          None => continue,
         };
 
         if new_text != token.text() {
@@ -1075,5 +947,29 @@ impl Document {
     self.apply_edits(edits)?;
 
     Ok(warnings)
+  }
+}
+
+fn inline_quote_replacement(raw_value: &str, current_kind: SyntaxKind, style: &QuoteStyle) -> Option<String> {
+  match style {
+    QuoteStyle::Double => {
+      if raw_value.contains('"') && current_kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
+        return None;
+      }
+
+      Some(format_scalar_value(raw_value, SyntaxKind::DOUBLE_QUOTED_SCALAR))
+    }
+
+    QuoteStyle::Single => Some(format_scalar_value(raw_value, SyntaxKind::SINGLE_QUOTED_SCALAR)),
+
+    QuoteStyle::Plain => {
+      if raw_value.contains('"') || raw_value.contains('\'') || raw_value.contains(':') || raw_value.contains('#') {
+        return None;
+      }
+
+      Some(raw_value.to_string())
+    }
+
+    _ => None,
   }
 }

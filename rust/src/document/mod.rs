@@ -296,7 +296,20 @@ impl Document {
   }
 
   fn insert_after_node(&mut self, node: &SyntaxNode, text: &str) -> Result<(), YerbaError> {
-    let position = node.text_range().end();
+    let end: usize = node.text_range().end().into();
+    let source = self.to_string();
+
+    let rest = &source[end..];
+    let line_end = rest.find('\n').unwrap_or(rest.len());
+    let trailing = &rest[..line_end];
+
+    let position = if let Some(comment_start) = trailing.find('#') {
+      let _ = comment_start;
+      rowan::TextSize::from((end + line_end) as u32)
+    } else {
+      node.text_range().end()
+    };
+
     let range = TextRange::new(position, position);
 
     self.apply_edit(range, text)

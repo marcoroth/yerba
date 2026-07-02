@@ -857,3 +857,188 @@ fn test_insert_block_value_in_deeply_nested_map() {
     "}
   );
 }
+
+#[test]
+fn test_insert_after_preserves_inline_comment() {
+  let mut document = parse(indoc! {r#"
+    - id: "vinash"
+      title: "Lightning Talk: Vinash" # TODO: missing last name
+      event_name: "Garden City Ruby 2014"
+  "#});
+
+  document
+    .insert_into("[0].kind", "lightning_talk", InsertPosition::After("title".to_string()))
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - id: "vinash"
+        title: "Lightning Talk: Vinash" # TODO: missing last name
+        kind: lightning_talk
+        event_name: "Garden City Ruby 2014"
+    "#}
+  );
+}
+
+#[test]
+fn test_insert_last_preserves_inline_comment_on_last_entry() {
+  let mut document = parse(indoc! {r#"
+    name: "Alice"
+    age: 30 # years old
+  "#});
+
+  document.insert_into("email", "alice@example.com", InsertPosition::Last).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      name: "Alice"
+      age: 30 # years old
+      email: alice@example.com
+    "#}
+  );
+}
+
+#[test]
+fn test_insert_after_without_comment_still_works() {
+  let mut document = parse(indoc! {r#"
+    - id: "talk-1"
+      title: "First Talk"
+      event_name: "Conf 2024"
+  "#});
+
+  document.insert_into("[0].kind", "talk", InsertPosition::After("title".to_string())).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - id: "talk-1"
+        title: "First Talk"
+        kind: talk
+        event_name: "Conf 2024"
+    "#}
+  );
+}
+
+#[test]
+fn test_insert_preserves_comment_on_first_entry() {
+  let mut document = parse(indoc! {r#"
+    name: "Alice" # primary name
+    age: 30
+  "#});
+
+  document
+    .insert_into("email", "alice@example.com", InsertPosition::After("name".to_string()))
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      name: "Alice" # primary name
+      email: alice@example.com
+      age: 30
+    "#}
+  );
+}
+
+#[test]
+fn test_insert_preserves_comment_on_middle_entry() {
+  let mut document = parse(indoc! {r#"
+    name: "Alice"
+    age: 30 # years old
+    email: "alice@example.com"
+  "#});
+
+  document.insert_into("role", "admin", InsertPosition::After("age".to_string())).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      name: "Alice"
+      age: 30 # years old
+      role: admin
+      email: "alice@example.com"
+    "#}
+  );
+}
+
+#[test]
+fn test_insert_preserves_multiple_comments_on_different_entries() {
+  let mut document = parse(indoc! {r#"
+    name: "Alice" # first name only
+    age: 30 # years old
+  "#});
+
+  document.insert_into("email", "alice@example.com", InsertPosition::Last).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      name: "Alice" # first name only
+      age: 30 # years old
+      email: alice@example.com
+    "#}
+  );
+}
+
+#[test]
+fn test_insert_before_preserves_inline_comment() {
+  let mut document = parse(indoc! {r#"
+    name: "Alice"
+    age: 30 # years old
+    email: "alice@example.com"
+  "#});
+
+  document.insert_into("role", "admin", InsertPosition::Before("age".to_string())).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      name: "Alice"
+      role: admin
+      age: 30 # years old
+      email: "alice@example.com"
+    "#}
+  );
+}
+
+#[test]
+fn test_insert_into_sequence_preserves_inline_comment() {
+  let mut document = parse(indoc! {"
+    - name: Alice # admin
+    - name: Bob
+  "});
+
+  document.insert_into("", "name: Carol", InsertPosition::Last).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - name: Alice # admin
+      - name: Bob
+      - name: Carol
+    "}
+  );
+}
+
+#[test]
+fn test_insert_at_index_preserves_inline_comment() {
+  let mut document = parse(indoc! {r#"
+    name: "Alice"
+    age: 30 # years old
+    email: "alice@example.com"
+  "#});
+
+  document.insert_into("role", "admin", InsertPosition::At(1)).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      name: "Alice"
+      role: admin
+      age: 30 # years old
+      email: "alice@example.com"
+    "#}
+  );
+}

@@ -425,15 +425,33 @@ impl Document {
   }
 
   fn apply_edit(&mut self, range: TextRange, replacement: &str) -> Result<(), YerbaError> {
-    let source = self.root.text().to_string();
-    let start: usize = range.start().into();
-    let end: usize = range.end().into();
+    self.apply_edits(vec![(range, replacement.to_string())])
+  }
 
-    let mut new_source = source;
-    new_source.replace_range(start..end, replacement);
+  fn apply_edits(&mut self, mut edits: Vec<(TextRange, String)>) -> Result<(), YerbaError> {
+    if edits.is_empty() {
+      return Ok(());
+    }
 
+    edits.sort_by_key(|(range, _)| std::cmp::Reverse(range.start()));
+
+    let mut new_source = self.root.text().to_string();
+
+    for (range, replacement) in edits {
+      let start: usize = range.start().into();
+      let end: usize = range.end().into();
+
+      new_source.replace_range(start..end, &replacement);
+    }
+
+    self.reparse(&new_source)
+  }
+
+  fn reparse(&mut self, new_source: &str) -> Result<(), YerbaError> {
+    let document = Self::parse(new_source)?;
     let path = self.path.take();
-    *self = Self::parse(&new_source)?;
+
+    *self = document;
     self.path = path;
 
     Ok(())

@@ -265,26 +265,7 @@ impl Document {
       }
     }
 
-    if edits.is_empty() {
-      return Ok(());
-    }
-
-    edits.sort_by_key(|edit| std::cmp::Reverse(edit.0.start()));
-
-    let mut new_source = source;
-
-    for (range, replacement) in edits {
-      let start: usize = range.start().into();
-      let end: usize = range.end().into();
-
-      new_source.replace_range(start..end, &replacement);
-    }
-
-    let path = self.path.take();
-    *self = Self::parse(&new_source)?;
-    self.path = path;
-
-    Ok(())
+    self.apply_edits(edits)
   }
 
   pub fn enforce_collection_style(&mut self, style: &str, dot_path: Option<&str>) -> Result<(), YerbaError> {
@@ -508,18 +489,7 @@ impl Document {
         return Ok(());
       }
 
-      edits.sort_by_key(|edit| std::cmp::Reverse(edit.0.start()));
-
-      let mut new_source = source;
-      for (range, replacement) in edits {
-        let start: usize = range.start().into();
-        let end: usize = range.end().into();
-        new_source.replace_range(start..end, &replacement);
-      }
-
-      let path = self.path.take();
-      *self = Self::parse(&new_source)?;
-      self.path = path;
+      self.apply_edits(edits)?;
     }
   }
 
@@ -725,27 +695,7 @@ impl Document {
       }
     }
 
-    if edits.is_empty() {
-      return Ok(());
-    }
-
-    edits.sort_by_key(|edit| std::cmp::Reverse(edit.0.start()));
-
-    let source = self.root.text().to_string();
-    let mut new_source = source;
-
-    for (range, replacement) in edits {
-      let start: usize = range.start().into();
-      let end: usize = range.end().into();
-
-      new_source.replace_range(start..end, &replacement);
-    }
-
-    let path = self.path.take();
-    *self = Self::parse(&new_source)?;
-    self.path = path;
-
-    Ok(())
+    self.apply_edits(edits)
   }
 
   pub fn has_directives_marker(&self) -> bool {
@@ -777,11 +727,7 @@ impl Document {
     let source = self.root.text().to_string();
     let new_source = format!("---\n{}", source);
 
-    let path = self.path.take();
-    *self = Self::parse(&new_source)?;
-    self.path = path;
-
-    Ok(())
+    self.reparse(&new_source)
   }
 
   pub fn remove_directives(&mut self) -> Result<(), YerbaError> {
@@ -796,16 +742,10 @@ impl Document {
       .unwrap_or(&source)
       .to_string();
 
-    let path = self.path.take();
-    *self = Self::parse(&new_source)?;
-    self.path = path;
-
-    Ok(())
+    self.reparse(&new_source)
   }
 
   pub fn enforce_key_style(&mut self, style: &crate::KeyStyle, dot_path: Option<&str>) -> Result<(), YerbaError> {
-    let source = self.root.text().to_string();
-
     let scope_ranges: Vec<TextRange> = match dot_path {
       Some(path) if !path.is_empty() => self.navigate_all_compact(path).iter().map(|node| node.text_range()).collect(),
       _ => vec![self.root.text_range()],
@@ -874,26 +814,7 @@ impl Document {
       }
     }
 
-    if edits.is_empty() {
-      return Ok(());
-    }
-
-    edits.reverse();
-
-    let mut new_source = source;
-
-    for (range, replacement) in edits {
-      let start: usize = range.start().into();
-      let end: usize = range.end().into();
-
-      new_source.replace_range(start..end, &replacement);
-    }
-
-    let path = self.path.take();
-    *self = Self::parse(&new_source)?;
-    self.path = path;
-
-    Ok(())
+    self.apply_edits(edits)
   }
 
   pub fn enforce_quote_style(
@@ -1151,24 +1072,7 @@ impl Document {
       }
     }
 
-    if edits.is_empty() {
-      return Ok(warnings);
-    }
-
-    edits.reverse();
-
-    let mut new_source = source;
-
-    for (range, replacement) in edits {
-      let start: usize = range.start().into();
-      let end: usize = range.end().into();
-
-      new_source.replace_range(start..end, &replacement);
-    }
-
-    let path = self.path.take();
-    *self = Self::parse(&new_source)?;
-    self.path = path;
+    self.apply_edits(edits)?;
 
     Ok(warnings)
   }

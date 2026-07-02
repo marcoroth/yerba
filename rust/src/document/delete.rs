@@ -87,17 +87,9 @@ impl Document {
           }
         }
 
-        if ranges.is_empty() {
-          return Ok(());
-        }
+        let edits = ranges.into_iter().map(|range| (range, String::new())).collect();
 
-        ranges.reverse();
-
-        for range in ranges {
-          self.apply_edit(range, "")?;
-        }
-
-        Ok(())
+        self.apply_edits(edits)
       }
 
       crate::selector::SelectorSegment::Index(index) => self.remove_at(&parent_path, *index),

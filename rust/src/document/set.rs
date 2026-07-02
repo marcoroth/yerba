@@ -20,8 +20,6 @@ impl Document {
           .map(|(index, line)| {
             if line.is_empty() && index > 0 {
               String::new()
-            } else if index == 0 {
-              format!("{}{}", indent, line)
             } else {
               format!("{}{}", indent, line)
             }
@@ -52,12 +50,14 @@ impl Document {
       return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
     }
 
-    for node in nodes.into_iter().rev() {
+    let source = self.to_string();
+    let mut edits: Vec<(TextRange, String)> = Vec::new();
+
+    for node in nodes {
       if let Some(block_scalar) = node.descendants().find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR) {
         let new_text = if value.is_empty() {
           "\"\"".to_string()
         } else if value.contains('\n') {
-          let source = self.to_string();
           let offset: usize = block_scalar.text_range().start().into();
           let line_start = source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0);
           let key_indent = source[line_start..offset].len() - source[line_start..offset].trim_start().len();
@@ -69,8 +69,6 @@ impl Document {
             .map(|(index, line)| {
               if line.is_empty() && index > 0 {
                 String::new()
-              } else if index == 0 {
-                format!("{}{}", indent, line)
               } else {
                 format!("{}{}", indent, line)
               }
@@ -82,15 +80,13 @@ impl Document {
           format!("\"{}\"", value.replace('"', "\\\""))
         };
 
-        self.apply_edit(block_scalar.text_range(), &new_text)?;
+        edits.push((block_scalar.text_range(), new_text));
       } else if let Some(scalar_token) = find_scalar_token(&node) {
-        let new_text = format_scalar_value(value, scalar_token.kind());
-
-        self.replace_token(&scalar_token, &new_text)?;
+        edits.push((scalar_token.text_range(), format_scalar_value(value, scalar_token.kind())));
       }
     }
 
-    Ok(())
+    self.apply_edits(edits)
   }
 
   pub fn set_scalar_style(&mut self, dot_path: &str, style: &QuoteStyle) -> Result<(), YerbaError> {

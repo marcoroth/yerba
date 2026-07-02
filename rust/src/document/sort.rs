@@ -283,27 +283,7 @@ impl Document {
       }
     }
 
-    if edits.is_empty() {
-      return Ok(());
-    }
-
-    edits.reverse();
-
-    let source = self.root.text().to_string();
-    let mut new_source = source;
-
-    for (range, replacement) in edits {
-      let start: usize = range.start().into();
-      let end: usize = range.end().into();
-
-      new_source.replace_range(start..end, &replacement);
-    }
-
-    let path = self.path.take();
-    *self = Self::parse(&new_source)?;
-    self.path = path;
-
-    Ok(())
+    self.apply_edits(edits)
   }
 
   pub fn validate_each_sort_keys(&self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
@@ -445,7 +425,6 @@ impl Document {
     };
 
     let parent_nodes = self.navigate_all_compact(parent_path);
-    let source = self.root.text().to_string();
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
     for parent_node in &parent_nodes {
@@ -538,26 +517,7 @@ impl Document {
       }
     }
 
-    if edits.is_empty() {
-      return Ok(());
-    }
-
-    edits.reverse();
-
-    let mut new_source = source;
-
-    for (range, replacement) in edits {
-      let start: usize = range.start().into();
-      let end: usize = range.end().into();
-
-      new_source.replace_range(start..end, &replacement);
-    }
-
-    let path = self.path.take();
-    *self = Self::parse(&new_source)?;
-    self.path = path;
-
-    Ok(())
+    self.apply_edits(edits)
   }
 
   pub fn reorder_items(&mut self, dot_path: &str, by: &str, desired_order: &[&str]) -> Result<(), YerbaError> {

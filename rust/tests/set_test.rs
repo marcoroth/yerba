@@ -318,3 +318,154 @@ fn test_set_all_handles_mixed_block_and_inline_scalars() {
   "#}
   );
 }
+
+#[test]
+fn test_set_multiline_on_block_scalar() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+      description: |-
+        Old text
+  "});
+
+  document.set("[0].description", "First line.\nSecond line.").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: talk-1
+        description: |-
+          First line.
+          Second line.
+    "}
+  );
+}
+
+#[test]
+fn test_set_multiline_with_blank_line_on_block_scalar() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+      description: |-
+        Old text
+  "});
+
+  document.set("[0].description", "First paragraph.\n\nSecond paragraph.").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: talk-1
+        description: |-
+          First paragraph.
+
+          Second paragraph.
+    "}
+  );
+}
+
+#[test]
+fn test_set_multiline_on_nested_block_scalar() {
+  let mut document = parse(indoc! {"
+    app:
+      config:
+        description: |-
+          Old text
+  "});
+
+  document.set("app.config.description", "Line 1.\nLine 2.").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      app:
+        config:
+          description: |-
+            Line 1.
+            Line 2.
+    "}
+  );
+}
+
+#[test]
+fn test_set_multiline_on_top_level_block_scalar() {
+  let mut document = parse(indoc! {"
+    description: |-
+      Old text
+  "});
+
+  document.set("description", "New first.\nNew second.").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      description: |-
+        New first.
+        New second.
+    "}
+  );
+}
+
+#[test]
+fn test_set_empty_on_block_scalar() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+      description: |-
+        Old text
+  "});
+
+  document.set("[0].description", "").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - id: talk-1
+        description: ""
+    "#}
+  );
+}
+
+#[test]
+fn test_set_single_line_on_block_scalar() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+      description: |-
+        Old text
+  "});
+
+  document.set("[0].description", "New single line").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - id: talk-1
+        description: "New single line"
+    "#}
+  );
+}
+
+#[test]
+fn test_set_all_multiline_on_block_scalars() {
+  let mut document = parse(indoc! {"
+    - id: talk-1
+      description: |-
+        Old 1
+    - id: talk-2
+      description: |-
+        Old 2
+  "});
+
+  document.set_all("[].description", "Line A.\nLine B.").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: talk-1
+        description: |-
+          Line A.
+          Line B.
+      - id: talk-2
+        description: |-
+          Line A.
+          Line B.
+    "}
+  );
+}

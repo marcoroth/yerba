@@ -8,7 +8,27 @@ impl Document {
       let new_text = if value.is_empty() {
         "\"\"".to_string()
       } else if value.contains('\n') {
-        format!("|-\n  {}", value.replace('\n', "\n  "))
+        let source = self.to_string();
+        let offset: usize = block_scalar.text_range().start().into();
+        let line_start = source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0);
+        let key_indent = source[line_start..offset].len() - source[line_start..offset].trim_start().len();
+        let indent = " ".repeat(key_indent + 2);
+
+        let indented_lines: Vec<String> = value
+          .split('\n')
+          .enumerate()
+          .map(|(index, line)| {
+            if line.is_empty() && index > 0 {
+              String::new()
+            } else if index == 0 {
+              format!("{}{}", indent, line)
+            } else {
+              format!("{}{}", indent, line)
+            }
+          })
+          .collect();
+
+        format!("|-\n{}", indented_lines.join("\n"))
       } else {
         format!("\"{}\"", value.replace('"', "\\\""))
       };
@@ -37,7 +57,27 @@ impl Document {
         let new_text = if value.is_empty() {
           "\"\"".to_string()
         } else if value.contains('\n') {
-          format!("|-\n  {}", value.replace('\n', "\n  "))
+          let source = self.to_string();
+          let offset: usize = block_scalar.text_range().start().into();
+          let line_start = source[..offset].rfind('\n').map(|position| position + 1).unwrap_or(0);
+          let key_indent = source[line_start..offset].len() - source[line_start..offset].trim_start().len();
+          let indent = " ".repeat(key_indent + 2);
+
+          let indented_lines: Vec<String> = value
+            .split('\n')
+            .enumerate()
+            .map(|(index, line)| {
+              if line.is_empty() && index > 0 {
+                String::new()
+              } else if index == 0 {
+                format!("{}{}", indent, line)
+              } else {
+                format!("{}{}", indent, line)
+              }
+            })
+            .collect();
+
+          format!("|-\n{}", indented_lines.join("\n"))
         } else {
           format!("\"{}\"", value.replace('"', "\\\""))
         };

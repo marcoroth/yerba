@@ -42,7 +42,7 @@ Running Ruby tests:
 # All tests
 bundle exec rake test
 # Single test file
-bundle exec rake test TEST=test/map_test.rb
+bundle exec minitest test/map_test.rb
 ```
 
 Running Rust tests:

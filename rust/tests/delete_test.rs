@@ -191,6 +191,27 @@ fn test_delete_only_sequence_item_replaces_with_empty_sequence() {
 }
 
 #[test]
+fn test_delete_only_top_level_sequence_item_replaces_with_empty_sequence() {
+  let mut document = parse(indoc! {"
+      # TODO: Add videos and recordings
+      ---
+      - video_id: delete-me
+        title: About to be Deleted
+  "});
+
+  document.delete("[0]").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+       # TODO: Add videos and recordings
+       ---
+       []
+    "}
+  );
+}
+
+#[test]
 fn test_delete_wildcard_removes_key_from_all_entries() {
   let mut document = parse(indoc! {r#"
     - name: "Alice"

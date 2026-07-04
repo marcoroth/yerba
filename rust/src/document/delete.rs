@@ -140,7 +140,15 @@ impl Document {
 
   fn collapse_to_empty_flow_sequence(&mut self, current_node: &SyntaxNode) -> Result<(), YerbaError> {
     if current_node.kind() == SyntaxKind::BLOCK_MAP_VALUE {
-      return self.apply_edit(current_node.text_range(), "[]");
+      let mut range = current_node.text_range();
+
+      if let Some(previous) = current_node.prev_sibling_or_token().and_then(|element| element.into_token()) {
+        if previous.kind() == SyntaxKind::WHITESPACE && previous.text().contains('\n') {
+          range = TextRange::new(previous.text_range().start(), range.end());
+        }
+      }
+
+      return self.apply_edit(range, " []");
     }
 
     let sequence = current_node
@@ -148,6 +156,6 @@ impl Document {
       .find_map(BlockSeq::cast)
       .ok_or_else(|| YerbaError::NotASequence("Expected a sequence".to_string()))?;
 
-    self.apply_edit(sequence.syntax().text_range(), "[]")
+    self.apply_edit(removal_range(sequence.syntax()), "[]")
   }
 }

@@ -185,8 +185,7 @@ fn test_delete_only_sequence_item_replaces_with_empty_sequence() {
   assert_eq!(
     document.to_string(),
     indoc! {"
-       tags:
-         []
+       tags: []
     "}
   );
 }

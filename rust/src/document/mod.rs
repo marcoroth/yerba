@@ -19,6 +19,7 @@ pub struct LocatedNode {
   pub file_path: Option<String>,
   pub selector: String,
   pub line: usize,
+  pub location: Location,
 }
 
 use std::fs;

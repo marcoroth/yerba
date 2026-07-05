@@ -843,6 +843,14 @@ pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *cons
         "node_type": node.node_type,
         "selector": node.selector,
         "line": node.line,
+        "location": {
+          "start_line": node.location.start_line,
+          "start_column": node.location.start_column,
+          "end_line": node.location.end_line,
+          "end_column": node.location.end_column,
+          "start_offset": node.location.start_offset,
+          "end_offset": node.location.end_offset,
+        },
       });
 
       if let Some(file_path) = &node.file_path {

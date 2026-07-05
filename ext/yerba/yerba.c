@@ -986,10 +986,12 @@ static VALUE collection_s_get(VALUE self, VALUE pattern, VALUE path) {
 
     VALUE line = rb_hash_aref(item, rb_str_new_cstr("line"));
     VALUE kwargs = rb_hash_new();
+    VALUE location = rb_hash_aref(item, rb_str_new_cstr("location"));
 
     rb_hash_aset(kwargs, ID2SYM(rb_intern("selector")), selector);
     if (!NIL_P(file_path)) rb_hash_aset(kwargs, ID2SYM(rb_intern("file_path")), file_path);
     if (!NIL_P(line)) rb_hash_aset(kwargs, ID2SYM(rb_intern("line")), line);
+    if (!NIL_P(location)) rb_hash_aset(kwargs, ID2SYM(rb_intern("location")), location);
 
     if (strcmp(type_str, "scalar") == 0) {
       VALUE text = rb_hash_aref(item, rb_str_new_cstr("text"));

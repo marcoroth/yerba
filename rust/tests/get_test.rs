@@ -1164,6 +1164,26 @@ fn test_get_all_located_lines_are_correct() {
 }
 
 #[test]
+fn test_get_all_located_includes_location() {
+  let document = parse(indoc! {"
+    speakers:
+      - hello
+      - world
+  "});
+
+  let results = document.get_all_located("speakers[]");
+
+  assert_eq!(results.len(), 2);
+  assert_eq!(results[0].location.start_line, 2);
+  assert_eq!(results[0].location.start_column, 2);
+  assert_eq!(results[0].location.end_line, 2);
+  assert_eq!(results[0].location.end_column, 9);
+
+  assert_eq!(results[1].location.start_line, 3);
+  assert_eq!(results[1].location.start_column, 2);
+}
+
+#[test]
 fn test_get_all_located_with_file_path() {
   use std::io::Write;
 

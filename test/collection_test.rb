@@ -96,6 +96,28 @@ class CollectionTest < Minitest::Spec
     assert_equal 2, result[0].line
   end
 
+  test "get includes location with start/end columns" do
+    File.write(File.join(@dir, "loc.yml"), <<~YAML)
+      speakers:
+        - hello
+        - world
+    YAML
+
+    result = Yerba::Collection.get(File.join(@dir, "loc.yml"), "speakers[]")
+
+    assert_equal 2, result.length
+
+    location = result[0].location
+    refute_nil location
+
+    assert_equal 2, location.start_line
+    assert_equal 2, location.start_column
+    assert_equal 2, location.end_line
+    assert_equal 9, location.end_column
+
+    assert_equal 3, result[1].location.start_line
+  end
+
   test "get returns Map objects for map selectors" do
     collection = Yerba.files(File.join(@dir, "c.yml"))
     result = collection.get("items[]")

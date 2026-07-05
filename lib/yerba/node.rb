@@ -36,13 +36,19 @@ module Yerba
         instance
       end
 
-      def from(file_path:, selector:, line: nil, **attributes)
+      def from(file_path:, selector:, line: nil, location: nil, **attributes)
         instance = allocate
 
-        instance.send(:init_node, nil, selector, nil, nil, file_path, line)
+        instance.send(:init_node, nil, selector, coerce_location(location), nil, file_path, line)
         instance.send(:init_from, **attributes) if instance.respond_to?(:init_from, true)
 
         instance
+      end
+
+      def coerce_location(location)
+        return location unless location.is_a?(Hash)
+
+        Location.new(**location.transform_keys(&:to_sym))
       end
     end
 

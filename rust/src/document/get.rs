@@ -90,8 +90,10 @@ impl Document {
       .navigate_all_compact(dot_path)
       .iter()
       .map(|node| {
-        let offset: usize = node.text_range().start().into();
+        let range = node.text_range();
+        let offset: usize = range.start().into();
         let line = line_at(&source, offset);
+        let location = compute_location(&source, offset, range.end().into());
         let selector = node_selector(node);
         let is_scalar = !node
           .descendants()
@@ -121,6 +123,7 @@ impl Document {
           file_path: file_path.clone(),
           selector,
           line,
+          location,
         }
       })
       .collect()

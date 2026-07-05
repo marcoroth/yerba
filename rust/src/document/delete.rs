@@ -11,8 +11,8 @@ impl Document {
 
     if source_parent == destination_parent {
       let (parent_path, source_key) = source_path.rsplit_once('.').unwrap_or(("", source_path));
-      let parent_node = self.navigate(parent_path)?;
 
+      let parent_node = self.navigate(parent_path)?;
       let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
 
       let entry = find_entry_by_key(&map, source_key).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
@@ -64,6 +64,10 @@ impl Document {
         if parent_nodes.len() == 1 && (!has_wildcard || !has_brackets) {
           let map = find_block_map(&parent_nodes[0]).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
           let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+          if map.entries().count() == 1 {
+            return self.collapse_to_empty_flow_map(&parent_nodes[0]);
+          }
 
           return self.remove_map_entry(&entry);
         }
@@ -131,17 +135,53 @@ impl Document {
     self.remove_node(entries[index].syntax())
   }
 
+  fn collapse_to_empty_flow_map(&mut self, current_node: &SyntaxNode) -> Result<(), YerbaError> {
+    let map_value = current_node
+      .descendants()
+      .find(|descendant| descendant.kind() == SyntaxKind::BLOCK_MAP_VALUE)
+      .ok_or_else(|| YerbaError::SelectorNotFound("Expected a map value".to_string()))?;
+
+    let mut range = map_value.text_range();
+
+    if let Some(previous) = map_value.prev_sibling_or_token().and_then(|element| element.into_token()) {
+      if previous.kind() == SyntaxKind::WHITESPACE && previous.text().contains('\n') {
+        range = TextRange::new(previous.text_range().start(), range.end());
+      }
+    }
+
+    self.apply_edit(range, " {}")
+  }
+
   fn collapse_to_empty_flow_sequence(&mut self, current_node: &SyntaxNode) -> Result<(), YerbaError> {
     if current_node.kind() == SyntaxKind::BLOCK_MAP_VALUE {
       let mut range = current_node.text_range();
+      let mut comment_text: Option<String> = None;
+      let mut sibling = current_node.prev_sibling_or_token();
 
-      if let Some(previous) = current_node.prev_sibling_or_token().and_then(|element| element.into_token()) {
-        if previous.kind() == SyntaxKind::WHITESPACE && previous.text().contains('\n') {
-          range = TextRange::new(previous.text_range().start(), range.end());
+      while let Some(ref element) = sibling {
+        match element {
+          rowan::NodeOrToken::Token(token) => {
+            if token.kind() == SyntaxKind::COMMENT {
+              comment_text = Some(token.text().to_string());
+              range = TextRange::new(token.text_range().start(), range.end());
+              sibling = token.prev_sibling_or_token();
+            } else if token.kind() == SyntaxKind::WHITESPACE {
+              range = TextRange::new(token.text_range().start(), range.end());
+              sibling = token.prev_sibling_or_token();
+            } else {
+              break;
+            }
+          }
+          _ => break,
         }
       }
 
-      return self.apply_edit(range, " []");
+      let replacement = match comment_text {
+        Some(comment) => format!(" [] {}", comment),
+        None => " []".to_string(),
+      };
+
+      return self.apply_edit(range, &replacement);
     }
 
     let sequence = current_node

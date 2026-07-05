@@ -38,12 +38,10 @@ impl Document {
     let parent_path = selector.parent_path();
 
     match last_segment {
-      // Last segement is a key
       crate::selector::SelectorSegment::Key(last_key) => {
         let has_wildcard = selector.has_wildcard();
-        let has_brackets = selector.has_brackets(); // Brackets indicate the sequence is being deleted.
+        let has_brackets = selector.has_brackets();
 
-        // If there's no wildcard nor brackets, we can directly navigate to the parent node and remove the entry.
         if parent_path.is_empty() && (!has_wildcard || !has_brackets) {
           let parent_node = self.navigate(&parent_path)?;
           let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
@@ -53,11 +51,8 @@ impl Document {
           return self.remove_map_entry(&entry);
         }
 
-        // Return all the children of the parent node - siblings of the last segment.
         let parent_nodes = self.navigate_all_compact(&parent_path);
 
-        // If there are no parent nodes, return an error - our selector was invalid.
-        // But if there's a wildcard, it's okay to not find any matches.
         if parent_nodes.is_empty() {
           if has_wildcard {
             return Ok(());
@@ -68,7 +63,6 @@ impl Document {
 
         if parent_nodes.len() == 1 && (!has_wildcard || !has_brackets) {
           let map = find_block_map(&parent_nodes[0]).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
-
           let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
           return self.remove_map_entry(&entry);
@@ -88,9 +82,8 @@ impl Document {
 
         self.apply_edits(edits)
       }
-      // Last segment is an index
+
       crate::selector::SelectorSegment::Index(index) => self.remove_at(&parent_path, *index),
-      // Any sequence not already matched
       crate::selector::SelectorSegment::AllItems => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
     }
   }

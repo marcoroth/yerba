@@ -402,6 +402,122 @@ class DocumentTest < Minitest::Spec
     assert_equal expected, document.to_s
   end
 
+  test "delete removes only entry in array and replaces sequence with []" do
+    document = Yerba::Document.parse(<<~YAML)
+      tier:
+        sponsors:
+          - name: "Typesense"
+    YAML
+    document["tier.sponsors[0]"].delete
+
+    assert_equal [], document["tier.sponsors"].value
+  end
+
+  test "delete last sequence item collapses to [] in the YAML output" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+    YAML
+    document.delete("tags[0]")
+
+    assert_equal "tags: []\n", document.to_s
+  end
+
+  test "delete one of two sequence items does not collapse" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rust
+    YAML
+    document.delete("tags[0]")
+
+    expected = <<~YAML
+      tags:
+        - rust
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "delete last item of nested sequence collapses in place" do
+    document = Yerba::Document.parse(<<~YAML)
+      a:
+        b:
+          - x
+    YAML
+    document.delete("a.b[0]")
+
+    expected = <<~YAML
+      a:
+        b: []
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "delete last sequence item then append restores block style" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+    YAML
+    document.delete("tags[0]")
+    document["tags"] << "rust"
+
+    expected = <<~YAML
+      tags:
+        - rust
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
+  test "delete last sequence item preserves comment on the key line" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags: # note
+        - ruby
+    YAML
+    document.delete("tags[0]")
+
+    assert_equal "tags: [] # note\n", document.to_s
+  end
+
+  test "delete last sequence item preserves standalone comment above it" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        # explains ruby
+        - ruby
+    YAML
+    document.delete("tags[0]")
+
+    assert_equal "tags: [] # explains ruby\n", document.to_s
+  end
+
+  test "delete only map key collapses to {} in the YAML output" do
+    document = Yerba::Document.parse(<<~YAML)
+      speaker:
+        name: Alice
+    YAML
+    document.delete("speaker.name")
+
+    assert_equal "speaker: {}\n", document.to_s
+  end
+
+  test "delete one of two map keys does not collapse" do
+    document = Yerba::Document.parse(<<~YAML)
+      speaker:
+        name: Alice
+        role: host
+    YAML
+    document.delete("speaker.name")
+
+    expected = <<~YAML
+      speaker:
+        role: host
+    YAML
+
+    assert_equal expected, document.to_s
+  end
+
   test "delete removes a key from indexed entry keeping other keys" do
     document = Yerba::Document.parse(<<~YAML)
       - name: "Alice"

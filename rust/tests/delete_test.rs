@@ -174,6 +174,116 @@ fn test_delete_nested_sequence_item_by_index() {
 }
 
 #[test]
+fn test_delete_only_sequence_item_replaces_with_empty_sequence() {
+  let mut document = parse(indoc! {"
+    tags:
+      - ruby
+  "});
+
+  document.delete("tags[0]").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+       tags: []
+    "}
+  );
+}
+
+#[test]
+fn test_delete_only_top_level_sequence_item_replaces_with_empty_sequence() {
+  let mut document = parse(indoc! {"
+      # TODO: Add videos and recordings
+      ---
+      - video_id: delete-me
+        title: About to be Deleted
+  "});
+
+  document.delete("[0]").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+       # TODO: Add videos and recordings
+       ---
+       []
+    "}
+  );
+}
+
+#[test]
+fn test_delete_one_of_two_sequence_items_does_not_collapse() {
+  let mut document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+  "});
+
+  document.delete("tags[0]").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+       tags:
+         - rust
+    "}
+  );
+}
+
+#[test]
+fn test_delete_only_sequence_item_preserves_key_comment() {
+  let mut document = parse(indoc! {"
+    tags: # note
+      - ruby
+  "});
+
+  document.delete("tags[0]").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+       tags: [] # note
+    "}
+  );
+}
+
+#[test]
+fn test_delete_one_of_two_map_keys_does_not_collapse() {
+  let mut document = parse(indoc! {"
+    speaker:
+      name: Alice
+      role: host
+  "});
+
+  document.delete("speaker.name").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+       speaker:
+         role: host
+    "}
+  );
+}
+
+#[test]
+fn test_delete_only_map_key_replaces_with_empty_map() {
+  let mut document = parse(indoc! {"
+    speaker:
+      name: Alice
+  "});
+
+  document.delete("speaker.name").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+       speaker: {}
+    "}
+  );
+}
+
+#[test]
 fn test_delete_wildcard_removes_key_from_all_entries() {
   let mut document = parse(indoc! {r#"
     - name: "Alice"

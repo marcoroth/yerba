@@ -258,6 +258,17 @@ class MapTest < Minitest::Spec
     assert_equal expected, document.to_s
   end
 
+  test "map.delete on only value replaces sequence with []" do
+    document = Yerba::Document.parse(<<~YAML)
+      tier:
+        sponsors:
+          - name: "Typesense"
+    YAML
+    document["tier.sponsors[0]"].delete
+
+    assert_equal [], document["tier.sponsors"].value
+  end
+
   test "map.delete removes a map" do
     document = Yerba::Document.parse(<<~YAML)
       speaker:

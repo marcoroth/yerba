@@ -27,3 +27,31 @@ Or build a release binary:
 cargo build --release
 ./target/release/yerba --help
 ```
+
+If you run into an issue or SEGFAULT - try rake clean to recompile the C extension and Rust library:
+```bash
+bundle exec rake clean
+bundle exec rake test
+```
+
+### Running Tests
+
+Running Ruby tests:
+
+```bash
+# All tests
+bundle exec rake test
+# Single test file
+bundle exec minitest test/map_test.rb
+```
+
+Running Rust tests:
+
+```bash
+# All tests
+cargo test
+# Single test file
+cargo test --test delete_test
+# Single test function
+cargo test --test delete_test test_delete_only_sequence_item_replaces_with_empty_sequence
+```

@@ -258,6 +258,21 @@ module Yerba
       self
     end
 
+    # Deletes the entire sequence node from the YAML document.
+    #
+    # Removes the sequence at its selector path from the parent document.
+    # Has no effect if the sequence is not connected to a document.
+    #
+    # Returns the document, or +nil+ if the sequence is not connected to a document.
+    #
+    #   document = Yerba::Document.parse(<<~YAML)
+    #     items:
+    #       - name: Ruby
+    #       - name: Rust
+    #   YAML
+    #
+    #   document["items"].delete
+    #   document.to_s # => "{}\n"
     def delete
       document&.delete(@selector)
     end

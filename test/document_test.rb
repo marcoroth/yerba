@@ -918,6 +918,36 @@ class DocumentTest < Minitest::Spec
     assert_equal [{ "name" => "Hello" }, { "name" => "World" }], document.to_a
   end
 
+  test "to_h returns empty hash for empty document" do
+    document = Yerba::Document.parse("")
+
+    assert_equal({}, document.to_h)
+  end
+
+  test "to_a returns empty array for empty document" do
+    document = Yerba::Document.parse("")
+
+    assert_equal [], document.to_a
+  end
+
+  test "to_h returns empty hash for comments-only document" do
+    document = Yerba::Document.parse("# no content yet\n")
+
+    assert_equal({}, document.to_h)
+  end
+
+  test "to_a returns empty array for comments-only document" do
+    document = Yerba::Document.parse("# no content yet\n")
+
+    assert_equal [], document.to_a
+  end
+
+  test "to_h preserves false scalar root" do
+    document = Yerba::Document.parse("false\n")
+
+    assert_equal false, document.to_h
+  end
+
   test "get_value returns hash for map path" do
     document = Yerba::Document.parse(<<~YAML)
       database:
@@ -1152,6 +1182,34 @@ class DocumentTest < Minitest::Spec
     names = document.pluck(:name)
 
     assert_equal ["Alice", "Bob", "Charlie"], names
+  end
+
+  test "document.find_by returns nil for empty document" do
+    document = Yerba::Document.parse("")
+
+    assert_nil document.find_by(name: "Alice")
+  end
+
+  test "document.where returns empty result for empty document" do
+    document = Yerba::Document.parse("")
+
+    result = document.where(name: "Alice")
+
+    assert_predicate result, :empty?
+    assert_equal 0, result.length
+    assert_equal [], result.to_a
+  end
+
+  test "document.pluck returns empty array for empty document" do
+    document = Yerba::Document.parse("")
+
+    assert_equal [], document.pluck(:name)
+  end
+
+  test "document.find_by returns nil for comments-only document" do
+    document = Yerba::Document.parse("# no content yet\n")
+
+    assert_nil document.find_by(name: "Alice")
   end
 
   test "document << appends to root sequence" do

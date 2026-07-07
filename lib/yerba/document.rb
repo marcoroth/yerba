@@ -51,11 +51,13 @@ module Yerba
     end
 
     def to_h
-      value_at(ROOT_SELECTOR)
+      value = value_at(ROOT_SELECTOR)
+      value.nil? ? {} : value
     end
 
     def to_a
-      value_at(ROOT_SELECTOR)
+      value = value_at(ROOT_SELECTOR)
+      value.nil? ? [] : value
     end
 
     def to_yaml
@@ -85,14 +87,20 @@ module Yerba
     end
 
     def find_by(...)
+      return nil if empty_root?
+
       root.find_by(...)
     end
 
     def where(...)
+      return QueryResult.new(nil, []) if empty_root?
+
       root.where(...)
     end
 
     def pluck(...)
+      return [] if empty_root?
+
       root.pluck(...)
     end
 
@@ -168,6 +176,10 @@ module Yerba
     end
 
     private
+
+    def empty_root?
+      root.is_a?(Scalar) && root.value.nil?
+    end
 
     def check_stale!
       return unless stale?

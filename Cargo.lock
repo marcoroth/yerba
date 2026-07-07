@@ -1772,7 +1772,7 @@ dependencies = [
 
 [[package]]
 name = "yerba"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "cbindgen",
  "clap",

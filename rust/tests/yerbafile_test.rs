@@ -1448,3 +1448,94 @@ fn test_apply_to_document_with_absolute_file_path() {
   "#}
   );
 }
+
+#[test]
+fn test_global_pipeline_runs_on_unmatched_file_via_apply_to_document() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    files: "data/**/*.yml"
+
+    pipeline:
+      - directives:
+          ensure: true
+
+    rules:
+      - files: "data/correct_name.yml"
+        pipeline:
+          - quote_style:
+              key_style: plain
+              value_style: double
+  "#},
+  )
+  .unwrap();
+
+  let mut document = yerba::Document::parse("name: Alice\n").unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let changed = yerbafile.apply_to_document(&mut document, "data/typo_file.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(document.to_string(), "---\nname: Alice\n");
+}
+
+#[test]
+fn test_global_pipeline_skips_file_outside_global_glob() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    files: "data/**/*.yml"
+
+    pipeline:
+      - directives:
+          ensure: true
+
+    rules: []
+  "#},
+  )
+  .unwrap();
+
+  let mut document = yerba::Document::parse("name: Carol\n").unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let changed = yerbafile.apply_to_document(&mut document, "other/config.yml").unwrap();
+
+  assert!(!changed);
+  assert_eq!(document.to_string(), "name: Carol\n");
+}
+
+#[test]
+fn test_global_pipeline_does_not_double_run_on_rule_matched_file() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    files: "data/**/*.yml"
+
+    pipeline:
+      - directives:
+          ensure: true
+      - quote_style:
+          key_style: plain
+          value_style: double
+
+    rules:
+      - files: "data/**/*.yml"
+        pipeline: []
+  "#},
+  )
+  .unwrap();
+
+  let mut document = yerba::Document::parse("name: Dave\n").unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      ---
+      name: "Dave"
+    "#}
+  );
+}

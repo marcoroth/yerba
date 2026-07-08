@@ -656,6 +656,18 @@ impl Document {
     self.reparse(&new_source)
   }
 
+  pub fn enforce_final_newline(&mut self, count: usize) -> Result<(), YerbaError> {
+    let source = self.to_string();
+    let trimmed = source.trim_end_matches('\n');
+    let expected = format!("{}{}", trimmed, "\n".repeat(count));
+
+    if source != expected {
+      self.reparse(&expected)
+    } else {
+      Ok(())
+    }
+  }
+
   pub fn enforce_key_style(&mut self, style: &crate::KeyStyle, dot_path: Option<&str>) -> Result<(), YerbaError> {
     let scope_ranges: Vec<TextRange> = match dot_path {
       Some(path) if !path.is_empty() => self.navigate_all_compact(path).iter().map(|node| node.text_range()).collect(),

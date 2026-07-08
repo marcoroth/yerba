@@ -359,6 +359,22 @@ impl Yerbafile {
       results.extend(file_results);
     }
 
+    if !self.pipeline.is_empty() {
+      if let Some(ref global_glob) = self.files {
+        if let Ok(paths) = glob::glob(global_glob) {
+          let unprocessed: Vec<String> = paths
+            .filter_map(|entry| entry.ok())
+            .map(|path| path.to_string_lossy().to_string())
+            .filter(|file| !globally_processed.contains(file.as_str()))
+            .collect();
+
+          let global_results: Vec<RuleResult> = unprocessed.par_iter().map(|file| self.apply_global_pipeline_to_file(file, write)).collect();
+
+          results.extend(global_results);
+        }
+      }
+    }
+
     results
   }
 
@@ -436,7 +452,53 @@ impl Yerbafile {
       ran_global = true;
     }
 
+    if !ran_global && self.should_run_global_pipeline(file) {
+      results.push(self.apply_global_pipeline_to_file(file, write));
+    }
+
     results
+  }
+
+  fn apply_global_pipeline_to_file(&self, file: &str, write: bool) -> RuleResult {
+    let mut document = match Document::parse_file(file) {
+      Ok(document) => document,
+      Err(error) => {
+        return RuleResult {
+          file: file.to_string(),
+          changed: false,
+          error: Some(error),
+        }
+      }
+    };
+
+    let original = document.to_string();
+
+    if let Err(error) = execute_pipeline(&mut document, &self.pipeline, None, file, self) {
+      return RuleResult {
+        file: file.to_string(),
+        changed: false,
+        error: Some(error),
+      };
+    }
+
+    let new_content = document.to_string();
+    let changed = new_content != original;
+
+    if changed && write {
+      if let Err(error) = fs::write(file, &new_content) {
+        return RuleResult {
+          file: file.to_string(),
+          changed,
+          error: Some(YerbaError::IoError(error)),
+        };
+      }
+    }
+
+    RuleResult {
+      file: file.to_string(),
+      changed,
+      error: None,
+    }
   }
 
   fn relativize_path(&self, file_path: &str) -> Option<String> {

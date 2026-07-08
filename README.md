@@ -539,6 +539,7 @@ Available pipeline steps:
 - `directives` Add or remove the document start marker (`---`), with optional `max` validation
 - `unique` Find or remove duplicate items in a sequence
 - `schema` Validate against a JSON schema (with optional `path` for scoping)
+- `final_newline` Enforce exact number of trailing newlines (`count: 1` by default, strips extras)
 
 This makes it easy to enforce project-wide YAML conventions in CI:
 

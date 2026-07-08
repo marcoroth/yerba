@@ -41,6 +41,7 @@ pub enum PipelineStep {
   Directives(DirectivesConfig),
   Unique(UniqueConfig),
   Schema(SchemaConfig),
+  FinalNewline(FinalNewlineConfig),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -93,6 +94,16 @@ pub struct SchemaConfig {
   pub path: Option<String>,
   #[serde(default)]
   pub items: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FinalNewlineConfig {
+  #[serde(default = "default_one")]
+  pub count: usize,
+}
+
+fn default_one() -> usize {
+  1
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -188,8 +199,13 @@ impl<'de> Deserialize<'de> for PipelineStep {
       return Ok(PipelineStep::Schema(config));
     }
 
+    if let Some(value) = mapping.get(yaml_serde::Value::String("final_newline".to_string())) {
+      let config: FinalNewlineConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      return Ok(PipelineStep::FinalNewline(config));
+    }
+
     Err(serde::de::Error::custom(
-      "unknown pipeline step: expected sort_keys, quote_style, collection_style, sequence_indent, set, insert, delete, rename, remove, blank_lines, sort, directives, unique, or schema",
+      "unknown pipeline step: expected sort_keys, quote_style, collection_style, sequence_indent, set, insert, delete, rename, remove, blank_lines, sort, directives, unique, schema, or final_newline",
     ))
   }
 }
@@ -806,6 +822,8 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
 
       Ok(())
     }
+
+    PipelineStep::FinalNewline(config) => document.enforce_final_newline(config.count),
   }
 }
 

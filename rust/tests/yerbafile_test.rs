@@ -1539,3 +1539,139 @@ fn test_global_pipeline_does_not_double_run_on_rule_matched_file() {
     "#}
   );
 }
+
+#[test]
+fn test_final_newline_strips_trailing_newlines() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - final_newline:
+              count: 1
+  "#},
+  )
+  .unwrap();
+
+  let mut document = yerba::Document::parse("name: Alice\n\n\n").unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(document.to_string(), "name: Alice\n");
+}
+
+#[test]
+fn test_final_newline_adds_missing_newline() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - final_newline:
+              count: 1
+  "#},
+  )
+  .unwrap();
+
+  let mut document = yerba::Document::parse("name: Alice").unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(document.to_string(), "name: Alice\n");
+}
+
+#[test]
+fn test_final_newline_noop_when_already_correct() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - final_newline:
+              count: 1
+  "#},
+  )
+  .unwrap();
+
+  let mut document = yerba::Document::parse("name: Alice\n").unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(!changed);
+}
+
+#[test]
+fn test_final_newline_default_count_is_one() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - final_newline: {}
+  "#},
+  )
+  .unwrap();
+
+  let mut document = yerba::Document::parse("name: Alice\n\n\n").unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(document.to_string(), "name: Alice\n");
+}
+
+#[test]
+fn test_final_newline_count_two() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - final_newline:
+              count: 2
+  "#},
+  )
+  .unwrap();
+
+  let mut document = yerba::Document::parse("name: Alice\n").unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(document.to_string(), "name: Alice\n\n");
+}
+
+#[test]
+fn test_final_newline_count_zero() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - final_newline:
+              count: 0
+  "#},
+  )
+  .unwrap();
+
+  let mut document = yerba::Document::parse("name: Alice\n").unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let changed = yerbafile.apply_to_document(&mut document, "data/config.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(document.to_string(), "name: Alice");
+}

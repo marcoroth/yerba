@@ -8,15 +8,15 @@ use super::{output, parse_file, resolve_files, run_op};
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
     yerba rename config.yml "database.host" "database.hostname"
-    yerba rename config.yml "database.host" "hostname"
-    yerba rename config.yml "database.host" "settings.db_host"
     yerba rename videos.yml "[0].old_name" "[0].name"
+    yerba rename config.yml "database.host" "settings.db_host"  # moves the key to another map
+    yerba rename config.yml "database.host" "hostname"          # moves the key to the document root
   "#})
 });
 
 #[derive(clap::Args)]
 #[command(
-  about = "Rename a key in a map (preserves value and position)",
+  about = "Rename a key, or move it to another map (the destination is a full selector path)",
   arg_required_else_help = true,
   after_help = EXAMPLES.as_str()
 )]

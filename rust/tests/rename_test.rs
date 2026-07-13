@@ -163,3 +163,45 @@ fn test_rename_with_bracket_index_path() {
     "}
   );
 }
+
+#[test]
+fn test_rename_nested_key_in_sequence_item() {
+  let mut document = parse(indoc! {"
+    items:
+      - name: Ruby
+        year: 1995
+      - name: Rust
+        year: 2015
+  "});
+
+  document.rename("items[0].year", "items[0].founded").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      items:
+        - name: Ruby
+          founded: 1995
+        - name: Rust
+          year: 2015
+    "}
+  );
+}
+
+#[test]
+fn test_rename_relocate_empties_parent() {
+  let mut document = parse(indoc! {"
+    database:
+      host: localhost
+  "});
+
+  document.rename("database.host", "hostname").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      database: {}
+      hostname: localhost
+    "}
+  );
+}

@@ -90,6 +90,20 @@ impl Document {
 
   pub fn insert_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     Self::validate_path(dot_path)?;
+    self.refuse_flow_target(dot_path)?;
+
+    if let Some((parent_path, _)) = dot_path.rsplit_once('.') {
+      if let Ok(parent) = self.navigate(parent_path) {
+        let occupied_flow = find_flow_map(&parent).map(|map| !flow_map_entries(&map).is_empty()).unwrap_or(false)
+          || find_flow_sequence(&parent)
+            .map(|sequence| !flow_sequence_entries(&sequence).is_empty())
+            .unwrap_or(false);
+
+        if occupied_flow {
+          return Err(YerbaError::FlowCollectionNotWritable(dot_path.to_string()));
+        }
+      }
+    }
 
     if crate::selector::Selector::parse(dot_path)
       .segments()

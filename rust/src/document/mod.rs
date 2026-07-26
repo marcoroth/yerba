@@ -38,9 +38,10 @@ use crate::error::YerbaError;
 use crate::QuoteStyle;
 
 use crate::syntax::{
-  column_at, dedent_block_scalar, extract_scalar, extract_scalar_text, find_block_map, find_block_sequence, find_entry_by_key, find_scalar_token,
-  first_collection, format_scalar_value, is_map_key, is_yaml_non_string, line_at, line_start_at, preceding_whitespace_indent, preceding_whitespace_token,
-  raw_scalar_value, removal_range, FirstCollection, ScalarValue,
+  column_at, dedent_block_scalar, extract_scalar, extract_scalar_text, find_block_map, find_block_sequence, find_entry_by_key, find_flow_entry_by_key,
+  find_flow_map, find_flow_sequence, find_scalar_token, first_collection, flow_map_entries, flow_sequence_entries, format_scalar_value, in_flow_collection,
+  is_map_key, is_yaml_non_string, line_at, line_start_at, preceding_whitespace_indent, preceding_whitespace_token, raw_scalar_value, removal_range,
+  FirstCollection, ScalarValue,
 };
 
 #[derive(Debug, Clone)]
@@ -191,6 +192,14 @@ impl Document {
 
   pub fn navigate_all_compact(&self, dot_path: &str) -> Vec<SyntaxNode> {
     self.navigate_all(dot_path).into_iter().flatten().collect()
+  }
+
+  pub(crate) fn refuse_flow_target(&self, dot_path: &str) -> Result<(), YerbaError> {
+    if self.navigate_all_compact(dot_path).iter().any(in_flow_collection) {
+      return Err(YerbaError::FlowCollectionNotWritable(dot_path.to_string()));
+    }
+
+    Ok(())
   }
 
   pub fn navigate_all(&self, dot_path: &str) -> Vec<Option<SyntaxNode>> {
@@ -682,6 +691,8 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
     SelectorSegment::AllItems => {
       if let Some(sequence) = find_block_sequence(node) {
         sequence.entries().map(|entry| entry.syntax().clone()).collect()
+      } else if let Some(sequence) = find_flow_sequence(node) {
+        flow_sequence_entries(&sequence)
       } else {
         Vec::new()
       }
@@ -690,6 +701,12 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
     SelectorSegment::Index(index) => {
       if let Some(sequence) = find_block_sequence(node) {
         sequence.entries().nth(*index).map(|entry| vec![entry.syntax().clone()]).unwrap_or_default()
+      } else if let Some(sequence) = find_flow_sequence(node) {
+        flow_sequence_entries(&sequence)
+          .into_iter()
+          .nth(*index)
+          .map(|entry| vec![entry])
+          .unwrap_or_default()
       } else {
         Vec::new()
       }
@@ -698,6 +715,11 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
     SelectorSegment::AllKeys => {
       if let Some(map) = find_block_map(node) {
         map.entries().filter_map(|entry| entry.value().map(|value| value.syntax().clone())).collect()
+      } else if let Some(map) = find_flow_map(node) {
+        flow_map_entries(&map)
+          .into_iter()
+          .filter_map(|entry| entry.value().map(|value| value.syntax().clone()))
+          .collect()
       } else {
         Vec::new()
       }
@@ -706,6 +728,16 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
     SelectorSegment::Key(key) => {
       if let Some(map) = find_block_map(node) {
         if let Some(entry) = find_entry_by_key(&map, key) {
+          if let Some(value) = entry.value() {
+            return vec![value.syntax().clone()];
+          }
+        }
+
+        return Vec::new();
+      }
+
+      if let Some(map) = find_flow_map(node) {
+        if let Some(entry) = find_flow_entry_by_key(&map, key) {
           if let Some(value) = entry.value() {
             return vec![value.syntax().clone()];
           }

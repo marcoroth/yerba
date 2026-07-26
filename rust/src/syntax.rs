@@ -1,7 +1,7 @@
 use rowan::ast::AstNode;
 use rowan::{TextRange, TextSize};
 
-use yaml_parser::ast::{BlockMap, BlockMapEntry, BlockSeq};
+use yaml_parser::ast::{BlockMap, BlockMapEntry, BlockSeq, FlowMap, FlowMapEntry, FlowSeq};
 use yaml_parser::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -80,6 +80,46 @@ pub fn find_block_map(node: &SyntaxNode) -> Option<BlockMap> {
 
 pub fn find_block_sequence(node: &SyntaxNode) -> Option<BlockSeq> {
   node.descendants().find_map(BlockSeq::cast)
+}
+
+fn first_collection_node(node: &SyntaxNode) -> Option<SyntaxNode> {
+  node.descendants().find(|descendant| {
+    matches!(
+      descendant.kind(),
+      SyntaxKind::BLOCK_MAP | SyntaxKind::BLOCK_SEQ | SyntaxKind::FLOW_MAP | SyntaxKind::FLOW_SEQ
+    )
+  })
+}
+
+pub fn find_flow_sequence(node: &SyntaxNode) -> Option<FlowSeq> {
+  first_collection_node(node).and_then(FlowSeq::cast)
+}
+
+pub fn find_flow_map(node: &SyntaxNode) -> Option<FlowMap> {
+  first_collection_node(node).and_then(FlowMap::cast)
+}
+
+pub fn flow_sequence_entries(sequence: &FlowSeq) -> Vec<SyntaxNode> {
+  sequence
+    .entries()
+    .map(|entries| entries.entries().map(|entry| entry.syntax().clone()).collect())
+    .unwrap_or_default()
+}
+
+pub fn flow_map_entries(map: &FlowMap) -> Vec<FlowMapEntry> {
+  map.entries().map(|entries| entries.entries().collect()).unwrap_or_default()
+}
+
+pub fn find_flow_entry_by_key(map: &FlowMap, key: &str) -> Option<FlowMapEntry> {
+  flow_map_entries(map)
+    .into_iter()
+    .find(|entry| entry.key().and_then(|found| extract_scalar_text(found.syntax())).as_deref() == Some(key))
+}
+
+pub fn in_flow_collection(node: &SyntaxNode) -> bool {
+  node
+    .ancestors()
+    .any(|ancestor| matches!(ancestor.kind(), SyntaxKind::FLOW_MAP | SyntaxKind::FLOW_SEQ))
 }
 
 pub enum FirstCollection {

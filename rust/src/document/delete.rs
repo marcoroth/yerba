@@ -31,6 +31,7 @@ impl Document {
 
   pub fn delete(&mut self, dot_path: &str) -> Result<(), YerbaError> {
     Self::validate_path(dot_path)?;
+    self.refuse_flow_target(dot_path)?;
 
     let selector = crate::selector::Selector::parse(dot_path);
     let segments = selector.segments();
@@ -94,6 +95,10 @@ impl Document {
 
   pub fn remove(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
+
+    if find_flow_sequence(&current_node).is_some() {
+      return Err(YerbaError::FlowCollectionNotWritable(dot_path.to_string()));
+    }
 
     let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
 

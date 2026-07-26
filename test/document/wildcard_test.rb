@@ -218,12 +218,13 @@ class DocumentWildcardTest < Minitest::Spec
     refute empty.exists?("db.*")
   end
 
-  test "* does not resolve the values of a flow map" do
+  test "* resolves the values of a flow map" do
     flow = Yerba::Document.parse("db: {host: localhost, port: 5432}\n")
 
     assert_equal ["host", "port"], flow["db"].keys
-    assert_nil flow["db.host"]
-    assert_empty flow.get_all("db.*")
+    assert_equal "localhost", flow["db.host"].value
+    assert_equal ["localhost", 5432], flow.get_all("db.*").map(&:value)
+    assert_equal ["db.host", "db.port"], flow.get_all("db.*").map(&:selector)
   end
 
   test "* resolves across a glob" do

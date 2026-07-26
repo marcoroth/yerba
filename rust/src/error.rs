@@ -6,6 +6,7 @@ pub enum YerbaError {
   AmbiguousSelector(String, usize),
   InvalidCondition(String, String),
   NotASequence(String),
+  FlowCollectionNotWritable(String),
   IndexOutOfBounds(usize, usize),
   UnknownKeys(Vec<String>),
   DuplicateValues(Vec<crate::DuplicateInfo>),
@@ -25,6 +26,14 @@ impl std::fmt::Display for YerbaError {
       YerbaError::IoError(err) => write!(f, "io error: {}", err),
       YerbaError::SelectorNotFound(selector) => write!(f, "selector not found: {}", selector),
       YerbaError::NotASequence(path) => write!(f, "not a sequence: {}", path),
+
+      YerbaError::FlowCollectionNotWritable(path) => {
+        write!(
+          f,
+          "cannot write to \"{}\": flow collections are not writable yet. Convert it to block style first, with `collection_style` or `yerba collection-style`",
+          path
+        )
+      }
 
       YerbaError::AmbiguousSelector(selector, count) => {
         write!(

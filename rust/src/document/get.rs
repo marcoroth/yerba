@@ -1,5 +1,25 @@
 use super::*;
 
+fn key_of(node: &SyntaxNode, source: &str) -> (Option<String>, Location) {
+  node
+    .parent()
+    .and_then(|parent| {
+      use yaml_parser::ast::BlockMapEntry;
+
+      BlockMapEntry::cast(parent).and_then(|entry| {
+        entry.key().and_then(|key_node| {
+          let key_text = extract_scalar_text(key_node.syntax())?;
+          let key_range = key_node.syntax().text_range();
+          let key_location = compute_location(source, key_range.start().into(), key_range.end().into());
+
+          Some((key_text, key_location))
+        })
+      })
+    })
+    .map(|(name, location)| (Some(name), location))
+    .unwrap_or((None, Location::default()))
+}
+
 impl Document {
   pub fn is_valid_selector(&self, dot_path: &str) -> bool {
     if dot_path.is_empty() {
@@ -116,6 +136,8 @@ impl Document {
           }
         };
 
+        let (key_name, key_location) = key_of(node, &source);
+
         LocatedNode {
           node_type: node_type.to_string(),
           text,
@@ -124,6 +146,8 @@ impl Document {
           selector,
           line,
           location,
+          key_name,
+          key_location,
         }
       })
       .collect()
@@ -214,23 +238,7 @@ impl Document {
         let range = node.text_range();
         let location = compute_location(source, range.start().into(), range.end().into());
 
-        let (key_name, key_location) = node
-          .parent()
-          .and_then(|parent| {
-            use yaml_parser::ast::BlockMapEntry;
-
-            BlockMapEntry::cast(parent).and_then(|entry| {
-              entry.key().and_then(|key_node| {
-                let key_text = extract_scalar_text(key_node.syntax())?;
-                let key_range = key_node.syntax().text_range();
-                let key_location = compute_location(source, key_range.start().into(), key_range.end().into());
-
-                Some((key_text, key_location))
-              })
-            })
-          })
-          .map(|(name, location)| (Some(name), location))
-          .unwrap_or((None, Location::default()));
+        let (key_name, key_location) = key_of(&node, source);
 
         (location, key_name, key_location)
       }

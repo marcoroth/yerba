@@ -21,6 +21,7 @@ pub enum Selector {
 pub enum SelectorSegment {
   Key(String),
   AllItems,
+  AllKeys,
   Index(usize),
 }
 
@@ -163,6 +164,14 @@ impl Selector {
           result.push_str("[]");
         }
 
+        SelectorSegment::AllKeys => {
+          if index > 0 && !result.ends_with('.') {
+            result.push('.');
+          }
+
+          result.push('*');
+        }
+
         SelectorSegment::Index(i) => {
           result.push_str(&format!("[{}]", i));
         }
@@ -227,7 +236,9 @@ fn parse_segments(input: &str) -> Vec<SelectorSegment> {
         Some(index) => {
           let key = &rest[..index];
 
-          if !key.is_empty() {
+          if key == "*" {
+            segments.push(SelectorSegment::AllKeys);
+          } else if !key.is_empty() {
             segments.push(SelectorSegment::Key(key.to_string()));
           }
 
@@ -238,7 +249,9 @@ fn parse_segments(input: &str) -> Vec<SelectorSegment> {
           }
         }
         None => {
-          if !rest.is_empty() {
+          if rest == "*" {
+            segments.push(SelectorSegment::AllKeys);
+          } else if !rest.is_empty() {
             segments.push(SelectorSegment::Key(rest.to_string()));
           }
 

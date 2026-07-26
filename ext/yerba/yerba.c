@@ -959,12 +959,7 @@ static VALUE document_path(VALUE self) {
   return rb_iv_get(self, "@path");
 }
 
-/* Collection.get(glob, selector) → [Yerba::Scalar|Map|Sequence, ...] */
-static VALUE collection_s_get(VALUE self, VALUE pattern, VALUE path) {
-  (void) self;
-
-  YerbaTypedList result = yerba_glob_get(StringValueCStr(pattern), StringValueCStr(path));
-
+static VALUE located_list_to_ruby(YerbaTypedList result, VALUE document) {
   if (!result.json) return rb_ary_new();
 
   VALUE json_string = make_utf8_string(result.json);
@@ -992,6 +987,23 @@ static VALUE collection_s_get(VALUE self, VALUE pattern, VALUE path) {
     if (!NIL_P(file_path)) rb_hash_aset(kwargs, ID2SYM(rb_intern("file_path")), file_path);
     if (!NIL_P(line)) rb_hash_aset(kwargs, ID2SYM(rb_intern("line")), line);
     if (!NIL_P(location)) rb_hash_aset(kwargs, ID2SYM(rb_intern("location")), location);
+    if (!NIL_P(document)) rb_hash_aset(kwargs, ID2SYM(rb_intern("document")), document);
+
+    VALUE key_name = rb_hash_aref(item, rb_str_new_cstr("key_name"));
+
+    if (!NIL_P(key_name)) {
+      VALUE key_location = rb_hash_aref(item, rb_str_new_cstr("key_location"));
+      VALUE key_kwargs = rb_hash_new();
+
+      rb_hash_aset(key_kwargs, ID2SYM(rb_intern("selector")), Qnil);
+      rb_hash_aset(key_kwargs, ID2SYM(rb_intern("value")), key_name);
+      if (!NIL_P(key_location)) rb_hash_aset(key_kwargs, ID2SYM(rb_intern("location")), key_location);
+
+      VALUE key_args[1] = { key_kwargs };
+      VALUE key = rb_funcallv_kw(rb_path2class("Yerba::Scalar"), rb_intern("from"), 1, key_args, RB_PASS_KEYWORDS);
+
+      rb_hash_aset(kwargs, ID2SYM(rb_intern("key")), key);
+    }
 
     if (strcmp(type_str, "scalar") == 0) {
       VALUE text = rb_hash_aref(item, rb_str_new_cstr("text"));
@@ -1013,6 +1025,20 @@ static VALUE collection_s_get(VALUE self, VALUE pattern, VALUE path) {
   }
 
   return array;
+}
+
+/* Collection.get(glob, selector) → [Yerba::Scalar|Map|Sequence, ...] */
+static VALUE collection_s_get(VALUE self, VALUE pattern, VALUE path) {
+  (void) self;
+
+  return located_list_to_ruby(yerba_glob_get(StringValueCStr(pattern), StringValueCStr(path)), Qnil);
+}
+
+/* document.get_all(selector) → [Yerba::Scalar|Map|Sequence, ...] */
+static VALUE document_get_all(VALUE self, VALUE path) {
+  struct Document *document = get_document(self);
+
+  return located_list_to_ruby(yerba_document_get_all(document, StringValueCStr(path)), self);
 }
 
 /* Collection.find(glob, path, condition: nil, select: nil) */
@@ -1080,6 +1106,7 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "[]", document_bracket, 1);
   rb_define_method(rb_cDocument, "node_at", document_bracket, 1);
   rb_define_method(rb_cDocument, "value_at", document_get_value, 1);
+  rb_define_method(rb_cDocument, "get_all", document_get_all, 1);
   rb_define_method(rb_cDocument, "location", document_location, -1);
   rb_define_method(rb_cDocument, "locations", document_locations, 1);
   rb_define_method(rb_cDocument, "selectors", document_selectors, 0);

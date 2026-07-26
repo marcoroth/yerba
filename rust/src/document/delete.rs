@@ -88,7 +88,7 @@ impl Document {
       }
 
       crate::selector::SelectorSegment::Index(index) => self.remove_at(&parent_path, *index),
-      crate::selector::SelectorSegment::AllItems => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
+      crate::selector::SelectorSegment::AllItems | crate::selector::SelectorSegment::AllKeys => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
     }
   }
 

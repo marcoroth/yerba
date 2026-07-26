@@ -201,6 +201,41 @@ class SequenceTest < Minitest::Spec
     assert_equal ["Ruby", "Rust"], names
   end
 
+  test "each yields the same nodes as indexing" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: Ruby
+        - name: Rust
+    YAML
+
+    sequence = document["items"]
+    indexed = sequence.length.times.map { |index| sequence[index] }
+    iterated = sequence.each.to_a
+
+    assert_equal indexed.map(&:selector), iterated.map(&:selector)
+    assert_equal(indexed.map { |node| node.location&.start_line }, iterated.map { |node| node.location&.start_line })
+  end
+
+  test "each yields nodes that can still be written to" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: Ruby
+    YAML
+
+    document["items"].each { |item| item["name"] = "Crystal" }
+
+    assert_equal "Crystal", document.value_at("items[0].name")
+  end
+
+  test "each yields entries of the document root" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Ruby
+      - name: Rust
+    YAML
+
+    assert_equal(["Ruby", "Rust"], document.root.each.map { |item| item["name"].value })
+  end
+
   test "first returns bound node for sequence of maps" do
     document = Yerba::Document.parse(<<~YAML)
       items:

@@ -20,6 +20,8 @@ pub struct LocatedNode {
   pub selector: String,
   pub line: usize,
   pub location: Location,
+  pub key_name: Option<String>,
+  pub key_location: Location,
 }
 
 use std::fs;
@@ -220,7 +222,7 @@ impl Document {
     let segments = parsed.segments();
 
     for (i, segment) in segments.iter().enumerate() {
-      let is_wildcard = matches!(segment, crate::selector::SelectorSegment::AllItems);
+      let is_wildcard = matches!(segment, crate::selector::SelectorSegment::AllItems | crate::selector::SelectorSegment::AllKeys);
       let has_remaining = i + 1 < segments.len();
       let mut next_nodes: Vec<Option<SyntaxNode>> = Vec::new();
 
@@ -335,22 +337,28 @@ impl Document {
       return self.remove_node(entry_node);
     }
 
-    let end = if let Some(next_sibling) = entry_node.next_sibling() {
-      next_sibling.text_range().start()
-    } else {
-      entry_node.parent().map(|parent| parent.text_range().end()).unwrap_or(entry_range.end())
-    };
+    let source = self.source_text();
 
-    let start = if let Some(whitespace_token) = preceding_whitespace_token(entry_node) {
-      let whitespace_text = whitespace_token.text();
-      let whitespace_start = whitespace_token.text_range().start();
+    let (start, end) = match preceding_whitespace_token(entry_node) {
+      Some(whitespace_token) => {
+        let whitespace_text = whitespace_token.text();
+        let whitespace_start = whitespace_token.text_range().start();
 
-      whitespace_text
-        .rfind('\n')
-        .map(|offset| whitespace_start + TextSize::from(offset as u32))
-        .unwrap_or(whitespace_start)
-    } else {
-      entry_range.start()
+        let start = whitespace_text
+          .rfind('\n')
+          .map(|offset| whitespace_start + TextSize::from(offset as u32))
+          .unwrap_or(whitespace_start);
+
+        (start, entry_range.end())
+      }
+
+      None => {
+        let entry_end: usize = entry_range.end().into();
+        let line_start = line_start_at(&source, entry_range.start().into());
+        let after_entry = source[entry_end..].find('\n').map(|offset| entry_end + offset + 1).unwrap_or(entry_end);
+
+        (TextSize::from(line_start as u32), TextSize::from(after_entry as u32))
+      }
     };
 
     self.apply_edit(TextRange::new(start, end), "")
@@ -681,6 +689,14 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
     SelectorSegment::Index(index) => {
       if let Some(sequence) = find_block_sequence(node) {
         sequence.entries().nth(*index).map(|entry| vec![entry.syntax().clone()]).unwrap_or_default()
+      } else {
+        Vec::new()
+      }
+    }
+
+    SelectorSegment::AllKeys => {
+      if let Some(map) = find_block_map(node) {
+        map.entries().filter_map(|entry| entry.value().map(|value| value.syntax().clone())).collect()
       } else {
         Vec::new()
       }

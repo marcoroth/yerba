@@ -90,10 +90,14 @@ module Yerba
       self
     end
 
-    def each
+    def each(&)
       return enum_for(:each) unless block_given?
 
-      length.times { |index| yield self[index] }
+      if connected? && (items = document&.get_all("#{@selector}[]"))
+        items.each(&)
+      else
+        length.times { |index| yield self[index] }
+      end
     end
 
     def find_by(selector = nil, value = nil, **criteria)

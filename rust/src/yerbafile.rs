@@ -279,7 +279,31 @@ impl Yerbafile {
     let content = fs::read_to_string(path.as_ref())?;
     let mut yerbafile: Yerbafile = yaml_serde::from_str(&content).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
     yerbafile.directory = path.as_ref().parent().map(|p| p.to_path_buf());
+    yerbafile.validate_conditions()?;
     Ok(yerbafile)
+  }
+
+  fn validate_conditions(&self) -> Result<(), YerbaError> {
+    let pipelines = std::iter::once(&self.pipeline).chain(self.rules.iter().map(|rule| &rule.pipeline));
+
+    for pipeline in pipelines {
+      for step in pipeline {
+        let condition = match step {
+          PipelineStep::Set(config) => config.condition.as_deref(),
+          PipelineStep::Insert(config) => config.condition.as_deref(),
+          PipelineStep::Delete(config) => config.condition.as_deref(),
+          PipelineStep::Rename(config) => config.condition.as_deref(),
+          PipelineStep::Remove(config) => config.condition.as_deref(),
+          _ => None,
+        };
+
+        if let Some(condition) = condition {
+          crate::validate_condition(condition)?;
+        }
+      }
+    }
+
+    Ok(())
   }
 
   pub fn resolve_path(&self, relative: &str) -> PathBuf {
@@ -675,7 +699,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
       if let Some(condition) = &config.condition {
         let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, condition) {
+        if !document.evaluate_condition(parent_path, condition)? {
           return Ok(());
         }
       }
@@ -689,7 +713,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
       if let Some(condition) = &config.condition {
         let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, condition) {
+        if !document.evaluate_condition(parent_path, condition)? {
           return Ok(());
         }
       }
@@ -707,7 +731,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
           if let Some(condition) = &config.condition {
             let parent_path = selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-            if !document.evaluate_condition(parent_path, condition) {
+            if !document.evaluate_condition(parent_path, condition)? {
               continue;
             }
           }
@@ -720,7 +744,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         if let Some(condition) = &config.condition {
           let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-          if !document.evaluate_condition(parent_path, condition) {
+          if !document.evaluate_condition(parent_path, condition)? {
             return Ok(());
           }
         }
@@ -735,7 +759,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
       if let Some(condition) = &config.condition {
         let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, condition) {
+        if !document.evaluate_condition(parent_path, condition)? {
           return Ok(());
         }
       }
@@ -749,7 +773,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
       if let Some(condition) = &config.condition {
         let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, condition) {
+        if !document.evaluate_condition(parent_path, condition)? {
           return Ok(());
         }
       }

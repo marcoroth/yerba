@@ -98,6 +98,19 @@ static VALUE typed_value_to_ruby(YerbaTypedValue typed_value) {
   return result;
 }
 
+static void check_condition(const char *condition, bool item_context) {
+  if (!condition) return;
+
+  char *error = yerba_validate_condition(condition, item_context);
+
+  if (!error) return;
+
+  VALUE message = make_utf8_string(error);
+  yerba_string_free(error);
+
+  rb_raise(rb_eError, "%s", StringValueCStr(message));
+}
+
 static int should_proceed(struct Document *document, VALUE opts) {
   if (NIL_P(opts)) return 1;
   VALUE v_condition = rb_hash_aref(opts, ID2SYM(rb_intern("condition")));
@@ -105,6 +118,8 @@ static int should_proceed(struct Document *document, VALUE opts) {
 
   VALUE v_path = rb_hash_aref(opts, ID2SYM(rb_intern("condition_path")));
   const char *parent_path = NIL_P(v_path) ? "" : StringValueCStr(v_path);
+
+  check_condition(StringValueCStr(v_condition), parent_path[0] != '\0');
 
   return yerba_document_evaluate_condition(document, parent_path, StringValueCStr(v_condition));
 }
@@ -520,6 +535,8 @@ static VALUE document_condition_p(int argc, VALUE *argv, VALUE self) {
 
   struct Document *document = get_document(self);
 
+  check_condition(StringValueCStr(condition), parent_path[0] != '\0');
+
   return yerba_document_evaluate_condition(document, parent_path, StringValueCStr(condition)) ? Qtrue : Qfalse;
 }
 
@@ -540,6 +557,9 @@ static VALUE document_find(int argc, VALUE *argv, VALUE self) {
   }
 
   struct Document *document = get_document(self);
+
+  check_condition(condition, true);
+
   char *json = yerba_document_find(document, StringValueCStr(path), condition, select);
 
   if (!json) return rb_ary_new();
@@ -1069,6 +1089,8 @@ static VALUE collection_s_find(int argc, VALUE *argv, VALUE self) {
     if (!NIL_P(v_condition)) condition = StringValueCStr(v_condition);
     if (!NIL_P(v_select)) select = StringValueCStr(v_select);
   }
+
+  check_condition(condition, true);
 
   YerbaTypedList result = yerba_glob_find(StringValueCStr(pattern), StringValueCStr(path), condition, select);
 

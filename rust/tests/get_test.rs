@@ -218,7 +218,7 @@ fn test_find_items_filters_by_field() {
       title: Closing
   "});
 
-  let matches = document.filter("[]", ".kind == keynote");
+  let matches = document.filter("[]", ".kind == keynote").unwrap();
   assert_eq!(matches.len(), 2);
   assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("talk-1"));
   assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("talk-1"));
@@ -238,7 +238,7 @@ fn test_find_items_condition_on_nested_value() {
       video_id: ghi789
   "});
 
-  let matches = document.filter("[]", ".video_provider == youtube");
+  let matches = document.filter("[]", ".video_provider == youtube").unwrap();
   assert_eq!(matches.len(), 2);
 }
 
@@ -253,7 +253,7 @@ fn test_find_items_contains_condition() {
       title: Advanced Ruby
   "});
 
-  let matches = document.filter("[]", ".title contains Ruby");
+  let matches = document.filter("[]", ".title contains Ruby").unwrap();
   assert_eq!(matches.len(), 2);
 }
 
@@ -266,7 +266,7 @@ fn test_find_items_not_contains_condition() {
       title: Python Basics
   "});
 
-  let matches = document.filter("[]", ".title not_contains Ruby");
+  let matches = document.filter("[]", ".title not_contains Ruby").unwrap();
   assert_eq!(matches.len(), 1);
   assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("Python"));
 }
@@ -280,7 +280,7 @@ fn test_find_items_inequality_condition() {
       status: published
   "});
 
-  let matches = document.filter("[]", ".status != draft");
+  let matches = document.filter("[]", ".status != draft").unwrap();
   assert_eq!(matches.len(), 1);
   assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("published"));
 }
@@ -307,7 +307,7 @@ fn test_find_items_no_matches_returns_empty() {
       kind: talk
   "});
 
-  let matches = document.filter("[]", ".kind == keynote");
+  let matches = document.filter("[]", ".kind == keynote").unwrap();
   assert_eq!(matches.len(), 0);
 }
 
@@ -338,7 +338,7 @@ fn test_get_all_bracket_on_scalar_array() {
 }
 
 #[test]
-fn test_find_items_without_dot_prefix_does_not_match() {
+fn test_find_items_without_dot_prefix_is_rejected() {
   let document = parse(indoc! {"
     - id: talk-1
       kind: keynote
@@ -346,8 +346,12 @@ fn test_find_items_without_dot_prefix_does_not_match() {
       kind: talk
   "});
 
-  let matches = document.filter("[]", "kind == keynote");
-  assert_eq!(matches.len(), 0);
+  // Used to come back empty, which read as "nothing matched" rather than
+  // "that is not a condition".
+  let error = document.filter("[]", "kind == keynote").unwrap_err();
+
+  assert!(error.to_string().contains("must be relative"), "{}", error);
+  assert!(error.to_string().contains("did you mean \".kind\""), "{}", error);
 }
 
 #[test]
@@ -362,7 +366,7 @@ fn test_find_items_speakers_contains_array_member() {
         - Charlie
   "});
 
-  let matches = document.filter("[]", ".speakers contains Alice");
+  let matches = document.filter("[]", ".speakers contains Alice").unwrap();
   assert_eq!(matches.len(), 1);
   assert!(yaml_serde::to_string(&matches[0]).unwrap().contains("talk-1"));
 }
@@ -783,7 +787,7 @@ fn test_filter_with_contains() {
         - Charlie
   "});
 
-  let values = document.filter("[]", ".title contains Ruby");
+  let values = document.filter("[]", ".title contains Ruby").unwrap();
   assert_eq!(values.len(), 2);
 }
 
@@ -798,7 +802,7 @@ fn test_filter_extracts_full_objects() {
       video_id: def
   "});
 
-  let values = document.filter("[]", ".video_provider == youtube");
+  let values = document.filter("[]", ".video_provider == youtube").unwrap();
   assert_eq!(values.len(), 1);
 
   if let yaml_serde::Value::Mapping(map) = &values[0] {
@@ -1006,7 +1010,7 @@ fn test_filter_with_selectors() {
       title: Closing
   "});
 
-  let results = document.filter_with_selectors("[]", ".kind == keynote");
+  let results = document.filter_with_selectors("[]", ".kind == keynote").unwrap();
 
   assert_eq!(results.len(), 2);
   assert_eq!(results[0].1, "[0]");
@@ -1030,7 +1034,7 @@ fn test_filter_with_selectors_no_matches() {
       kind: talk
   "});
 
-  let results = document.filter_with_selectors("[]", ".kind == keynote");
+  let results = document.filter_with_selectors("[]", ".kind == keynote").unwrap();
 
   assert!(results.is_empty());
 }
@@ -1044,7 +1048,7 @@ fn test_filter_with_selectors_all_match() {
       kind: keynote
   "});
 
-  let results = document.filter_with_selectors("[]", ".kind == keynote");
+  let results = document.filter_with_selectors("[]", ".kind == keynote").unwrap();
 
   assert_eq!(results.len(), 2);
   assert_eq!(results[0].1, "[0]");

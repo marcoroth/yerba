@@ -11,7 +11,9 @@ mod yaml_writer;
 pub mod yerbafile;
 
 pub use document::style::StyleEnforcement;
-pub use document::{collect_selectors, Document, DuplicateInfo, InsertPosition, LocatedNode, Location, NodeInfo, NodeType, SortField};
+pub use document::{
+  collect_selectors, validate_condition, validate_item_condition, Document, DuplicateInfo, InsertPosition, LocatedNode, Location, NodeInfo, NodeType, SortField,
+};
 pub use error::YerbaError;
 pub use quote_style::{KeyStyle, QuoteStyle};
 pub use selector::Selector;
@@ -53,24 +55,28 @@ pub fn glob_get(pattern: &str, selector: &str) -> Vec<document::LocatedNode> {
     .collect()
 }
 
-pub fn glob_find(pattern: &str, selector: &str, condition: Option<&str>, select: Option<&str>) -> Vec<serde_json::Value> {
+pub fn glob_find(pattern: &str, selector: &str, condition: Option<&str>, select: Option<&str>) -> Result<Vec<serde_json::Value>, YerbaError> {
   use rayon::prelude::*;
+
+  if let Some(cond) = condition {
+    crate::document::validate_condition(cond)?;
+  }
 
   let files = match glob::glob(pattern) {
     Ok(paths) => paths.filter_map(|p| p.ok()).collect::<Vec<_>>(),
-    Err(_) => return vec![],
+    Err(_) => return Ok(vec![]),
   };
 
   let select_fields: Option<Vec<&str>> = select.map(|s| s.split(',').collect());
 
-  files
+  let results: Vec<serde_json::Value> = files
     .par_iter()
     .flat_map(|file| {
       let mut file_results = Vec::new();
 
       if let Ok(document) = Document::parse_file(file) {
         let values = match condition {
-          Some(cond) => document.filter(selector, cond),
+          Some(cond) => document.filter(selector, cond).unwrap_or_default(),
           None => document.get_values(selector),
         };
 
@@ -108,5 +114,7 @@ pub fn glob_find(pattern: &str, selector: &str, condition: Option<&str>, select:
 
       file_results
     })
-    .collect()
+    .collect();
+
+  Ok(results)
 }

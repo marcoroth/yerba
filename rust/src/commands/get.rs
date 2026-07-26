@@ -62,6 +62,16 @@ impl Args {
       condition.clone()
     });
 
+    if let Some(condition) = &normalized_condition {
+      if let Err(error) = yerba::validate_item_condition(condition) {
+        use super::color::*;
+
+        eprintln!("{RED}Error:{RESET} {}", error);
+
+        process::exit(1);
+      }
+    }
+
     let search_path_string = search_path.to_selector_string();
     let mut all_results: Vec<serde_json::Value> = Vec::new();
     let files = resolve_files(&self.file);
@@ -114,7 +124,7 @@ impl Args {
 
       let (values, selectors, lines): (Vec<yaml_serde::Value>, Vec<String>, Vec<usize>) = if select_fields.is_some() {
         if let Some(condition) = &normalized_condition {
-          let triples = document.filter_with_selectors(&search_path_string, condition);
+          let triples = document.filter_with_selectors(&search_path_string, condition).unwrap_or_default();
           let (values, rest): (Vec<_>, Vec<_>) = triples.into_iter().map(|(v, s, l)| (v, (s, l))).unzip();
           let (selectors, lines): (Vec<_>, Vec<_>) = rest.into_iter().unzip();
 
@@ -129,7 +139,7 @@ impl Args {
           (values, selectors, lines)
         }
       } else if let Some(condition) = &normalized_condition {
-        (document.filter(&search_path_string, condition), Vec::new(), Vec::new())
+        (document.filter(&search_path_string, condition).unwrap_or_default(), Vec::new(), Vec::new())
       } else {
         (document.get_values(&search_path_string), Vec::new(), Vec::new())
       };

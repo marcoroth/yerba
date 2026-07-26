@@ -4,17 +4,18 @@ fn key_of(node: &SyntaxNode, source: &str) -> (Option<String>, Location) {
   node
     .parent()
     .and_then(|parent| {
-      use yaml_parser::ast::BlockMapEntry;
+      use yaml_parser::ast::{BlockMapEntry, FlowMapEntry};
 
-      BlockMapEntry::cast(parent).and_then(|entry| {
-        entry.key().and_then(|key_node| {
-          let key_text = extract_scalar_text(key_node.syntax())?;
-          let key_range = key_node.syntax().text_range();
-          let key_location = compute_location(source, key_range.start().into(), key_range.end().into());
+      let key_node = match BlockMapEntry::cast(parent.clone()) {
+        Some(entry) => entry.key().map(|key| key.syntax().clone()),
+        None => FlowMapEntry::cast(parent).and_then(|entry| entry.key().map(|key| key.syntax().clone())),
+      }?;
 
-          Some((key_text, key_location))
-        })
-      })
+      let key_text = extract_scalar_text(&key_node)?;
+      let key_range = key_node.text_range();
+      let key_location = compute_location(source, key_range.start().into(), key_range.end().into());
+
+      Some((key_text, key_location))
     })
     .map(|(name, location)| (Some(name), location))
     .unwrap_or((None, Location::default()))
@@ -512,11 +513,13 @@ pub(crate) fn node_selector(node: &SyntaxNode) -> String {
   let mut parts: Vec<String> = Vec::new();
   let mut current = node.clone();
 
-  if current.kind() == SyntaxKind::BLOCK_SEQ_ENTRY {
+  if matches!(current.kind(), SyntaxKind::BLOCK_SEQ_ENTRY | SyntaxKind::FLOW_SEQ_ENTRY) {
     if let Some(parent) = current.parent() {
+      let kind = current.kind();
+
       let index = parent
         .children()
-        .filter(|child| child.kind() == SyntaxKind::BLOCK_SEQ_ENTRY)
+        .filter(|child| child.kind() == kind)
         .position(|child| child == current)
         .unwrap_or(0);
 
@@ -531,11 +534,11 @@ pub(crate) fn node_selector(node: &SyntaxNode) -> String {
     };
 
     match parent.kind() {
-      SyntaxKind::BLOCK_SEQ_ENTRY => {
+      SyntaxKind::BLOCK_SEQ_ENTRY | SyntaxKind::FLOW_SEQ_ENTRY => {
         if let Some(grandparent) = parent.parent() {
           let index = grandparent
             .children()
-            .filter(|child| child.kind() == SyntaxKind::BLOCK_SEQ_ENTRY)
+            .filter(|child| child.kind() == parent.kind())
             .position(|child| child == parent)
             .unwrap_or(0);
 
@@ -545,6 +548,14 @@ pub(crate) fn node_selector(node: &SyntaxNode) -> String {
 
       SyntaxKind::BLOCK_MAP_ENTRY => {
         if let Some(key_node) = parent.children().find(|child| child.kind() == SyntaxKind::BLOCK_MAP_KEY) {
+          if let Some(key_text) = extract_scalar_text(&key_node) {
+            parts.push(key_text);
+          }
+        }
+      }
+
+      SyntaxKind::FLOW_MAP_ENTRY => {
+        if let Some(key_node) = parent.children().find(|child| child.kind() == SyntaxKind::FLOW_MAP_KEY) {
           if let Some(key_text) = extract_scalar_text(&key_node) {
             parts.push(key_text);
           }

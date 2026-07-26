@@ -834,6 +834,24 @@ document["database"].collection_style = :flow  # => database: {host: localhost, 
 document["database"].collection_style = :block # => database:\n  host: localhost\n  port: 5432
 ```
 
+Flow collections are read and iterated like block ones, and their scalars can be
+changed in place:
+
+```ruby
+document = Yerba::Document.parse("tags: [ruby, rails]\n")
+
+document["tags"].map(&:value)   # => ["ruby", "rails"]
+document["tags[1]"].value = "crystal"  # => tags: [ruby, crystal]
+```
+
+Adding or removing entries is not supported yet, and raises rather than
+reformatting the collection. Switch to block style first:
+
+```ruby
+document["tags"].collection_style = :block
+document.delete("tags[0]")
+```
+
 ### Sequence Indent
 
 Control whether sequence items are indented under their key or at the same level:

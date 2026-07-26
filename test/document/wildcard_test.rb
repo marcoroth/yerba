@@ -13,6 +13,16 @@ class DocumentWildcardTest < Minitest::Spec
       - name: "b"
   YAML
 
+  NESTED_ITEMS = <<~YAML
+    items:
+      - venue:
+          city: "Berlin"
+          country: "DE"
+      - venue:
+          city: "Lisbon"
+          country: "PT"
+  YAML
+
   def document
     @document ||= Yerba::Document.parse(YAML_SOURCE)
   end
@@ -133,6 +143,49 @@ class DocumentWildcardTest < Minitest::Spec
     YAML
 
     assert_equal [{ "venue" => ["Berlin"] }, { "venue" => ["Hamburg", "DE"] }], document.find("items[]", select: "venue.*")
+  end
+
+  test "* matches in a condition" do
+    nested = Yerba::Document.parse(NESTED_ITEMS)
+
+    assert_equal [{ "venue" => { "city" => "Berlin", "country" => "DE" } }], nested.find("items[]", condition: '.venue.* == "Berlin"')
+  end
+
+  test "* in a condition agrees with the concrete key" do
+    nested = Yerba::Document.parse(NESTED_ITEMS)
+
+    assert_equal nested.find("items[]", condition: '.venue.city == "Lisbon"'), nested.find("items[]", condition: '.venue.* == "Lisbon"')
+  end
+
+  test "* works with a non-equality condition operator" do
+    nested = Yerba::Document.parse(NESTED_ITEMS)
+
+    assert_equal [{ "venue" => { "city" => "Berlin", "country" => "DE" } }], nested.find("items[]", condition: ".venue.* contains Berl")
+  end
+
+  test "* matches any value of an item in a condition" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: "a"
+          kind: "keynote"
+        - name: "b"
+          kind: "talk"
+    YAML
+
+    assert_equal [{ "name" => "a", "kind" => "keynote" }], document.find("items[]", condition: '.* == "keynote"')
+  end
+
+  test "* resolves after a [] container" do
+    nested = Yerba::Document.parse(NESTED_ITEMS)
+
+    assert_equal ["Berlin", "DE", "Lisbon", "PT"], nested.get_all("items[].venue.*").map(&:value)
+    assert_equal ["items[0].venue.city", "items[0].venue.country", "items[1].venue.city", "items[1].venue.country"], nested.get_all("items[].venue.*").map(&:selector)
+  end
+
+  test "* combines with a condition and a select field" do
+    nested = Yerba::Document.parse(NESTED_ITEMS)
+
+    assert_equal [{ "venue" => ["Berlin", "DE"] }], nested.find("items[]", condition: '.venue.* == "Berlin"', select: "venue.*")
   end
 
   test "* resolves the values of a nested map" do

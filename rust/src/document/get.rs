@@ -32,6 +32,10 @@ impl Document {
       return true;
     }
 
+    if crate::selector::Selector::parse(dot_path).has_wildcard() && !self.navigate_all_compact(dot_path).is_empty() {
+      return true;
+    }
+
     let wildcard_version = dot_path.replace(|c: char| c.is_ascii_digit(), "").replace("[.", "[");
 
     let mut normalized = String::new();
@@ -100,6 +104,49 @@ impl Document {
 
   pub fn resolve_selectors(&self, dot_path: &str) -> Vec<String> {
     self.navigate_all_compact(dot_path).iter().map(node_selector).collect()
+  }
+
+  pub fn keys_at(&self, dot_path: &str) -> Vec<String> {
+    let node = if dot_path.is_empty() {
+      self.root.clone()
+    } else {
+      match self.navigate_all_compact(dot_path).into_iter().next() {
+        Some(node) => node,
+        None => return Vec::new(),
+      }
+    };
+
+    let collection = node.descendants().find(|descendant| {
+      matches!(
+        descendant.kind(),
+        SyntaxKind::BLOCK_MAP | SyntaxKind::BLOCK_SEQ | SyntaxKind::FLOW_MAP | SyntaxKind::FLOW_SEQ
+      )
+    });
+
+    let Some(collection) = collection else {
+      return Vec::new();
+    };
+
+    if let Some(map) = BlockMap::cast(collection.clone()) {
+      return map
+        .entries()
+        .filter_map(|entry| entry.key().and_then(|key| extract_scalar_text(key.syntax())))
+        .collect();
+    }
+
+    if let Some(map) = yaml_parser::ast::FlowMap::cast(collection) {
+      return map
+        .entries()
+        .map(|entries| {
+          entries
+            .entries()
+            .filter_map(|entry| entry.key().and_then(|key| extract_scalar_text(key.syntax())))
+            .collect()
+        })
+        .unwrap_or_default();
+    }
+
+    Vec::new()
   }
 
   pub fn get_all_located(&self, dot_path: &str) -> Vec<LocatedNode> {
@@ -345,7 +392,7 @@ impl Document {
   }
 
   pub fn exists(&self, dot_path: &str) -> bool {
-    if dot_path.contains('[') {
+    if crate::selector::Selector::parse(dot_path).has_wildcard() {
       if !self.navigate_all_compact(dot_path).is_empty() {
         return true;
       }

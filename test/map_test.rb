@@ -69,6 +69,33 @@ class MapTest < Minitest::Spec
     assert_equal ["id", "name", "channels"], document.root.keys
   end
 
+  test "map.keys is not confused by a nested sequence of scalars" do
+    document = Yerba::Document.parse(<<~YAML)
+      id: "aloha"
+      tags:
+        - ruby
+        - rails
+    YAML
+
+    assert_equal ["id", "tags"], document.root.keys
+  end
+
+  test "map.keys includes a key whose value is empty" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+      port:
+      name: app
+    YAML
+
+    assert_equal ["host", "port", "name"], document.root.keys
+  end
+
+  test "map.keys reads the keys of a flow map" do
+    document = Yerba::Document.parse("database: { host: localhost, port: 5432 }\n")
+
+    assert_equal ["host", "port"], document["database"].keys
+  end
+
   test "map.each yields every key and its value node" do
     document = Yerba::Document.parse(<<~YAML)
       name: Conf

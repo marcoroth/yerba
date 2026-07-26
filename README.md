@@ -96,7 +96,12 @@ Selectors let you address any node in a YAML document:
 | `key.nested`      | Nested key path     | `"database.settings.pool"` |
 | `[]`              | All items in array  | `"[].title"`               |
 | `[N]`             | Item at index       | `"[0].title"`              |
+| `*`               | All values in a map | `"database.*"`             |
 | `[].key[].nested` | Nested array access | `"[].speakers[].name"`     |
+
+`[]` and `*` are the same idea applied to the two collection types: `[]` matches
+every item of a sequence, `*` matches every value of a map. Both can be combined
+with the other patterns, as in `"[].*"` or `"*.city"`.
 
 ### Conditions
 
@@ -893,15 +898,50 @@ document.locations("[].speakers[]")
 
 ### Wildcard Access
 
-When `[]` receives a wildcard selector (containing `[]`), it returns an array of nodes instead of a single node:
+When `[]` receives a wildcard selector, it returns an array of nodes instead of a single node. `[]` matches every item of a sequence and `*` matches every value of a map:
 
 ```ruby
 document["[].title"]       # => [Yerba::Scalar, Yerba::Scalar, ...]
 document["[].speakers[]"]  # => [Yerba::Scalar, Yerba::Scalar, ...]
 document["items[].name"]   # => [Yerba::Scalar, Yerba::Scalar, ...]
 
+document["database.*"]     # => [Yerba::Scalar, Yerba::Scalar, ...]
+document["*"]              # => every value of the root map
+document["[].*"]           # => every value of every item
+
 document["[].title"].each { |scalar| puts scalar.value }
 document["[].title"].each { |scalar| scalar.value = "Updated" }
+```
+
+Each node knows the key it belongs to, which is how a map value can be traced back to its name:
+
+```ruby
+document["database.*"].map { |node| [node.key.value, node.value] }
+# => [["host", "localhost"], ["port", 5432]]
+```
+
+`get_all` resolves the same selectors in a single walk of the document, rather than looking each node up separately. It is the faster choice when reading many nodes, and returns nodes that are still connected to the document:
+
+```ruby
+document.get_all("[].title")     # => [Yerba::Scalar, Yerba::Scalar, ...]
+document.get_all("database.*")   # => [Yerba::Scalar, Yerba::Scalar, ...]
+
+document.get_all("[].title").first.value = "Updated"
+document.save!
+```
+
+Reading values rather than nodes keeps a positional `nil` where a branch does not match, while resolving nodes skips it:
+
+```ruby
+document.value_at("*.city")            # => [nil, "Berlin", nil]
+document.get_all("*.city").map(&:value) # => ["Berlin"]
+```
+
+Wildcards address more than one node, so they cannot be written through. `set`, `insert` and `delete` raise rather than change every match at once:
+
+```ruby
+document.set("database.*", "x")  # => raises Yerba::Error
+document.delete("database.*")    # => raises Yerba::Error
 ```
 
 ### Collections

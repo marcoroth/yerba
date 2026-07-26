@@ -93,11 +93,19 @@ module Yerba
     def each(&)
       return enum_for(:each) unless block_given?
 
-      if connected? && (items = document&.get_all("#{@selector}[]"))
-        items.each(&)
-      else
-        length.times { |index| yield self[index] }
+      if connected?
+        items = document.get_all("#{@selector}[]")
+
+        if items.length == length
+          items.each(&)
+
+          return self
+        end
       end
+
+      length.times { |index| yield self[index] }
+
+      self
     end
 
     def find_by(selector = nil, value = nil, **criteria)

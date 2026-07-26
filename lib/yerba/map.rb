@@ -79,13 +79,7 @@ module Yerba
     def keys
       return @data.keys unless connected?
 
-      value = document&.value_at(@selector)
-      return value.keys if value.is_a?(Hash)
-
-      results = document&.find(@selector)
-      return [] unless results.is_a?(Array) && results.first.is_a?(Hash)
-
-      results.first.keys
+      document.keys_at(@selector)
     end
 
     def each(&)
@@ -97,10 +91,10 @@ module Yerba
       end
 
       names = keys
-      values = document&.get_all(@selector.empty? ? "*" : "#{@selector}.*") || []
+      values = document.get_all(@selector.empty? ? "*" : "#{@selector}.*")
 
-      if values.length == names.length
-        names.each_with_index { |key, index| yield key, values[index] }
+      if values.length == names.length && values.all?(&:key)
+        values.each { |value| yield value.key.value, value }
       else
         names.each { |key| yield key, self[key] }
       end

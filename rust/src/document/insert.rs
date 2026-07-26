@@ -91,6 +91,14 @@ impl Document {
   pub fn insert_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
     Self::validate_path(dot_path)?;
 
+    if crate::selector::Selector::parse(dot_path)
+      .segments()
+      .iter()
+      .any(|segment| matches!(segment, crate::selector::SelectorSegment::AllKeys))
+    {
+      return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+    }
+
     if let Ok(current_node) = self.navigate(dot_path) {
       if find_block_sequence(&current_node).is_some()
         || matches!(self.get_value(dot_path).as_ref(), Some(yaml_serde::Value::Sequence(sequence)) if sequence.is_empty())

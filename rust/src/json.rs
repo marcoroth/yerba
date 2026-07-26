@@ -102,7 +102,10 @@ pub fn resolve_select_field(value: &yaml_serde::Value, field: &str) -> serde_jso
     current_values = next_values;
   }
 
-  let used_all_items = parsed.segments().iter().any(|s| matches!(s, SelectorSegment::AllItems));
+  let used_all_items = parsed
+    .segments()
+    .iter()
+    .any(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::AllKeys));
 
   if current_values.is_empty() {
     if used_all_items {

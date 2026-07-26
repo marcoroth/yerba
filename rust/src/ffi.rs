@@ -331,6 +331,13 @@ pub unsafe extern "C" fn yerba_document_resolve_selectors(document: *const Docum
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_selector_has_wildcard(path: *const c_char) -> bool {
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  crate::selector::Selector::parse(selector_string).has_wildcard()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_keys(document: *const Document, path: *const c_char) -> *mut c_char {
   let document = &*document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");

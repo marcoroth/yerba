@@ -111,6 +111,17 @@ class DocumentWildcardTest < Minitest::Spec
     refute_includes document.to_s, "*"
   end
 
+  test "a key containing * is treated as a key rather than a wildcard" do
+    document = Yerba::Document.parse(<<~YAML)
+      a*b: 1
+      name: Conf
+    YAML
+
+    assert_instance_of Yerba::Scalar, document["a*b"]
+    assert_equal 1, document["a*b"].value
+    refute document.valid_selector?("*.missing")
+  end
+
   test "a * select field stays an array when it matches a single value" do
     document = Yerba::Document.parse(<<~YAML)
       items:

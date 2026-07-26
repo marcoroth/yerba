@@ -256,7 +256,7 @@ static VALUE document_bracket(VALUE self, VALUE path) {
 
   const char *selector = StringValueCStr(path);
 
-  if (strstr(selector, "[]") != NULL || strchr(selector, '*') != NULL) {
+  if (yerba_selector_has_wildcard(selector)) {
     char *json = yerba_document_resolve_selectors(document, selector);
 
     if (!json) return rb_ary_new();

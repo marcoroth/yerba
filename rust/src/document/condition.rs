@@ -1,29 +1,83 @@
 use super::*;
 
-impl Document {
-  pub fn filter(&self, dot_path: &str, condition: &str) -> Vec<yaml_serde::Value> {
-    self
-      .navigate_all_compact(dot_path)
-      .iter()
-      .filter(|node| self.evaluate_condition_on_node(node, condition))
-      .map(node_to_yaml_value)
-      .collect()
+const CONDITION_OPERATORS: &str = "expected `<selector> <operator> <value>`, where operator is one of ==, !=, contains, not_contains";
+
+pub fn validate_condition(condition: &str) -> Result<(), YerbaError> {
+  let trimmed = condition.trim();
+
+  if trimmed.is_empty() {
+    return Err(YerbaError::InvalidCondition(condition.to_string(), "condition is empty".to_string()));
   }
 
-  pub fn filter_with_selectors(&self, dot_path: &str, condition: &str) -> Vec<(yaml_serde::Value, String, usize)> {
+  let Some((left, _operator, _right)) = parse_condition(trimmed) else {
+    return Err(YerbaError::InvalidCondition(condition.to_string(), CONDITION_OPERATORS.to_string()));
+  };
+
+  if crate::selector::Selector::parse(&left).is_empty() {
+    return Err(YerbaError::InvalidCondition(
+      condition.to_string(),
+      "condition is missing a selector on the left of the operator".to_string(),
+    ));
+  }
+
+  Ok(())
+}
+
+pub fn validate_item_condition(condition: &str) -> Result<(), YerbaError> {
+  validate_condition(condition)?;
+
+  let trimmed = condition.trim();
+
+  let Some((left, _operator, _right)) = parse_condition(trimmed) else {
+    return Ok(());
+  };
+
+  if !crate::selector::Selector::parse(&left).is_relative() {
+    return Err(YerbaError::InvalidCondition(
+      condition.to_string(),
+      format!(
+        "selector \"{}\" is absolute, but this condition is tested against each item, so it must be relative and start with `.` — did you mean \".{}\"?",
+        left.trim(),
+        left.trim()
+      ),
+    ));
+  }
+
+  Ok(())
+}
+
+impl Document {
+  pub fn filter(&self, dot_path: &str, condition: &str) -> Result<Vec<yaml_serde::Value>, YerbaError> {
+    validate_item_condition(condition)?;
+
+    Ok(
+      self
+        .navigate_all_compact(dot_path)
+        .iter()
+        .filter(|node| self.evaluate_condition_on_node(node, condition))
+        .map(node_to_yaml_value)
+        .collect(),
+    )
+  }
+
+  pub fn filter_with_selectors(&self, dot_path: &str, condition: &str) -> Result<Vec<(yaml_serde::Value, String, usize)>, YerbaError> {
+    validate_item_condition(condition)?;
+
     let source = self.source_text();
 
-    self
-      .navigate_all_compact(dot_path)
-      .iter()
-      .filter(|node| self.evaluate_condition_on_node(node, condition))
-      .map(|node| {
-        let offset: usize = node.text_range().start().into();
-        let line = line_at(&source, offset);
+    Ok(
+      self
+        .navigate_all_compact(dot_path)
+        .iter()
+        .filter(|node| self.evaluate_condition_on_node(node, condition))
+        .map(|node| {
+          let offset: usize = node.text_range().start().into();
+          let line = line_at(&source, offset);
 
-        (node_to_yaml_value(node), super::get::node_selector(node), line)
-      })
-      .collect()
+          (node_to_yaml_value(node), super::get::node_selector(node), line)
+        })
+        .collect(),
+    )
   }
 
   pub(super) fn evaluate_condition_on_node(&self, node: &SyntaxNode, condition: &str) -> bool {
@@ -84,31 +138,32 @@ impl Document {
     }
   }
 
-  pub fn evaluate_condition(&self, parent_path: &str, condition: &str) -> bool {
+  pub fn evaluate_condition(&self, parent_path: &str, condition: &str) -> Result<bool, YerbaError> {
+    if parent_path.is_empty() {
+      validate_condition(condition)?;
+    } else {
+      validate_item_condition(condition)?;
+    }
+
     let condition = condition.trim();
 
     let (left, operator, right) = match parse_condition(condition) {
       Some(parts) => parts,
-      None => return false,
+      None => return Ok(false),
     };
 
     let path = crate::selector::Selector::parse(&left);
+    let path_string = path.to_selector_string();
 
-    let full_path = if path.is_relative() {
-      let path_string = path.to_selector_string();
-
-      if parent_path.is_empty() {
-        path_string
-      } else {
-        format!("{}.{}", parent_path, path_string)
-      }
+    let full_path = if parent_path.is_empty() {
+      path_string
     } else {
-      path.to_selector_string()
+      format!("{}.{}", parent_path, path_string)
     };
 
     let has_brackets = crate::selector::Selector::parse(&full_path).has_brackets();
 
-    match operator {
+    let result = match operator {
       "==" => {
         if has_brackets {
           self.get_all(&full_path).iter().any(|value| value == &right)
@@ -150,6 +205,8 @@ impl Document {
         }
       }
       _ => false,
-    }
+    };
+
+    Ok(result)
   }
 }

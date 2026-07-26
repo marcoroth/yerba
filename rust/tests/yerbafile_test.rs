@@ -1675,3 +1675,118 @@ fn test_final_newline_count_zero() {
   assert!(changed);
   assert_eq!(document.to_string(), "name: Alice");
 }
+
+#[test]
+fn test_load_rejects_an_unparseable_condition() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - delete:
+              path: "[].website"
+              condition: '.website = ""'
+  "#},
+  )
+  .unwrap();
+
+  let error = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap_err();
+
+  assert!(error.to_string().contains("invalid condition"), "{}", error);
+}
+
+#[test]
+fn test_load_rejects_a_condition_without_an_operator() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - set:
+              path: "name"
+              value: "x"
+              condition: 'nonsense'
+  "#},
+  )
+  .unwrap();
+
+  assert!(yerba::Yerbafile::load(dir.path().join("Yerbafile")).is_err());
+}
+
+#[test]
+fn test_load_rejects_a_malformed_condition_in_the_global_pipeline() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    files: "**/*.yml"
+    pipeline:
+      - remove:
+          path: "tags"
+          value: "old"
+          condition: '.tags = old'
+  "#},
+  )
+  .unwrap();
+
+  assert!(yerba::Yerbafile::load(dir.path().join("Yerbafile")).is_err());
+}
+
+#[test]
+fn test_load_accepts_valid_conditions() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - delete:
+              path: "[].website"
+              condition: '.website == ""'
+          - rename:
+              from: "old"
+              to: "new"
+              condition: '.kind == keynote'
+  "#},
+  )
+  .unwrap();
+
+  assert!(yerba::Yerbafile::load(dir.path().join("Yerbafile")).is_ok());
+}
+
+#[test]
+fn test_apply_refuses_an_absolute_condition_under_a_parent_instead_of_deleting_everything() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - delete:
+              path: "[].website"
+              condition: 'website == ""'
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {r#"
+    - name: "empty"
+      website: ""
+    - name: "real"
+      website: "https://real.com"
+  "#})
+  .unwrap();
+
+  let error = yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap_err();
+
+  assert!(error.to_string().contains("must be relative"), "{}", error);
+  assert!(document.to_string().contains("https://real.com"));
+}

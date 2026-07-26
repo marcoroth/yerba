@@ -293,15 +293,15 @@ impl Document {
     }
   }
 
-  pub fn find_items(&self, dot_path: &str, condition: Option<&str>, select: Option<&str>) -> Vec<serde_json::Value> {
+  pub fn find_items(&self, dot_path: &str, condition: Option<&str>, select: Option<&str>) -> Result<Vec<serde_json::Value>, YerbaError> {
     let values = match condition {
-      Some(cond) => self.filter(dot_path, cond),
+      Some(cond) => self.filter(dot_path, cond)?,
       None => self.get_values(dot_path),
     };
 
     let select_fields: Option<Vec<&str>> = select.map(|s| s.split(',').collect());
 
-    values
+    let items = values
       .iter()
       .map(|value| match &select_fields {
         Some(fields) => {
@@ -317,7 +317,9 @@ impl Document {
         }
         None => crate::json::yaml_to_json(value),
       })
-      .collect()
+      .collect();
+
+    Ok(items)
   }
 
   pub fn get_value(&self, dot_path: &str) -> Option<yaml_serde::Value> {

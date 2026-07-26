@@ -42,6 +42,16 @@ impl Args {
   pub fn run(self) {
     let parent_path = self.selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
+    if let Some(condition) = &self.condition {
+      if let Err(error) = yerba::validate_condition(condition) {
+        use super::color::*;
+
+        eprintln!("{RED}Error:{RESET} {}", error);
+
+        std::process::exit(1);
+      }
+    }
+
     for resolved_file in resolve_files(&self.file) {
       let mut document = parse_file(&resolved_file);
 
@@ -50,7 +60,7 @@ impl Args {
       } else if self.if_missing {
         !document.exists(&self.selector)
       } else if let Some(condition) = &self.condition {
-        document.evaluate_condition(parent_path, condition)
+        document.evaluate_condition(parent_path, condition).unwrap_or(false)
       } else {
         true
       };

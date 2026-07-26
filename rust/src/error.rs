@@ -4,6 +4,7 @@ pub enum YerbaError {
   IoError(std::io::Error),
   SelectorNotFound(String),
   AmbiguousSelector(String, usize),
+  InvalidCondition(String, String),
   NotASequence(String),
   IndexOutOfBounds(usize, usize),
   UnknownKeys(Vec<String>),
@@ -31,6 +32,10 @@ impl std::fmt::Display for YerbaError {
           "selector \"{}\" matched {} nodes (expected 1). Use --all to update all matches",
           selector, count
         )
+      }
+
+      YerbaError::InvalidCondition(condition, reason) => {
+        write!(f, "invalid condition \"{}\": {}", condition, reason)
       }
 
       YerbaError::DuplicateKey {

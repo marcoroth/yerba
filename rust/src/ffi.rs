@@ -428,11 +428,32 @@ pub unsafe extern "C" fn yerba_document_set_sequence_indent(document: *mut Docum
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_validate_condition(condition: *const c_char, item_context: bool) -> *mut c_char {
+  if condition.is_null() {
+    return ptr::null_mut();
+  }
+
+  let cond = CStr::from_ptr(condition).to_str().unwrap_or("");
+
+  let result = if item_context {
+    crate::validate_item_condition(cond)
+  } else {
+    crate::validate_condition(cond)
+  };
+
+  match result {
+    Ok(()) => ptr::null_mut(),
+    Err(error) => CString::new(error.to_string()).unwrap_or_default().into_raw(),
+  }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_evaluate_condition(document: *const Document, parent_path: *const c_char, condition: *const c_char) -> bool {
   let document = &*document;
   let parent = CStr::from_ptr(parent_path).to_str().unwrap_or("");
   let cond = CStr::from_ptr(condition).to_str().unwrap_or("");
-  document.evaluate_condition(parent, cond)
+
+  document.evaluate_condition(parent, cond).unwrap_or(false)
 }
 
 #[no_mangle]
@@ -458,7 +479,7 @@ pub unsafe extern "C" fn yerba_document_find(document: *const Document, path: *c
 
   let select_string = if select.is_null() { None } else { CStr::from_ptr(select).to_str().ok() };
 
-  let results = document.find_items(selector_string, condition_string, select_string);
+  let results = document.find_items(selector_string, condition_string, select_string).unwrap_or_default();
   let json = serde_json::to_string_pretty(&results).unwrap_or_else(|_| "[]".to_string());
 
   CString::new(json).unwrap_or_default().into_raw()
@@ -926,7 +947,7 @@ pub unsafe extern "C" fn yerba_glob_find(glob_pattern: *const c_char, path: *con
   let condition_string = if condition.is_null() { None } else { CStr::from_ptr(condition).to_str().ok() };
   let select_string = if select.is_null() { None } else { CStr::from_ptr(select).to_str().ok() };
 
-  let all_results = crate::glob_find(pattern, selector_string, condition_string, select_string);
+  let all_results = crate::glob_find(pattern, selector_string, condition_string, select_string).unwrap_or_default();
   let length = all_results.len();
   let json = serde_json::to_string_pretty(&all_results).unwrap_or_else(|_| "[]".to_string());
 

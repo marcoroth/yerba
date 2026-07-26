@@ -1,4 +1,5 @@
 mod condition;
+pub use condition::{validate_condition, validate_item_condition};
 mod delete;
 mod get;
 mod insert;

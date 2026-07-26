@@ -20,6 +20,7 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
       key.nested           Nested key path       "database.settings.pool"
       []                   All items in array    "[].title"
       [N]                  Item at index         "[0].title"
+      *                    All values in a map   "database.*"
       [].key[].nested      Nested array access   "[].speakers[].name"
 
     Conditions:

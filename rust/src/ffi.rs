@@ -331,6 +331,17 @@ pub unsafe extern "C" fn yerba_document_resolve_selectors(document: *const Docum
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_keys(document: *const Document, path: *const c_char) -> *mut c_char {
+  let document = &*document;
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  let keys = document.keys_at(selector_string);
+  let json_string = serde_json::to_string(&keys).unwrap_or_else(|_| "[]".to_string());
+
+  CString::new(json_string).unwrap_or_default().into_raw()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_get_quote_style(document: *const Document, path: *const c_char) -> *mut c_char {
   let document = &*document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");

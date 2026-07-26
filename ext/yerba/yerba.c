@@ -256,8 +256,7 @@ static VALUE document_bracket(VALUE self, VALUE path) {
 
   const char *selector = StringValueCStr(path);
 
-  /* Wildcard: resolve to concrete selectors and return array of nodes */
-  if (strstr(selector, "[]") != NULL) {
+  if (strstr(selector, "[]") != NULL || strchr(selector, '*') != NULL) {
     char *json = yerba_document_resolve_selectors(document, selector);
 
     if (!json) return rb_ary_new();
@@ -329,6 +328,19 @@ static VALUE document_get_value(VALUE self, VALUE path) {
 static VALUE document_selectors(VALUE self) {
   struct Document *document = get_document(self);
   char *json = yerba_document_selectors(document);
+
+  if (!json) return rb_ary_new();
+
+  VALUE json_string = make_utf8_string(json);
+  yerba_string_free(json);
+
+  return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+}
+
+/* document.keys_at(selector) → ["host", "port", ...] */
+static VALUE document_keys_at(VALUE self, VALUE path) {
+  struct Document *document = get_document(self);
+  char *json = yerba_document_keys(document, StringValueCStr(path));
 
   if (!json) return rb_ary_new();
 
@@ -1110,6 +1122,7 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "location", document_location, -1);
   rb_define_method(rb_cDocument, "locations", document_locations, 1);
   rb_define_method(rb_cDocument, "selectors", document_selectors, 0);
+  rb_define_method(rb_cDocument, "keys_at", document_keys_at, 1);
   rb_define_method(rb_cDocument, "resolve_selectors", document_resolve_selectors, 1);
   rb_define_method(rb_cDocument, "get_quote_style", document_get_quote_style, 1);
   rb_define_method(rb_cDocument, "set_quote_style", document_set_quote_style, 2);

@@ -334,3 +334,60 @@ fn test_resolve_relative_empty_base() {
 
   assert_eq!(resolved.to_selector_string(), "title");
 }
+
+#[test]
+fn test_parse_all_keys() {
+  let path = Selector::parse("*");
+
+  assert_eq!(path, Selector::Absolute(vec![SelectorSegment::AllKeys]));
+  assert!(path.has_wildcard());
+}
+
+#[test]
+fn test_parse_nested_all_keys() {
+  let path = Selector::parse("venue.*");
+
+  assert_eq!(
+    path,
+    Selector::Absolute(vec![SelectorSegment::Key("venue".to_string()), SelectorSegment::AllKeys])
+  );
+}
+
+#[test]
+fn test_parse_all_keys_after_all_items() {
+  let path = Selector::parse("[].*");
+
+  assert_eq!(path, Selector::Absolute(vec![SelectorSegment::AllItems, SelectorSegment::AllKeys]));
+}
+
+#[test]
+fn test_parse_key_after_all_keys() {
+  let path = Selector::parse("*.city");
+
+  assert_eq!(
+    path,
+    Selector::Absolute(vec![SelectorSegment::AllKeys, SelectorSegment::Key("city".to_string())])
+  );
+}
+
+#[test]
+fn test_all_keys_round_trips_to_selector_string() {
+  for input in ["*", "venue.*", "[].*", "*.city", "[0].venue.*"] {
+    assert_eq!(Selector::parse(input).to_selector_string(), input);
+  }
+}
+
+#[test]
+fn test_all_keys_counts_as_a_wildcard() {
+  assert!(Selector::parse("venue.*").has_wildcard());
+  assert!(Selector::parse("[].title").has_wildcard());
+  assert!(!Selector::parse("venue.city").has_wildcard());
+}
+
+#[test]
+fn test_all_keys_is_not_a_bracket() {
+  let path = Selector::parse("venue.*");
+
+  assert!(!path.has_brackets());
+  assert!(!path.ends_with_bracket());
+}

@@ -337,7 +337,9 @@ pub fn detect_yaml_type_from_plain(value: &str) -> YerbaValueType {
     return YerbaValueType::Null;
   }
 
-  // Boolean (YAML 1.2 + 1.1)
+  // Boolean, resolved the way libyaml/Psych resolve it: the YAML 1.1 bool set
+  // without the single-letter y/Y/n/N forms (which libyaml treats as strings),
+  // and broader than YAML 1.2 core schema (which only accepts true/false).
   if matches!(
     value,
     "true" | "True" | "TRUE" | "false" | "False" | "FALSE" | "yes" | "Yes" | "YES" | "no" | "No" | "NO" | "on" | "On" | "ON" | "off" | "Off" | "OFF"

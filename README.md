@@ -47,7 +47,7 @@ Use `yerba` as a library in your Rust project:
 
 ```toml
 [dependencies]
-yerba = "0.7"
+yerba = "0.8"
 ```
 
 ```rust
@@ -99,9 +99,7 @@ Selectors let you address any node in a YAML document:
 | `*`               | All values in a map | `"database.*"`             |
 | `[].key[].nested` | Nested array access | `"[].speakers[].name"`     |
 
-`[]` and `*` are the same idea applied to the two collection types: `[]` matches
-every item of a sequence, `*` matches every value of a map. Both can be combined
-with the other patterns, as in `"[].*"` or `"*.city"`.
+`[]` and `*` are the same idea applied to the two collection types: `[]` matches every item of a sequence, `*` matches every value of a map. Both can be combined with the other patterns, as in `"[].*"` or `"*.city"`.
 
 ### Conditions
 
@@ -113,6 +111,8 @@ Conditions filter which items a command operates on:
 | `.key != value`         | Inequality          | `".status != draft"`         |
 | `.key contains val`     | Substring or member | `".title contains Ruby"`     |
 | `.key not_contains val` | Negated contains    | `".title not_contains test"` |
+
+The selector is relative to each item and starts with `.`. A condition that is malformed, or that uses an absolute selector where each item is tested, is rejected rather than matching nothing, so a typo is an error instead of a command that quietly does nothing.
 
 ---
 
@@ -704,6 +704,12 @@ Set all matching nodes at once with `all: true`:
 
 ```ruby
 document.set("[].description", "", all: true)
+```
+
+Setting a scalar over a key whose value is a collection replaces the collection:
+
+```ruby
+document.root["venue"] = "none"  # => venue: none
 ```
 
 Insert new keys with positional control:

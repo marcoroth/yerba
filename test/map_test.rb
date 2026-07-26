@@ -46,6 +46,70 @@ class MapTest < Minitest::Spec
     assert_equal ["host", "port"], document["database"].keys
   end
 
+  test "map.keys returns the root map's own keys" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Conf
+      year: 2024
+      database:
+        host: localhost
+    YAML
+
+    assert_equal ["name", "year", "database"], document.root.keys
+  end
+
+  test "map.keys is not confused by a nested sequence of maps" do
+    document = Yerba::Document.parse(<<~YAML)
+      id: "aloha"
+      name: "Aloha"
+      channels:
+        - id: "UC123"
+          handle: "@confreaks"
+    YAML
+
+    assert_equal ["id", "name", "channels"], document.root.keys
+  end
+
+  test "map.each yields every key and its value node" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Conf
+      venue:
+        city: Berlin
+      tags:
+        - ruby
+    YAML
+
+    pairs = document.root.each.to_a
+
+    assert_equal ["name", "venue", "tags"], pairs.map(&:first)
+    assert_equal([Yerba::Scalar, Yerba::Map, Yerba::Sequence], pairs.map { |_key, value| value.class })
+    assert_equal "Berlin", pairs[1].last["city"].value
+  end
+
+  test "map.each yields values matching the ones indexing returns" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Conf
+      venue:
+        city: Berlin
+    YAML
+
+    map = document.root
+
+    assert_equal(map.keys.map { |key| map[key].location&.start_line },
+                 map.each.to_a.map { |_key, value| value.location&.start_line })
+  end
+
+  test "map.each yields values that can still be written to" do
+    document = Yerba::Document.parse(<<~YAML)
+      venue:
+        city: Berlin
+    YAML
+
+    _key, venue = document.root.each.to_a.first
+    venue["city"] = "Hamburg"
+
+    assert_equal "Hamburg", document.value_at("venue.city")
+  end
+
   test "map inspect shows keys and values" do
     document = Yerba::Document.parse(<<~YAML)
       database:

@@ -830,12 +830,7 @@ pub unsafe extern "C" fn yerba_get_result_free(result: YerbaGetResult) {
   }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *const c_char) -> YerbaTypedList {
-  let pattern = CStr::from_ptr(glob_pattern).to_str().unwrap_or("");
-  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
-  let nodes = crate::glob_get(pattern, selector_string);
-
+fn located_nodes_to_list(nodes: &[crate::LocatedNode]) -> YerbaTypedList {
   let results: Vec<serde_json::Value> = nodes
     .iter()
     .map(|node| {
@@ -865,6 +860,18 @@ pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *cons
         value["type"] = serde_json::json!(vt as u8);
       }
 
+      if let Some(key_name) = &node.key_name {
+        value["key_name"] = serde_json::json!(key_name);
+        value["key_location"] = serde_json::json!({
+          "start_line": node.key_location.start_line,
+          "start_column": node.key_location.start_column,
+          "end_line": node.key_location.end_line,
+          "end_column": node.key_location.end_column,
+          "start_offset": node.key_location.start_offset,
+          "end_offset": node.key_location.end_offset,
+        });
+      }
+
       value
     })
     .collect();
@@ -876,6 +883,22 @@ pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *cons
     json: CString::new(json).unwrap_or_default().into_raw(),
     length,
   }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *const c_char) -> YerbaTypedList {
+  let pattern = CStr::from_ptr(glob_pattern).to_str().unwrap_or("");
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  located_nodes_to_list(&crate::glob_get(pattern, selector_string))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_document_get_all(document: *const Document, path: *const c_char) -> YerbaTypedList {
+  let document = &*document;
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+
+  located_nodes_to_list(&document.get_all_located(selector_string))
 }
 
 #[no_mangle]

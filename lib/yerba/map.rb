@@ -77,24 +77,35 @@ module Yerba
     end
 
     def keys
-      if connected?
-        results = document.find(@selector)
-        return [] unless results.is_a?(Array) && results.first.is_a?(Hash)
+      return @data.keys unless connected?
 
-        results.first.keys
-      else
-        @data.keys
-      end
+      value = document&.value_at(@selector)
+      return value.keys if value.is_a?(Hash)
+
+      results = document&.find(@selector)
+      return [] unless results.is_a?(Array) && results.first.is_a?(Hash)
+
+      results.first.keys
     end
 
     def each(&)
       return enum_for(:each) unless block_given?
 
-      if connected?
-        keys.each { |key| yield key, self[key] }
-      else
+      unless connected?
         @data.each(&)
+        return self
       end
+
+      names = keys
+      values = document&.get_all(@selector.empty? ? "*" : "#{@selector}.*") || []
+
+      if values.length == names.length
+        names.each_with_index { |key, index| yield key, values[index] }
+      else
+        names.each { |key| yield key, self[key] }
+      end
+
+      self
     end
 
     def fetch(key)

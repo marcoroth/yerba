@@ -36,10 +36,10 @@ module Yerba
         instance
       end
 
-      def from(file_path:, selector:, line: nil, location: nil, **attributes)
+      def from(selector:, file_path: nil, line: nil, location: nil, document: nil, key: nil, **attributes)
         instance = allocate
 
-        instance.send(:init_node, nil, selector, coerce_location(location), nil, file_path, line)
+        instance.send(:init_node, document, selector, coerce_location(location), key, file_path, line)
         instance.send(:init_from, **attributes) if instance.respond_to?(:init_from, true)
 
         instance

@@ -93,6 +93,15 @@ class DocumentTest < Minitest::Spec
     assert_equal false, document.value_at("debug")
   end
 
+  test "get returns strings for plain y and n" do
+    document = Yerba::Document.parse("yes_lower: y\nyes_upper: Y\nno_lower: n\nno_upper: N\n")
+
+    assert_equal "y", document.value_at("yes_lower")
+    assert_equal "Y", document.value_at("yes_upper")
+    assert_equal "n", document.value_at("no_lower")
+    assert_equal "N", document.value_at("no_upper")
+  end
+
   test "get returns nil for plain null" do
     document = Yerba::Document.parse(<<~YAML)
       timeout: null

@@ -328,7 +328,7 @@ pub fn is_yaml_non_string(value: &str) -> bool {
 }
 
 pub fn is_yaml_truthy(value: &str) -> bool {
-  matches!(value, "true" | "True" | "TRUE" | "yes" | "Yes" | "YES" | "on" | "On" | "ON" | "y" | "Y")
+  matches!(value, "true" | "True" | "TRUE" | "yes" | "Yes" | "YES" | "on" | "On" | "ON")
 }
 
 pub fn detect_yaml_type_from_plain(value: &str) -> YerbaValueType {
@@ -340,28 +340,7 @@ pub fn detect_yaml_type_from_plain(value: &str) -> YerbaValueType {
   // Boolean (YAML 1.2 + 1.1)
   if matches!(
     value,
-    "true"
-      | "True"
-      | "TRUE"
-      | "false"
-      | "False"
-      | "FALSE"
-      | "yes"
-      | "Yes"
-      | "YES"
-      | "no"
-      | "No"
-      | "NO"
-      | "on"
-      | "On"
-      | "ON"
-      | "off"
-      | "Off"
-      | "OFF"
-      | "y"
-      | "Y"
-      | "n"
-      | "N"
+    "true" | "True" | "TRUE" | "false" | "False" | "FALSE" | "yes" | "Yes" | "YES" | "no" | "No" | "NO" | "on" | "On" | "ON" | "off" | "Off" | "OFF"
   ) {
     return YerbaValueType::Boolean;
   }

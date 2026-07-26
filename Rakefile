@@ -37,6 +37,15 @@ begin
     ext.cross_platform = PLATFORMS
   end
 
+  desc "Build the Rust library for the native platform"
+  task :cargo do
+    sh "cargo build --release"
+
+    FileUtils.rm_f(Dir.glob("tmp/*/yerba/*/yerba.{bundle,so}"))
+  end
+
+  Rake::Task["compile"].prerequisites.unshift("cargo")
+
   namespace "gem" do
     task "prepare" do
       require "rake_compiler_dock"

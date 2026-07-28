@@ -89,6 +89,18 @@ impl Document {
       }
 
       crate::selector::SelectorSegment::Index(index) => self.remove_at(&parent_path, *index),
+      crate::selector::SelectorSegment::IndexFromEnd(_) => {
+        let parent_node = self.navigate(&parent_path)?;
+        let length = find_block_sequence(&parent_node)
+          .map(|sequence| sequence.entries().count())
+          .or_else(|| find_flow_sequence(&parent_node).map(|sequence| flow_sequence_entries(&sequence).len()))
+          .ok_or_else(|| YerbaError::NotASequence(parent_path.clone()))?;
+        let index = last_segment
+          .sequence_index(length)
+          .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+
+        self.remove_at(&parent_path, index)
+      }
       crate::selector::SelectorSegment::AllItems | crate::selector::SelectorSegment::AllKeys => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
     }
   }

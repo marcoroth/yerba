@@ -27,6 +27,7 @@ serde = { version = "1", features = ["derive"] }
 yaml_serde = "0.10"
 serde_json = { version = "1", features = ["preserve_order"] }
 clap = { version = "4", features = ["derive"] }
+anstyle-query = "1"
 indoc = "2"
 rayon = "1"
 jsonschema = "0.29"

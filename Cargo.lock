@@ -1774,6 +1774,7 @@ dependencies = [
 name = "yerba"
 version = "0.8.0"
 dependencies = [
+ "anstyle-query",
  "cbindgen",
  "clap",
  "glob",

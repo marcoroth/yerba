@@ -18,6 +18,7 @@ pub mod selectors;
 pub mod set;
 pub mod sort;
 pub mod sort_keys;
+pub mod ui;
 pub mod unique;
 pub mod version;
 
@@ -28,6 +29,10 @@ use clap::Subcommand;
 
 pub(crate) fn is_github_actions() -> bool {
   std::env::var("GITHUB_ACTIONS").is_ok()
+}
+
+pub(crate) fn pluralize(count: usize, singular: &str, plural: &str) -> String {
+  format!("{} {}", count, if count == 1 { singular } else { plural })
 }
 
 pub(crate) mod color {
@@ -204,25 +209,43 @@ impl Command {
 }
 
 pub(crate) fn run_yerbafile(write: bool, files: Vec<String>) {
-  use color::*;
-
   let yerbafile_path = yerba::Yerbafile::find().unwrap_or_else(|| {
-    eprintln!("{RED}No Yerbafile found.{RESET} Run {BOLD}yerba init{RESET} to create one.");
+    eprintln!(
+      "{} No Yerbafile found. Run {} to create one.",
+      ui::failure(ui::glyph::FAIL),
+      ui::strong("yerba init")
+    );
     process::exit(1);
   });
 
   let yerbafile = yerba::Yerbafile::load(&yerbafile_path).unwrap_or_else(|error| {
-    eprintln!("{RED}Error loading {}:{RESET} {}", yerbafile_path.display(), error);
+    eprintln!(
+      "{} {}",
+      ui::failure(ui::glyph::FAIL),
+      ui::strong(format!("Could not read {}", yerbafile_path.display()))
+    );
+    eprintln!("  {}", error);
     process::exit(1);
   });
 
-  eprintln!("🧉 {BOLD}Using{RESET} {}", yerbafile_path.display());
+  eprintln!("{}", ui::banner());
+
+  eprintln!(
+    "{}{} {}\n",
+    ui::INDENT,
+    ui::strong("Using Yerbafile rules"),
+    ui::subtle(format!("(from {})", yerbafile_path.display()))
+  );
+
+  let started = std::time::Instant::now();
 
   let results = if files.is_empty() {
     yerbafile.apply(write)
   } else {
     files.iter().flat_map(|file| yerbafile.apply_file(file, write)).collect()
   };
+
+  let elapsed = started.elapsed();
 
   let mut has_changes = false;
   let mut has_errors = false;
@@ -231,7 +254,8 @@ pub(crate) fn run_yerbafile(write: bool, files: Vec<String>) {
 
   for result in &results {
     if let Some(error) = &result.error {
-      eprintln!("  {RED}error:{RESET} {} {DIM}—{RESET} {}", result.file, error);
+      eprintln!("  {} {}", ui::failure(ui::glyph::FAIL), ui::strong(&result.file));
+      eprintln!("    {}", ui::muted(error));
 
       if github {
         use yerba::error::GitHubAnnotations;
@@ -244,12 +268,15 @@ pub(crate) fn run_yerbafile(write: bool, files: Vec<String>) {
       has_errors = true;
     } else if result.changed {
       if write {
-        eprintln!("  {GREEN}updated:{RESET} {}", result.file);
+        eprintln!("  {} {}", ui::success(ui::glyph::OK), result.file);
       } else {
-        eprintln!("  {YELLOW}would change:{RESET} {}", result.file);
+        eprintln!("  {} {}", ui::pending(ui::glyph::PENDING), result.file);
 
         if github {
-          eprintln!("::error file={}::File does not match Yerbafile rules", result.file);
+          eprintln!(
+            "::error file={}::File does not match Yerbafile rules. Run `yerba apply` to update it.",
+            result.file
+          );
         }
       }
 
@@ -257,16 +284,67 @@ pub(crate) fn run_yerbafile(write: bool, files: Vec<String>) {
     }
   }
 
-  if !has_changes && !has_errors {
-    eprintln!("\n{BOLD}{GREEN}All files match the rules.{RESET}");
+  let changed = results.iter().filter(|result| result.error.is_none() && result.changed).count();
+  let seen: std::collections::HashSet<&String> = results.iter().map(|result| &result.file).collect();
+  let rules = yerbafile.rules.len() + usize::from(!yerbafile.pipeline.is_empty());
+  let steps = yerbafile.pipeline.len() + yerbafile.rules.iter().map(|rule| rule.pipeline.len()).sum::<usize>();
+
+  if seen.is_empty() {
+    eprintln!(
+      "{} {} {}",
+      ui::pending(ui::glyph::PENDING),
+      ui::pending("No files matched."),
+      ui::subtle("Check the `files:` patterns in your Yerbafile.")
+    );
+  } else if !has_changes && !has_errors {
+    eprintln!("{} {}", ui::success(ui::glyph::OK), ui::success("Everything's up to date."));
+  }
+
+  if write && has_changes {
+    eprintln!(
+      "\n{} {}",
+      ui::success(ui::glyph::OK),
+      ui::success(format!("Freshly brewed {}.", pluralize(changed, "file", "files")))
+    );
   }
 
   if !write && has_changes {
-    process::exit(1);
+    let command = if files.is_empty() {
+      "yerba apply".to_string()
+    } else {
+      format!("yerba apply {}", files.join(" "))
+    };
+
+    eprintln!(
+      "\n{} {} {}",
+      ui::pending(ui::glyph::PENDING),
+      ui::pending(format!("{} out of date.", pluralize(changed, "file", "files"))),
+      ui::subtle(format!("Run {} to update {}.", command, if changed == 1 { "it" } else { "them" }))
+    );
   }
 
-  if has_errors {
+  eprintln!(
+    "{}{}",
+    ui::STATUS_INDENT,
+    ui::subtle(format!(
+      "{} · {} · {} · {}",
+      pluralize(seen.len(), "file", "files"),
+      pluralize(rules, "rule", "rules"),
+      pluralize(steps, "step", "steps"),
+      format_duration(elapsed)
+    ))
+  );
+
+  if has_errors || (!write && has_changes) {
     process::exit(1);
+  }
+}
+
+fn format_duration(elapsed: std::time::Duration) -> String {
+  if elapsed.as_secs() == 0 {
+    format!("{}ms", elapsed.as_millis())
+  } else {
+    format!("{:.1}s", elapsed.as_secs_f64())
   }
 }
 

@@ -182,8 +182,127 @@ pub fn format_scalar_value(value: &str, kind: SyntaxKind) -> String {
   }
 }
 
+const LEADING_INDICATORS: [char; 16] = ['#', '&', '*', '!', '|', '>', '\'', '"', '%', '@', '`', ',', '[', ']', '{', '}'];
+const FLOW_INDICATORS: [char; 5] = [',', '[', ']', '{', '}'];
+
+pub fn is_plain_safe(value: &str) -> bool {
+  if value.is_empty() || value != value.trim() {
+    return false;
+  }
+
+  if value.contains('\n') || value.contains('\t') {
+    return false;
+  }
+
+  if value.contains(": ") || value.ends_with(':') {
+    return false;
+  }
+
+  if value.contains(" #") {
+    return false;
+  }
+
+  if value.starts_with("---") || value.starts_with("...") {
+    return false;
+  }
+
+  let mut characters = value.chars();
+  let first = characters.next().expect("value is non-empty");
+
+  if LEADING_INDICATORS.contains(&first) {
+    return false;
+  }
+
+  if matches!(first, '-' | '?' | ':') {
+    return matches!(characters.next(), Some(next) if next != ' ');
+  }
+
+  true
+}
+
+pub fn is_plain_safe_in_flow(value: &str) -> bool {
+  is_plain_safe(value) && !value.contains(FLOW_INDICATORS)
+}
+
+pub fn is_quoted_scalar(value: &str) -> bool {
+  let bytes = value.as_bytes();
+
+  if bytes.len() < 2 {
+    return false;
+  }
+
+  match (bytes[0], bytes[bytes.len() - 1]) {
+    (b'"', b'"') => {
+      let interior = &value[1..value.len() - 1];
+      let mut escaped = false;
+
+      for character in interior.chars() {
+        if escaped {
+          escaped = false;
+          continue;
+        }
+
+        match character {
+          '\\' => escaped = true,
+          '"' => return false,
+          _ => {}
+        }
+      }
+
+      !escaped
+    }
+
+    (b'\'', b'\'') => {
+      let interior = &value[1..value.len() - 1];
+      let mut characters = interior.chars().peekable();
+
+      while let Some(character) = characters.next() {
+        if character == '\'' {
+          if characters.peek() == Some(&'\'') {
+            characters.next();
+          } else {
+            return false;
+          }
+        }
+      }
+
+      true
+    }
+
+    _ => false,
+  }
+}
+
+pub fn is_flow_collection(value: &str) -> bool {
+  (value.starts_with('[') && value.ends_with(']')) || (value.starts_with('{') && value.ends_with('}'))
+}
+
+pub fn is_raw_yaml_text(value: &str) -> bool {
+  value.contains('\n') || value.starts_with("- ") || is_quoted_scalar(value) || is_flow_collection(value)
+}
+
+pub fn is_valid_inline_value(value: &str) -> bool {
+  if value.is_empty() {
+    return true;
+  }
+
+  is_raw_yaml_text(value) || is_plain_safe(value)
+}
+
+pub fn needs_quoting(value: &str) -> bool {
+  is_yaml_non_string(value) || !is_plain_safe(value)
+}
+
+pub fn needs_quoting_in_flow(value: &str) -> bool {
+  is_yaml_non_string(value) || !is_plain_safe_in_flow(value)
+}
+
 pub fn quote_if_needed(value: &str) -> String {
-  if is_yaml_non_string(value) {
+  if is_raw_yaml_text(value) {
+    return value.to_string();
+  }
+
+  if needs_quoting(value) {
     format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR)
   } else {
     value.to_string()

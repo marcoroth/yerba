@@ -28,6 +28,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
 pub struct Args {
   file: String,
   selector: String,
+  #[arg(allow_hyphen_values = true)]
   value: Option<String>,
   #[arg(long, help = "Read value from a file (use - for stdin)")]
   from: Option<String>,

@@ -69,8 +69,8 @@ pub fn yaml_value_to_flow_text(value: &yaml_serde::Value) -> String {
     yaml_serde::Value::Number(number) => number.to_string(),
 
     yaml_serde::Value::String(string) => {
-      if crate::syntax::is_yaml_non_string(string) {
-        format!("\"{}\"", string.replace('"', "\\\""))
+      if crate::syntax::needs_quoting_in_flow(string) {
+        crate::syntax::format_scalar_value(string, yaml_parser::SyntaxKind::DOUBLE_QUOTED_SCALAR)
       } else {
         string.clone()
       }
@@ -162,8 +162,8 @@ fn format_yaml_scalar(value: &Value, quote_style: &QuoteStyle) -> String {
       }
 
       QuoteStyle::Plain => {
-        if crate::syntax::is_yaml_non_string(string) {
-          format!("\"{}\"", string.replace('"', "\\\""))
+        if crate::syntax::needs_quoting(string) {
+          crate::syntax::format_scalar_value(string, yaml_parser::SyntaxKind::DOUBLE_QUOTED_SCALAR)
         } else {
           string.clone()
         }

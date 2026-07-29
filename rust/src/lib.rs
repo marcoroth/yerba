@@ -17,7 +17,10 @@ pub use document::{
 pub use error::YerbaError;
 pub use quote_style::{KeyStyle, QuoteStyle};
 pub use selector::Selector;
-pub use syntax::{detect_yaml_type, ScalarValue, YerbaValueType};
+pub use syntax::{
+  detect_yaml_type, is_flow_collection, is_plain_safe, is_plain_safe_in_flow, is_quoted_scalar, is_raw_yaml_text, is_valid_inline_value, needs_quoting,
+  needs_quoting_in_flow, quote_if_needed, ScalarValue, YerbaValueType,
+};
 pub use yaml_writer::json_to_yaml_text;
 pub use yerbafile::Yerbafile;
 

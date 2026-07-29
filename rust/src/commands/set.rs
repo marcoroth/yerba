@@ -25,6 +25,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
 pub struct Args {
   file: String,
   selector: String,
+  #[arg(allow_hyphen_values = true)]
   value: String,
   #[arg(long)]
   if_exists: bool,

@@ -42,4 +42,5 @@ jsonschema = { version = "0.29", default-features = false, optional = true }
 cbindgen = "0.28"
 
 [dev-dependencies]
+indoc = "2"
 tempfile = "3"

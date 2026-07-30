@@ -11,8 +11,8 @@ mod schema;
 
 pub mod style;
 
-pub use unique::DuplicateInfo;
 pub use condition::{validate_condition, validate_item_condition};
+pub use unique::DuplicateInfo;
 
 use crate::syntax::YerbaValueType;
 

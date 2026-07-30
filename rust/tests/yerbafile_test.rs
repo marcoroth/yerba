@@ -1,3 +1,5 @@
+#![cfg(feature = "cli")]
+
 use indoc::indoc;
 use std::fs;
 use tempfile::TempDir;

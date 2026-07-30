@@ -1,14 +1,18 @@
 mod condition;
-pub use condition::{validate_condition, validate_item_condition};
 mod delete;
 mod get;
 mod insert;
-mod schema;
 mod set;
 mod sort;
-pub mod style;
 mod unique;
+
+#[cfg(feature = "schema")]
+mod schema;
+
+pub mod style;
+
 pub use unique::DuplicateInfo;
+pub use condition::{validate_condition, validate_item_condition};
 
 use crate::syntax::YerbaValueType;
 

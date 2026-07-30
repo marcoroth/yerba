@@ -746,6 +746,7 @@ pub unsafe extern "C" fn yerba_document_blank_lines(document: *mut Document, pat
 }
 
 /// Caller must free with yerba_string_free.
+#[cfg(feature = "schema")]
 #[no_mangle]
 pub unsafe extern "C" fn yerba_document_validate_schema(document: *const Document, schema_json: *const c_char, selector: *const c_char) -> *mut c_char {
   let document = &*document;
@@ -784,6 +785,7 @@ pub unsafe extern "C" fn yerba_document_validate_schema(document: *const Documen
 }
 
 /// Caller must free with yerba_string_free.
+#[cfg(feature = "cli")]
 #[no_mangle]
 pub unsafe extern "C" fn yerba_yerbafile_find(directory: *const c_char) -> *mut c_char {
   let start = if directory.is_null() {
@@ -803,6 +805,7 @@ pub unsafe extern "C" fn yerba_yerbafile_find(directory: *const c_char) -> *mut 
   }
 }
 
+#[cfg(feature = "cli")]
 #[no_mangle]
 pub unsafe extern "C" fn yerba_document_apply_yerbafile(document: *mut Document, file_path: *const c_char, yerbafile_path: *const c_char) -> YerbaResult {
   let document = &mut *document;
@@ -924,6 +927,7 @@ fn located_nodes_to_list(nodes: &[crate::LocatedNode]) -> YerbaTypedList {
   }
 }
 
+#[cfg(feature = "glob")]
 #[no_mangle]
 pub unsafe extern "C" fn yerba_glob_get(glob_pattern: *const c_char, path: *const c_char) -> YerbaTypedList {
   let pattern = CStr::from_ptr(glob_pattern).to_str().unwrap_or("");
@@ -940,6 +944,7 @@ pub unsafe extern "C" fn yerba_document_get_all(document: *const Document, path:
   located_nodes_to_list(&document.get_all_located(selector_string))
 }
 
+#[cfg(feature = "glob")]
 #[no_mangle]
 pub unsafe extern "C" fn yerba_glob_find(glob_pattern: *const c_char, path: *const c_char, condition: *const c_char, select: *const c_char) -> YerbaTypedList {
   let pattern = CStr::from_ptr(glob_pattern).to_str().unwrap_or("");

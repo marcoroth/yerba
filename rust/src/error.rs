@@ -10,6 +10,7 @@ pub enum YerbaError {
   IndexOutOfBounds(usize, usize),
   UnknownKeys(Vec<String>),
   DuplicateValues(Vec<crate::DuplicateInfo>),
+  #[cfg(feature = "schema")]
   SchemaValidation(Vec<crate::schema::ValidationError>),
   DuplicateKey {
     key: String,
@@ -78,6 +79,7 @@ impl std::fmt::Display for YerbaError {
         write!(f, "index {} out of bounds (length {})", index, length)
       }
 
+      #[cfg(feature = "schema")]
       YerbaError::SchemaValidation(errors) => {
         let details: Vec<String> = errors.iter().map(|error| error.to_string()).collect();
 
@@ -137,6 +139,7 @@ impl GitHubAnnotations for YerbaError {
         })
         .collect(),
 
+      #[cfg(feature = "schema")]
       YerbaError::SchemaValidation(errors) => errors
         .iter()
         .map(|error| GitHubAnnotation {

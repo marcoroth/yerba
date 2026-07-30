@@ -1,3 +1,5 @@
+#![cfg(feature = "schema")]
+
 use indoc::indoc;
 use std::fs;
 use tempfile::TempDir;

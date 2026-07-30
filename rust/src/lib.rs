@@ -4,10 +4,12 @@ pub mod error;
 pub mod ffi;
 pub mod json;
 mod quote_style;
+#[cfg(feature = "schema")]
 pub mod schema;
 pub mod selector;
 mod syntax;
 mod yaml_writer;
+#[cfg(feature = "cli")]
 pub mod yerbafile;
 
 pub use document::style::StyleEnforcement;
@@ -22,6 +24,7 @@ pub use syntax::{
   needs_quoting, needs_quoting_in_flow, quote_if_needed, ScalarValue, YerbaValueType,
 };
 pub use yaml_writer::json_to_yaml_text;
+#[cfg(feature = "cli")]
 pub use yerbafile::Yerbafile;
 
 pub fn version() -> &'static str {
@@ -36,6 +39,7 @@ pub fn parse_file(path: impl AsRef<std::path::Path>) -> Result<Document, YerbaEr
   Document::parse_file(path)
 }
 
+#[cfg(feature = "glob")]
 pub fn glob_get(pattern: &str, selector: &str) -> Vec<document::LocatedNode> {
   use rayon::prelude::*;
 
@@ -58,6 +62,7 @@ pub fn glob_get(pattern: &str, selector: &str) -> Vec<document::LocatedNode> {
     .collect()
 }
 
+#[cfg(feature = "glob")]
 pub fn glob_find(pattern: &str, selector: &str, condition: Option<&str>, select: Option<&str>) -> Result<Vec<serde_json::Value>, YerbaError> {
   use rayon::prelude::*;
 

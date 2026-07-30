@@ -69,6 +69,43 @@ jobs:
         run: cargo +stable package
         working-directory: rust
 
+  features:
+    name: Features
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - "--no-default-features"
+          - "--no-default-features --features glob"
+          - "--no-default-features --features schema"
+          - "--no-default-features --features cli"
+          - "--all-features"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Copy README for packaging
+        run: cp README.md rust/README.md
+
+      - name: Clippy
+        run: cargo clippy -p yerba ${{ matrix.features }} -- -D warnings
+
+      - name: Run tests
+        run: cargo test -p yerba ${{ matrix.features }}
+
       - name: Upload Rust artifacts
         if: github.event_name == 'release'
         uses: actions/upload-artifact@v7

@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use indoc::indoc;
 
 use super::colorize_examples;
-use super::{color, parse_file, resolve_files};
+use super::{parse_file, resolve_files, ui};
 
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
@@ -108,7 +108,7 @@ impl Args {
       if let Some(label) = info.count_label() {
         let padding = max_selector_len - selector.len() + 2;
 
-        println!("{}{}{}{}{}", selector, " ".repeat(padding), color::DIM, label, color::RESET);
+        println!("{}{}{}", selector, " ".repeat(padding), ui::subtle(label));
       } else {
         println!("{}", selector);
       }

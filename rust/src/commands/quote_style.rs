@@ -1,3 +1,4 @@
+use super::ui;
 use std::sync::LazyLock;
 
 use indoc::indoc;
@@ -38,8 +39,8 @@ pub struct Args {
 impl Args {
   pub fn run(self) {
     if self.values.is_none() && self.keys.is_none() {
-      use super::color::*;
-      eprintln!("{RED}Error:{RESET} specify --values, --keys, or both");
+      use super::ui;
+      eprintln!("{} specify --values, --keys, or both", ui::failure("Error:"));
       std::process::exit(1);
     }
 
@@ -55,9 +56,7 @@ impl Args {
       if let Some(style) = &self.values {
         if let Ok(warnings) = document.enforce_quotes_at(style, selector) {
           for warning in warnings {
-            use super::color::*;
-
-            eprintln!("{YELLOW}Warning:{RESET} {} — {}", resolved_file, warning);
+            eprintln!("{} {} — {}", ui::pending("Warning:"), resolved_file, warning);
           }
         }
       }

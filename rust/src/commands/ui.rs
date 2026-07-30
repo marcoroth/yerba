@@ -129,3 +129,39 @@ pub mod glyph {
   pub const PENDING: &str = "~";
   pub const FAIL: &str = "✗";
 }
+
+/// Bare sequences, still gated, for a block too densely styled to wrap each span
+/// in a call. Prefer the named styles above everywhere else.
+pub mod raw {
+  fn sequence(code: &'static str) -> &'static str {
+    if super::colored() {
+      code
+    } else {
+      ""
+    }
+  }
+
+  pub fn green() -> &'static str {
+    sequence("\x1b[32m")
+  }
+
+  pub fn yellow() -> &'static str {
+    sequence("\x1b[33m")
+  }
+
+  pub fn bold() -> &'static str {
+    sequence("\x1b[1m")
+  }
+
+  pub fn dim() -> &'static str {
+    sequence("\x1b[2m")
+  }
+
+  pub fn italic() -> &'static str {
+    sequence("\x1b[3m")
+  }
+
+  pub fn reset() -> &'static str {
+    sequence("\x1b[0m")
+  }
+}

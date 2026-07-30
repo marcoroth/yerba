@@ -28,13 +28,13 @@ pub struct Args {
 
 impl Args {
   pub fn run(self) {
-    use super::color::*;
+    use super::ui;
 
     let document = parse_file(&self.file);
     let info = document.get_node_info(&self.selector);
 
     if info.location.start_line == 0 && info.location.end_line == 0 {
-      eprintln!("{RED}Error:{RESET} selector \"{}\" not found in {}", self.selector, self.file);
+      eprintln!("{} selector \"{}\" not found in {}", ui::failure("Error:"), self.selector, self.file);
 
       super::show_similar_selectors(&self.file, &document, &self.selector);
       process::exit(1);

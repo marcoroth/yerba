@@ -35,56 +35,11 @@ pub(crate) fn pluralize(count: usize, singular: &str, plural: &str) -> String {
   format!("{} {}", count, if count == 1 { singular } else { plural })
 }
 
-pub(crate) mod color {
-  pub const GREEN: &str = "\x1b[32m";
-  pub const RED: &str = "\x1b[31m";
-  pub const YELLOW: &str = "\x1b[33m";
-  pub const DIM: &str = "\x1b[2m";
-  pub const BOLD: &str = "\x1b[1m";
-  pub const RESET: &str = "\x1b[0m";
-}
-
-// Compile-time ANSI macros for use in concat!() / clap attributes (used in main.rs)
-#[allow(unused_macros)]
-macro_rules! h {
-  () => {
-    "\x1b[1;32m"
-  };
-} // header (bold green)
-#[allow(unused_macros)]
-macro_rules! b {
-  () => {
-    "\x1b[1m"
-  };
-} // bold
-#[allow(unused_macros)]
-macro_rules! c {
-  () => {
-    "\x1b[36m"
-  };
-} // cyan
-#[allow(unused_macros)]
-macro_rules! d {
-  () => {
-    "\x1b[2m"
-  };
-} // dim
-#[allow(unused_macros)]
-macro_rules! r {
-  () => {
-    "\x1b[0m"
-  };
-} // reset
-#[allow(unused_imports)]
-pub(crate) use {b, c, d, h, r};
-
 pub(crate) fn colorize_examples(input: &str) -> String {
   colorize_help(&format!("Examples:\n{}", input.trim()))
 }
 
 pub(crate) fn colorize_help(input: &str) -> String {
-  use color::*;
-
   let mut output = String::new();
 
   for line in input.lines() {
@@ -96,7 +51,7 @@ pub(crate) fn colorize_help(input: &str) -> String {
     }
 
     if trimmed.ends_with(':') && !trimmed.contains(' ') {
-      output.push_str(&format!("{GREEN}{BOLD}{trimmed}{RESET}\n"));
+      output.push_str(&format!("{}\n", ui::success(trimmed)));
       continue;
     }
 
@@ -105,11 +60,11 @@ pub(crate) fn colorize_help(input: &str) -> String {
 
       match (parts.next(), parts.next(), parts.next()) {
         (Some(cmd), Some(sub), Some(rest)) => {
-          output.push_str(&format!("  {BOLD}{cmd}{RESET} \x1b[36m{sub}{RESET} {rest}\n"));
+          output.push_str(&format!("  {} {} {}\n", ui::strong(cmd), ui::muted(sub), rest));
         }
 
         (Some(cmd), Some(sub), None) => {
-          output.push_str(&format!("  {BOLD}{cmd}{RESET} \x1b[36m{sub}{RESET}\n"));
+          output.push_str(&format!("  {} {}\n", ui::strong(cmd), ui::muted(sub)));
         }
 
         _ => {
@@ -139,9 +94,14 @@ pub(crate) fn colorize_help(input: &str) -> String {
     }
 
     if columns.len() == 3 {
-      output.push_str(&format!("  \x1b[36m{:<20}{RESET} {:<21} {DIM}{}{RESET}\n", columns[0], columns[1], columns[2]));
+      output.push_str(&format!(
+        "  {} {:<21} {}\n",
+        ui::muted(format!("{:<20}", columns[0])),
+        columns[1],
+        ui::subtle(columns[2])
+      ));
     } else if columns.len() == 2 {
-      output.push_str(&format!("  \x1b[36m{:<20}{RESET} {}\n", columns[0], columns[1]));
+      output.push_str(&format!("  {} {}\n", ui::muted(format!("{:<20}", columns[0])), columns[1]));
     } else {
       output.push_str(&format!("  {trimmed}\n"));
     }
@@ -357,10 +317,8 @@ pub(crate) fn resolve_move_indexes(
   to: Option<usize>,
   resolve: impl Fn(&yerba::Document, &str, &str) -> Result<usize, yerba::YerbaError>,
 ) -> (usize, usize) {
-  use color::*;
-
   let from_index = resolve(document, path, item).unwrap_or_else(|error| {
-    eprintln!("{RED}Error:{RESET} {}", error);
+    eprintln!("{} {}", ui::failure("Error:"), error);
     process::exit(1);
   });
 
@@ -368,7 +326,7 @@ pub(crate) fn resolve_move_indexes(
     index
   } else if let Some(target) = &before {
     let target_index = resolve(document, path, target).unwrap_or_else(|error| {
-      eprintln!("{RED}Error:{RESET} {}", error);
+      eprintln!("{} {}", ui::failure("Error:"), error);
       process::exit(1);
     });
 
@@ -379,7 +337,7 @@ pub(crate) fn resolve_move_indexes(
     }
   } else if let Some(target) = &after {
     let target_index = resolve(document, path, target).unwrap_or_else(|error| {
-      eprintln!("{RED}Error:{RESET} {}", error);
+      eprintln!("{} {}", ui::failure("Error:"), error);
       process::exit(1);
     });
 
@@ -389,7 +347,7 @@ pub(crate) fn resolve_move_indexes(
       target_index + 1
     }
   } else {
-    eprintln!("{RED}Error:{RESET} specify --before, --after, or --to");
+    eprintln!("{} specify --before, --after, or --to", ui::failure("Error:"));
     process::exit(1);
   };
 
@@ -397,12 +355,10 @@ pub(crate) fn resolve_move_indexes(
 }
 
 pub(crate) fn resolve_files(pattern: &str) -> Vec<String> {
-  use color::*;
-
   if pattern.contains('*') || pattern.contains('?') || pattern.contains('[') {
     let paths: Vec<String> = glob::glob(pattern)
       .unwrap_or_else(|error| {
-        eprintln!("{RED}Error:{RESET} invalid glob pattern '{}': {}", pattern, error);
+        eprintln!("{} invalid glob pattern '{}': {}", ui::failure("Error:"), pattern, error);
         process::exit(1);
       })
       .filter_map(|entry| entry.ok())
@@ -410,7 +366,7 @@ pub(crate) fn resolve_files(pattern: &str) -> Vec<String> {
       .collect();
 
     if paths.is_empty() {
-      eprintln!("{RED}Error:{RESET} no files matched pattern: {}", pattern);
+      eprintln!("{} no files matched pattern: {}", ui::failure("Error:"), pattern);
       process::exit(1);
     }
 
@@ -421,18 +377,16 @@ pub(crate) fn resolve_files(pattern: &str) -> Vec<String> {
 }
 
 pub(crate) fn parse_file(file: &str) -> yerba::Document {
-  use color::*;
-
   yerba::parse_file(file).unwrap_or_else(|error| {
     match &error {
       yerba::YerbaError::IoError(io_error) => match io_error.kind() {
-        std::io::ErrorKind::NotFound => eprintln!("{RED}Error:{RESET} file not found: {}", file),
+        std::io::ErrorKind::NotFound => eprintln!("{} file not found: {}", ui::failure("Error:"), file),
         std::io::ErrorKind::PermissionDenied => {
-          eprintln!("{RED}Error:{RESET} permission denied: {}", file)
+          eprintln!("{} permission denied: {}", ui::failure("Error:"), file)
         }
-        _ => eprintln!("{RED}Error:{RESET} reading {}: {}", file, io_error),
+        _ => eprintln!("{} reading {}: {}", ui::failure("Error:"), file, io_error),
       },
-      _ => eprintln!("{RED}Error:{RESET} parsing {}: {}", file, error),
+      _ => eprintln!("{} parsing {}: {}", ui::failure("Error:"), file, error),
     }
 
     process::exit(1);
@@ -444,21 +398,19 @@ pub(crate) fn run_op(display_file: &str, document: &yerba::Document, result: Res
 }
 
 pub(crate) fn run_op_with_hint(display_file: &str, document: &yerba::Document, result: Result<(), yerba::YerbaError>, hint: Option<&str>) {
-  use color::*;
-
   if let Err(error) = result {
     if let yerba::YerbaError::SelectorNotFound(selector) = &error {
-      eprintln!("{RED}Error:{RESET} selector \"{selector}\" not found in {display_file}");
+      eprintln!("{} selector \"{selector}\" not found in {display_file}", ui::failure("Error:"));
 
       show_similar_selectors(display_file, document, selector);
     } else {
-      eprintln!("{RED}Error:{RESET} {}", error);
+      eprintln!("{} {}", ui::failure("Error:"), error);
     }
 
     if let Some(hint) = hint {
       if matches!(error, yerba::YerbaError::SelectorNotFound(_)) {
         eprintln!();
-        eprintln!("  {DIM}Hint: {hint}{RESET}");
+        eprintln!("  {}", ui::subtle(format!("Hint: {}", hint)));
       }
     }
 
@@ -467,7 +419,6 @@ pub(crate) fn run_op_with_hint(display_file: &str, document: &yerba::Document, r
 }
 
 pub(crate) fn show_similar_selectors(file: &str, document: &yerba::Document, invalid_path: &str) {
-  use color::*;
   use yerba::didyoumean::didyoumean_ranked;
 
   let selectors = document.selectors();
@@ -483,19 +434,19 @@ pub(crate) fn show_similar_selectors(file: &str, document: &yerba::Document, inv
   eprintln!();
 
   if close.is_empty() {
-    eprintln!("  {BOLD}Available selectors in {file}:{RESET}");
+    eprintln!("  {}", ui::strong(format!("Available selectors in {}:", file)));
 
     for selector in selectors.iter().take(10) {
-      eprintln!("    {DIM}{selector}{RESET}");
+      eprintln!("    {}", ui::subtle(selector));
     }
 
     if selectors.len() > 10 {
-      eprintln!("    {DIM}... and {} more{RESET}", selectors.len() - 10);
+      eprintln!("    {}", ui::subtle(format!("... and {} more", selectors.len() - 10)));
     }
   } else if close.len() == 1 {
-    eprintln!("  {BOLD}Did you mean this selector?{RESET} {}", close[0]);
+    eprintln!("  {} {}", ui::strong("Did you mean this selector?"), close[0]);
   } else {
-    eprintln!("  {BOLD}Did you mean one of these selectors?{RESET}");
+    eprintln!("  {}", ui::strong("Did you mean one of these selectors?"));
 
     for selector in close.iter().take(5) {
       eprintln!("    {selector}");
@@ -503,8 +454,8 @@ pub(crate) fn show_similar_selectors(file: &str, document: &yerba::Document, inv
   }
 
   eprintln!();
-  eprintln!("  {BOLD}To see all valid selectors, run:{RESET}");
-  eprintln!("    yerba selectors \"{file}\"{RESET}");
+  eprintln!("  {}", ui::strong("To see all valid selectors, run:"));
+  eprintln!("    yerba selectors \"{file}\"");
 }
 
 pub(crate) fn output(file: &str, document: &yerba::Document, dry_run: bool) {

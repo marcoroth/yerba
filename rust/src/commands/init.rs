@@ -3,13 +3,13 @@ use std::process;
 
 use indoc::indoc;
 
-use super::color::*;
+use super::ui;
 
 pub fn run() {
   let filename = "Yerbafile";
 
   if Path::new(filename).exists() {
-    eprintln!("🧉 {YELLOW}{BOLD}Yerbafile already exists.{RESET}");
+    eprintln!("🧉 {}", ui::pending("Yerbafile already exists."));
     process::exit(1);
   }
 
@@ -81,9 +81,9 @@ pub fn run() {
   "#};
 
   std::fs::write(filename, content).unwrap_or_else(|error| {
-    eprintln!("{RED}Error:{RESET} writing Yerbafile: {}", error);
+    eprintln!("{} writing Yerbafile: {}", ui::failure("Error:"), error);
     process::exit(1);
   });
 
-  eprintln!("🧉 {GREEN}{BOLD}Created Yerbafile{RESET}");
+  eprintln!("🧉 {}", ui::success("Created Yerbafile"));
 }

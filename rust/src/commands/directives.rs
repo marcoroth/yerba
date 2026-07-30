@@ -1,3 +1,4 @@
+use super::ui;
 use std::sync::LazyLock;
 
 use indoc::indoc;
@@ -35,14 +36,13 @@ pub struct Args {
 impl Args {
   pub fn run(self) {
     if !self.ensure && !self.remove {
-      use super::color::*;
-      eprintln!("{RED}Error:{RESET} specify --ensure or --remove");
+      use super::ui;
+      eprintln!("{} specify --ensure or --remove", ui::failure("Error:"));
       std::process::exit(1);
     }
 
     if self.ensure && self.remove {
-      use super::color::*;
-      eprintln!("{RED}Error:{RESET} --ensure and --remove are mutually exclusive");
+      eprintln!("{} --ensure and --remove are mutually exclusive", ui::failure("Error:"));
       std::process::exit(1);
     }
 

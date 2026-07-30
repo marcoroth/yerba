@@ -1,5 +1,13 @@
 use super::*;
 
+fn scalar_replacement_text(value: &str, kind: SyntaxKind) -> String {
+  if kind == SyntaxKind::PLAIN_SCALAR && !crate::syntax::is_inline_scalar_safe(value) {
+    return format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR);
+  }
+
+  format_scalar_value(value, kind)
+}
+
 fn holds_collection(node: &SyntaxNode) -> bool {
   node.descendants().any(|descendant| {
     matches!(
@@ -84,7 +92,7 @@ impl Document {
 
     let scalar_token = find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
-    let new_text = format_scalar_value(value, scalar_token.kind());
+    let new_text = scalar_replacement_text(value, scalar_token.kind());
 
     self.replace_token(&scalar_token, &new_text)
   }
@@ -107,7 +115,7 @@ impl Document {
           edits.push((span.range, replacement_text(&span, value)));
         }
       } else if let Some(scalar_token) = find_scalar_token(&node) {
-        edits.push((scalar_token.text_range(), format_scalar_value(value, scalar_token.kind())));
+        edits.push((scalar_token.text_range(), scalar_replacement_text(value, scalar_token.kind())));
       }
     }
 

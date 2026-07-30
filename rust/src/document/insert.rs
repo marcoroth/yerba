@@ -570,6 +570,10 @@ impl Document {
     let is_block_value = value.contains('\n') || value.starts_with("- ");
 
     if !is_block_value {
+      if !crate::syntax::is_valid_inline_value(value) {
+        return format!("{}: {}", key, crate::syntax::quote_if_needed(value));
+      }
+
       return format!("{}: {}", key, value);
     }
 

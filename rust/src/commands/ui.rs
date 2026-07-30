@@ -1,11 +1,3 @@
-//! Terminal styling.
-//!
-//! Styles are declared once here and referred to by meaning, so a command asks
-//! for `success` or `failure` rather than picking a colour. The palette is the
-//! terminal's own sixteen, so output matches whatever theme is in use instead of
-//! imposing one. Colour is dropped entirely when the output is piped or
-//! `NO_COLOR` is set.
-
 use std::io::IsTerminal;
 use std::sync::OnceLock;
 
@@ -130,8 +122,6 @@ pub mod glyph {
   pub const FAIL: &str = "✗";
 }
 
-/// Bare sequences, still gated, for a block too densely styled to wrap each span
-/// in a call. Prefer the named styles above everywhere else.
 pub mod raw {
   fn sequence(code: &'static str) -> &'static str {
     if super::colored() {

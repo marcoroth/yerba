@@ -1,7 +1,7 @@
-use clap::ValueEnum;
 use yaml_parser::SyntaxKind;
 
-#[derive(Debug, Clone, PartialEq, ValueEnum)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum KeyStyle {
   /// Unquoted key (host:)
   Plain,
@@ -34,33 +34,34 @@ impl KeyStyle {
   }
 }
 
-#[derive(Debug, Clone, PartialEq, ValueEnum)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum QuoteStyle {
   /// Unquoted value (host: localhost)
   Plain,
   /// Single-quoted value (host: 'localhost')
-  #[value(alias = "single-quoted")]
+  #[cfg_attr(feature = "cli", value(alias = "single-quoted"))]
   Single,
   /// Double-quoted value (host: "localhost")
-  #[value(alias = "double-quoted")]
+  #[cfg_attr(feature = "cli", value(alias = "double-quoted"))]
   Double,
   /// Literal block scalar, strip trailing newline (|-)
-  #[value(alias = "block-literal", alias = "|-")]
+  #[cfg_attr(feature = "cli", value(alias = "block-literal", alias = "|-"))]
   Literal,
   /// Literal block scalar, keep one trailing newline (|)
-  #[value(alias = "|")]
+  #[cfg_attr(feature = "cli", value(alias = "|"))]
   LiteralClip,
   /// Literal block scalar, keep all trailing newlines (|+)
-  #[value(alias = "|+")]
+  #[cfg_attr(feature = "cli", value(alias = "|+"))]
   LiteralKeep,
   /// Folded block scalar, strip trailing newline (>-)
-  #[value(alias = "block-folded", alias = ">-")]
+  #[cfg_attr(feature = "cli", value(alias = "block-folded", alias = ">-"))]
   Folded,
   /// Folded block scalar, keep one trailing newline (>)
-  #[value(alias = ">")]
+  #[cfg_attr(feature = "cli", value(alias = ">"))]
   FoldedClip,
   /// Folded block scalar, keep all trailing newlines (>+)
-  #[value(alias = ">+")]
+  #[cfg_attr(feature = "cli", value(alias = ">+"))]
   FoldedKeep,
 }
 

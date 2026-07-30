@@ -132,4 +132,24 @@ class PlainScalarSafetyTest < Minitest::Spec
     assert_includes document.to_s, "video_id: -dZZJ6pex-g"
     assert_equal "-dZZJ6pex-g", Psych.load(document.to_s)["video_id"]
   end
+
+  test "set over a scalar quotes a dash-prefixed fragment instead of emitting invalid YAML" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags: old
+    YAML
+
+    document.set("tags", "- new")
+
+    output = document.to_s
+
+    assert_includes output, 'tags: "- new"'
+
+    loaded = begin
+      Psych.load(output)
+    rescue Psych::SyntaxError => e
+      flunk "Psych could not parse output: #{e.message}\n#{output}"
+    end
+
+    assert_equal "- new", loaded["tags"]
+  end
 end

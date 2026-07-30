@@ -289,6 +289,18 @@ pub fn is_valid_inline_value(value: &str) -> bool {
   is_raw_yaml_text(value) || is_plain_safe(value)
 }
 
+pub fn is_inline_scalar_safe(value: &str) -> bool {
+  if value.is_empty() {
+    return true;
+  }
+
+  if value.contains('\n') || value.starts_with("- ") {
+    return false;
+  }
+
+  is_quoted_scalar(value) || is_flow_collection(value) || is_plain_safe(value)
+}
+
 pub fn needs_quoting(value: &str) -> bool {
   is_yaml_non_string(value) || !is_plain_safe(value)
 }

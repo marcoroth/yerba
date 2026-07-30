@@ -1,7 +1,9 @@
 mod support;
 use indoc::indoc;
 use support::parse;
-use yerba::{is_plain_safe, is_plain_safe_in_flow, is_quoted_scalar, is_valid_inline_value, needs_quoting, quote_if_needed, InsertPosition};
+use yerba::{
+  is_inline_scalar_safe, is_plain_safe, is_plain_safe_in_flow, is_quoted_scalar, is_valid_inline_value, needs_quoting, quote_if_needed, InsertPosition,
+};
 
 #[test]
 fn test_plain_safe_accepts_ordinary_strings() {
@@ -135,6 +137,24 @@ fn test_is_valid_inline_value_keeps_raw_yaml_text_intact() {
   assert!(!is_valid_inline_value("One Record: Concurrency"));
   assert!(!is_valid_inline_value("#hashstart"));
   assert!(!is_valid_inline_value("  padded  "));
+}
+
+#[test]
+fn test_is_inline_scalar_safe_rejects_block_only_fragments() {
+  assert!(is_inline_scalar_safe(""));
+  assert!(is_inline_scalar_safe("plain"));
+  assert!(is_inline_scalar_safe("[]"));
+  assert!(is_inline_scalar_safe("[a, b]"));
+  assert!(is_inline_scalar_safe("{k: v}"));
+  assert!(is_inline_scalar_safe("\"a: b\""));
+
+  assert!(is_valid_inline_value("- new"));
+  assert!(!is_inline_scalar_safe("- new"));
+
+  assert!(is_valid_inline_value("host: localhost\nport: 5432"));
+  assert!(!is_inline_scalar_safe("host: localhost\nport: 5432"));
+
+  assert!(!is_inline_scalar_safe("One Record: Concurrency"));
 }
 
 #[test]
@@ -302,7 +322,8 @@ fn test_set_leaves_assembled_yaml_text_alone() {
 
   sequence.set("tags", "- new").unwrap();
 
-  assert_eq!(sequence.to_string(), "name: Alice\ntags: - new\n");
+  assert_eq!(sequence.to_string(), "name: Alice\ntags: \"- new\"\n");
+  assert_eq!(sequence.get_value("tags"), Some(yaml_serde::Value::String("- new".to_string())));
 
   let mut quoted = parse("name: Alice\ntags: old\n");
 

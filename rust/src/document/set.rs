@@ -1,7 +1,7 @@
 use super::*;
 
 fn scalar_replacement_text(value: &str, kind: SyntaxKind) -> String {
-  if kind == SyntaxKind::PLAIN_SCALAR && !crate::syntax::is_valid_inline_value(value) {
+  if kind == SyntaxKind::PLAIN_SCALAR && !crate::syntax::is_inline_scalar_safe(value) {
     return format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR);
   }
 

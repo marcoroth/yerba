@@ -1431,7 +1431,7 @@ dependencies = [
 
 [[package]]
 name = "yerba"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anstyle-query",
  "cbindgen",

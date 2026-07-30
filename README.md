@@ -324,17 +324,17 @@ yerba quote-style videos.yml "[].description" --values literal
 
 **Value styles** (`--values`):
 
-| Style          | Symbol | Example                  | Behavior                             |                            |
-|----------------|--------|--------------------------|--------------------------------------|----------------------------|
-| `plain`        | —      | `host: localhost`        | Unquoted                             |                            |
-| `single`       | `'`    | `host: 'localhost'`      | Single-quoted                        |                            |
-| `double`       | `"`    | `host: "localhost"`      | Double-quoted, supports `\n` escapes |                            |
-| `literal`      | `\     | -`                       | Preserves newlines                   | Strip trailing newline     |
-| `literal-clip` | `\     | `                        | Preserves newlines                   | Keep one trailing newline  |
-| `literal-keep` | `\     | +`                       | Preserves newlines                   | Keep all trailing newlines |
-| `folded`       | `>-`   | Folds newlines to spaces | Strip trailing newline               |                            |
-| `folded-clip`  | `>`    | Folds newlines to spaces | Keep one trailing newline            |                            |
-| `folded-keep`  | `>+`   | Folds newlines to spaces | Keep all trailing newlines           |                            |
+| Style          | Symbol | Example                  | Behavior                             |
+|----------------|--------|--------------------------|--------------------------------------|
+| `plain`        | —      | `host: localhost`        | Unquoted                             |
+| `single`       | `'`    | `host: 'localhost'`      | Single-quoted                        |
+| `double`       | `"`    | `host: "localhost"`      | Double-quoted, supports `\n` escapes |
+| `literal`      | `\|-`  | Preserves newlines       | Strip trailing newline               |
+| `literal-clip` | `\|`   | Preserves newlines       | Keep one trailing newline            |
+| `literal-keep` | `\|+`  | Preserves newlines       | Keep all trailing newlines           |
+| `folded`       | `>-`   | Folds newlines to spaces | Strip trailing newline               |
+| `folded-clip`  | `>`    | Folds newlines to spaces | Keep one trailing newline            |
+| `folded-keep`  | `>+`   | Folds newlines to spaces | Keep all trailing newlines           |
 
 Block scalars are only converted when scoped to a specific selector. An unscoped `--values double` will not touch existing block scalars.
 

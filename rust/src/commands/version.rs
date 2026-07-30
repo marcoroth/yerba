@@ -1,8 +1,18 @@
-use super::color::*;
+use super::ui;
 
 pub fn run() {
-  println!("🧉 {BOLD}yerba{RESET} {DIM}v{}{RESET}", yerba::version());
+  println!("{}", ui::banner());
   println!(
-    "   {BOLD}Y{RESET}{DIM}AML{RESET} {BOLD}E{RESET}{DIM}diting and{RESET} {BOLD}R{RESET}{DIM}efactoring with{RESET} {BOLD}B{RESET}{DIM}etter{RESET} {BOLD}A{RESET}{DIM}ccuracy{RESET}"
+    "   {}{} {}{} {}{} {}{} {}{}",
+    ui::strong("Y"),
+    ui::subtle("AML"),
+    ui::strong("E"),
+    ui::subtle("diting and"),
+    ui::strong("R"),
+    ui::subtle("efactoring with"),
+    ui::strong("B"),
+    ui::subtle("etter"),
+    ui::strong("A"),
+    ui::subtle("ccuracy")
   );
 }

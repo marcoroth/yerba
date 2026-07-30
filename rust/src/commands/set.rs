@@ -45,9 +45,9 @@ impl Args {
 
     if let Some(condition) = &self.condition {
       if let Err(error) = yerba::validate_condition(condition) {
-        use super::color::*;
+        use super::ui;
 
-        eprintln!("{RED}Error:{RESET} {}", error);
+        eprintln!("{} {}", ui::failure("Error:"), error);
 
         std::process::exit(1);
       }

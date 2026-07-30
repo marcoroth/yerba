@@ -1,7 +1,7 @@
 use std::process;
 
-use super::color::*;
 use super::resolve_files;
+use super::ui;
 
 #[derive(clap::Args)]
 #[command(
@@ -32,7 +32,7 @@ impl Args {
     let schema = match yerba::schema::load_schema(&self.schema) {
       Ok(schema) => schema,
       Err(error) => {
-        eprintln!("{RED}Error:{RESET} {}", error);
+        eprintln!("{} {}", ui::failure("Error:"), error);
         process::exit(1);
       }
     };
@@ -40,7 +40,7 @@ impl Args {
     let files = resolve_files(&self.file);
 
     if files.is_empty() {
-      eprintln!("{RED}Error:{RESET} no files matching: {}", self.file);
+      eprintln!("{} no files matching: {}", ui::failure("Error:"), self.file);
       process::exit(1);
     }
 
@@ -51,7 +51,7 @@ impl Args {
       let document = match yerba::Document::parse_file(file) {
         Ok(document) => document,
         Err(error) => {
-          eprintln!("  {RED}error:{RESET} {} {DIM}—{RESET} {}", file, error);
+          eprintln!("  {} {} {} {}", ui::failure("error:"), ui::subtle("—"), file, error);
           has_errors = true;
           continue;
         }
@@ -66,7 +66,7 @@ impl Args {
       has_errors = true;
 
       let relative = file.strip_prefix("./").unwrap_or(file);
-      eprintln!("  {RED}error:{RESET} {relative}");
+      eprintln!("  {} {relative}", ui::failure("error:"));
 
       for error in &errors {
         eprintln!("    {error}");
@@ -78,7 +78,7 @@ impl Args {
     if has_errors {
       process::exit(1);
     } else {
-      eprintln!("{GREEN}All {count} files valid.{RESET}", count = files.len());
+      eprintln!("{}", ui::success(format!("All {} files valid.", files.len())));
     }
   }
 }

@@ -1,3 +1,4 @@
+use super::ui;
 use std::process;
 use std::sync::LazyLock;
 
@@ -41,8 +42,7 @@ impl Args {
       let document = parse_file(resolved_file);
 
       if let Err(error) = document.validate_sort_keys(&self.selector, &key_order) {
-        use super::color::*;
-        eprintln!("{RED}Error in {}{RESET}: {}", resolved_file, error);
+        eprintln!("{}: {}", ui::failure(format!("Error in {}", resolved_file)), error);
         has_errors = true;
       }
     }

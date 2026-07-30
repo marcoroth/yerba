@@ -1,12 +1,12 @@
-use super::color::*;
+use super::ui;
 
 pub fn run() {
-  let g = GREEN;
-  let b = BOLD;
-  let d = DIM;
-  let i = "\x1b[3m"; // italic
-  let y = YELLOW;
-  let r = RESET;
+  let g = ui::raw::green();
+  let b = ui::raw::bold();
+  let d = ui::raw::dim();
+  let i = ui::raw::italic();
+  let y = ui::raw::yellow();
+  let r = ui::raw::reset();
   let hr = format!("    {d}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}{r}");
 
   println!();

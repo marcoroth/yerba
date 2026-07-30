@@ -37,9 +37,9 @@ impl Args {
     } else if let Ok(count) = self.first.parse::<usize>() {
       ("", count)
     } else {
-      use super::color::*;
+      use super::ui;
 
-      eprintln!("{RED}Error:{RESET} expected a number for blank line count, got '{}'", self.first);
+      eprintln!("{} expected a number for blank line count, got '{}'", ui::failure("Error:"), self.first);
 
       std::process::exit(1);
     };

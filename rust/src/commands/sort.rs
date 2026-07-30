@@ -1,3 +1,4 @@
+use super::ui;
 use std::process;
 use std::sync::LazyLock;
 
@@ -53,14 +54,14 @@ fn is_explicit_reorder(orders: &[String]) -> bool {
 
 impl Args {
   pub fn run(self) {
-    use super::color::*;
+    use super::ui;
 
     if self.by.is_empty() && self.order.is_empty() && self.selector.is_none() {
       let document = parse_file(&self.file);
 
-      eprintln!("{RED}Error:{RESET} specify a selector, --by, or --order");
+      eprintln!("{} specify a selector, --by, or --order", ui::failure("Error:"));
       eprintln!();
-      eprintln!("  {BOLD}Examples:{RESET}");
+      eprintln!("  {}", ui::strong("Examples:"));
       eprintln!("    yerba sort \"{}\" \"tags\"", self.file);
       eprintln!("    yerba sort \"{}\" --by \".title\" --order asc", self.file);
       eprintln!();
@@ -80,10 +81,8 @@ impl Args {
   }
 
   fn show_values(self) {
-    use super::color::*;
-
     if self.by.len() != 1 {
-      eprintln!("{RED}Error:{RESET} --order is required when using --by");
+      eprintln!("{} --order is required when using --by", ui::failure("Error:"));
       process::exit(1);
     }
 
@@ -94,14 +93,14 @@ impl Args {
     let (labels, context_values, selector_display) = self.resolve_labels(&document, by, selector, &items_selector);
 
     let context_hint = if self.context.is_empty() {
-      format!("\n\n  {DIM}Add --context \".field\" to show additional fields alongside values{RESET}")
+      format!("\n\n  {}", ui::subtle("Add --context \".field\" to show additional fields alongside values"))
     } else {
       String::new()
     };
 
-    eprintln!("{RED}Error:{RESET} --order is required when using --by");
+    eprintln!("{} --order is required when using --by", ui::failure("Error:"));
     eprintln!();
-    eprintln!("  {BOLD}Current values (by {by}):{RESET}");
+    eprintln!("  {}", ui::strong(format!("Current values (by {}):", by)));
 
     for (index, label) in labels.iter().enumerate() {
       let context = context_values.get(index).map(|c| c.as_slice()).unwrap_or(&[]);
@@ -113,22 +112,20 @@ impl Args {
 
     eprintln!("{context_hint}");
     eprintln!();
-    eprintln!("  {BOLD}To sort alphabetically:{RESET}");
+    eprintln!("  {}", ui::strong("To sort alphabetically:"));
     eprintln!("    yerba sort \"{}\"{selector_display} --by \"{by}\" --order asc", self.file);
     eprintln!("    yerba sort \"{}\"{selector_display} --by \"{by}\" --order desc", self.file);
     eprintln!();
-    eprintln!("  {BOLD}To reorder explicitly:{RESET}");
+    eprintln!("  {}", ui::strong("To reorder explicitly:"));
     eprintln!("    yerba sort \"{}\"{selector_display} --by \"{by}\" --order \"{csv}\"", self.file);
     eprintln!();
-    eprintln!("  {BOLD}To move individual items:{RESET}");
+    eprintln!("  {}", ui::strong("To move individual items:"));
     eprintln!("    yerba move \"{}\"{selector_display} <item> --before/--after <target>", self.file);
 
     process::exit(1);
   }
 
   fn run_sort(self) {
-    use super::color::*;
-
     let selector = self.selector.as_deref().unwrap_or("");
 
     let sort_fields: Vec<yerba::SortField> = if self.by.is_empty() {
@@ -145,7 +142,7 @@ impl Args {
             Some("desc" | "descending") => yerba::SortField::desc(field),
             Some("asc" | "ascending") | None => yerba::SortField::asc(field),
             Some(other) => {
-              eprintln!("{RED}Error:{RESET} invalid sort direction \"{other}\". Use \"asc\" or \"desc\"");
+              eprintln!("{} invalid sort direction \"{other}\". Use \"asc\" or \"desc\"", ui::failure("Error:"));
               process::exit(1);
             }
           }
@@ -161,7 +158,7 @@ impl Args {
 
         match document.get_value(&first_item_selector) {
           Some(first) if first.is_mapping() => {
-            eprintln!("{RED}Error:{RESET} --by is required to sort a sequence of maps");
+            eprintln!("{} --by is required to sort a sequence of maps", ui::failure("Error:"));
             eprintln!();
 
             let selectors = document.selectors();
@@ -175,7 +172,7 @@ impl Args {
               .collect();
 
             if !fields.is_empty() {
-              eprintln!("  {BOLD}Available fields:{RESET}");
+              eprintln!("  {}", ui::strong("Available fields:"));
 
               for field in &fields {
                 let short = field.rsplit_once('.').map(|(_, f)| f).unwrap_or(field);
@@ -187,9 +184,9 @@ impl Args {
           }
 
           None if selector.is_empty() => {
-            eprintln!("{RED}Error:{RESET} no sequence found at root level in {}", resolved_file);
+            eprintln!("{} no sequence found at root level in {}", ui::failure("Error:"), resolved_file);
             eprintln!();
-            eprintln!("  {DIM}Specify a selector for the sequence to sort:{RESET}");
+            eprintln!("  {}", ui::subtle("Specify a selector for the sequence to sort:"));
             eprintln!("    yerba sort \"{}\" \"<selector>\"", self.file);
             eprintln!();
 
@@ -209,16 +206,14 @@ impl Args {
   }
 
   fn run_reorder(self) {
-    use super::color::*;
-
     if self.by.len() != 1 {
-      eprintln!("{RED}Error:{RESET} explicit --order requires exactly one --by field");
+      eprintln!("{} explicit --order requires exactly one --by field", ui::failure("Error:"));
 
       process::exit(1);
     }
 
     if self.order.len() != 1 {
-      eprintln!("{RED}Error:{RESET} explicit --order must be a single comma-separated list");
+      eprintln!("{} explicit --order must be a single comma-separated list", ui::failure("Error:"));
 
       process::exit(1);
     }
@@ -236,17 +231,17 @@ impl Args {
     let duplicates: Vec<&String> = labels.iter().filter(|label| !seen.insert(label.as_str())).collect();
 
     if !duplicates.is_empty() {
-      eprintln!("{RED}Error:{RESET} --order requires unique values for {by}, but found duplicates");
+      eprintln!("{} --order requires unique values for {by}, but found duplicates", ui::failure("Error:"));
       eprintln!();
-      eprintln!("  {BOLD}Duplicate values:{RESET}");
+      eprintln!("  {}", ui::strong("Duplicate values:"));
 
       for label in &duplicates {
         eprintln!("    {label}");
       }
 
       eprintln!();
-      eprintln!("  {DIM}Use \"yerba sort\" with --by instead to sort by field, or");
-      eprintln!("  choose a --by field with unique values (e.g. \".id\"){RESET}");
+      eprintln!("  {}", ui::subtle("Use \"yerba sort\" with --by instead to sort by field, or"));
+      eprintln!("  {}", ui::subtle("choose a --by field with unique values (e.g. \".id\")"));
 
       process::exit(1);
     }
@@ -256,16 +251,19 @@ impl Args {
     if !values_with_commas.is_empty() {
       let selector_display = if selector.is_empty() { String::new() } else { format!(" \"{selector}\"") };
 
-      eprintln!("{RED}Error:{RESET} some values for {by} contain commas, which conflicts with --order parsing");
+      eprintln!(
+        "{} some values for {by} contain commas, which conflicts with --order parsing",
+        ui::failure("Error:")
+      );
       eprintln!();
-      eprintln!("  {BOLD}Values with commas:{RESET}");
+      eprintln!("  {}", ui::strong("Values with commas:"));
 
       for label in &values_with_commas {
         eprintln!("    {label}");
       }
 
       eprintln!();
-      eprintln!("  {BOLD}Use yerba move to reorder individual items instead:{RESET}");
+      eprintln!("  {}", ui::strong("Use yerba move to reorder individual items instead:"));
       eprintln!("    yerba move \"{}\"{selector_display} <item> --before/--after <target>", self.file);
 
       process::exit(1);
@@ -277,28 +275,26 @@ impl Args {
     match document.reorder_items(container, by, &desired_order) {
       Ok(()) => output(&self.file, &document, self.dry_run),
       Err(error) => {
-        eprintln!("{RED}Error:{RESET} {}", error);
+        eprintln!("{} {}", ui::failure("Error:"), error);
         process::exit(1);
       }
     }
   }
 
   fn resolve_labels(&self, document: &yerba::Document, by: &str, selector: &str, items_selector: &str) -> (Vec<String>, Vec<Vec<String>>, String) {
-    use super::color::*;
-
     let items = document.get_values(items_selector);
 
     if items.is_empty() {
       if selector.is_empty() {
-        eprintln!("{RED}Error:{RESET} no sequence found at root level");
+        eprintln!("{} no sequence found at root level", ui::failure("Error:"));
         eprintln!();
-        eprintln!("  {DIM}If the file is a map, specify which sequence to sort:{RESET}");
+        eprintln!("  {}", ui::subtle("If the file is a map, specify which sequence to sort:"));
         eprintln!("    yerba sort \"{}\" \"<selector>\" --by \"{by}\" --order asc", self.file);
         eprintln!();
 
         super::show_similar_selectors(&self.file, document, "[]");
       } else {
-        eprintln!("{RED}Error:{RESET} no sequence found at selector: {selector}");
+        eprintln!("{} no sequence found at selector: {selector}", ui::failure("Error:"));
 
         super::show_similar_selectors(&self.file, document, selector);
       }
@@ -316,7 +312,7 @@ impl Args {
       };
 
       if !document.exists(&by_selector) {
-        eprintln!("{RED}Error:{RESET} field \"{by}\" not found in items");
+        eprintln!("{} field \"{by}\" not found in items", ui::failure("Error:"));
 
         super::show_similar_selectors(&self.file, document, &by_selector);
 
@@ -367,17 +363,15 @@ impl Args {
   }
 
   fn format_label_line(&self, index: usize, label: &str, context: &[String]) -> String {
-    use super::color::*;
-
     if context.is_empty() {
-      format!("{DIM}[{index}]{RESET} {label}")
+      format!("{} {}", ui::subtle(format!("[{}]", index)), label)
     } else {
       let context = context.iter().filter(|c| !c.is_empty()).cloned().collect::<Vec<_>>().join(", ");
 
       if context.is_empty() {
-        format!("{DIM}[{index}]{RESET} {label}")
+        format!("{} {}", ui::subtle(format!("[{}]", index)), label)
       } else {
-        format!("{DIM}[{index}]{RESET} {label}  {DIM}{context}{RESET}")
+        format!("{} {}  {}", ui::subtle(format!("[{}]", index)), label, ui::subtle(context))
       }
     }
   }

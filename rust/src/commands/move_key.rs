@@ -1,3 +1,4 @@
+use super::ui;
 use std::process;
 use std::sync::LazyLock;
 
@@ -43,10 +44,11 @@ impl Args {
       let (target_parent, target_key) = target.rsplit_once('.').unwrap_or(("", &target));
 
       if target_parent != parent_path {
-        use super::color::*;
         eprintln!(
-          "{RED}Error:{RESET} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
-          self.selector, target
+          "{} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
+          ui::failure("Error:"),
+          self.selector,
+          target
         );
 
         process::exit(1);
@@ -59,10 +61,11 @@ impl Args {
       let (target_parent, target_key) = target.rsplit_once('.').unwrap_or(("", &target));
 
       if target_parent != parent_path {
-        use super::color::*;
         eprintln!(
-          "{RED}Error:{RESET} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
-          self.selector, target
+          "{} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
+          ui::failure("Error:"),
+          self.selector,
+          target
         );
 
         process::exit(1);

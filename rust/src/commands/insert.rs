@@ -1,3 +1,4 @@
+use super::ui;
 use std::sync::LazyLock;
 
 use indoc::indoc;
@@ -50,8 +51,8 @@ impl Args {
         let mut buffer = String::new();
 
         std::io::stdin().read_to_string(&mut buffer).unwrap_or_else(|error| {
-          use super::color::*;
-          eprintln!("{RED}Error:{RESET} reading stdin: {}", error);
+          use super::ui;
+          eprintln!("{} reading stdin: {}", ui::failure("Error:"), error);
 
           std::process::exit(1);
         });
@@ -60,8 +61,7 @@ impl Args {
       } else {
         std::fs::read_to_string(&from_path)
           .unwrap_or_else(|error| {
-            use super::color::*;
-            eprintln!("{RED}Error:{RESET} reading {}: {}", from_path, error);
+            eprintln!("{} reading {}: {}", ui::failure("Error:"), from_path, error);
             std::process::exit(1);
           })
           .trim()
@@ -70,8 +70,7 @@ impl Args {
     } else if let Some(val) = self.value {
       val
     } else {
-      use super::color::*;
-      eprintln!("{RED}Error:{RESET} either a value argument or --from is required");
+      eprintln!("{} either a value argument or --from is required", ui::failure("Error:"));
 
       std::process::exit(1);
     };

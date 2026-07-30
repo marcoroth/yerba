@@ -37,7 +37,7 @@ pub struct Args {
 
 impl Args {
   pub fn run(self) {
-    use super::color::*;
+    use super::ui;
 
     let selector = self.selector.as_deref().unwrap_or("");
     let by = self.by.as_deref().unwrap_or(".");
@@ -50,20 +50,20 @@ impl Args {
           let noun = if duplicates.len() == 1 { "duplicate" } else { "duplicates" };
 
           if duplicates.is_empty() {
-            eprintln!("{GREEN}No duplicates found{RESET} in {}", resolved_file);
+            eprintln!("{} in {}", ui::success("No duplicates found"), resolved_file);
           } else if self.remove {
-            eprintln!("{YELLOW}Removed {} {noun}{RESET} from {}", duplicates.len(), resolved_file);
+            eprintln!("{} from {}", ui::pending(format!("Removed {} {noun}", duplicates.len())), resolved_file);
 
             for duplicate in &duplicates {
-              eprintln!("  {DIM}line {}: {} == {}{RESET}", duplicate.line, by, duplicate.value);
+              eprintln!("  {}", ui::subtle(format!("line {}: {} == {}", duplicate.line, by, duplicate.value)));
             }
 
             output(&resolved_file, &document, self.dry_run);
           } else {
-            eprintln!("{RED}Found {} {noun}{RESET} in {}", duplicates.len(), resolved_file);
+            eprintln!("{} in {}", ui::failure(format!("Found {} {noun}", duplicates.len())), resolved_file);
 
             for duplicate in &duplicates {
-              eprintln!("  {DIM}line {}: {} == {}{RESET}", duplicate.line, by, duplicate.value);
+              eprintln!("  {}", ui::subtle(format!("line {}: {} == {}", duplicate.line, by, duplicate.value)));
             }
 
             process::exit(1);
@@ -71,7 +71,7 @@ impl Args {
         }
 
         Err(error) => {
-          eprintln!("{RED}Error:{RESET} {}", error);
+          eprintln!("{} {}", ui::failure("Error:"), error);
           process::exit(1);
         }
       }

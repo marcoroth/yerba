@@ -1,3 +1,4 @@
+use super::ui;
 use std::process;
 use std::sync::LazyLock;
 
@@ -64,9 +65,9 @@ impl Args {
 
     if let Some(condition) = &normalized_condition {
       if let Err(error) = yerba::validate_item_condition(condition) {
-        use super::color::*;
+        use super::ui;
 
-        eprintln!("{RED}Error:{RESET} {}", error);
+        eprintln!("{} {}", ui::failure("Error:"), error);
 
         process::exit(1);
       }
@@ -85,9 +86,7 @@ impl Args {
           continue;
         }
 
-        use super::color::*;
-
-        eprintln!("{RED}Error:{RESET} selector \"{}\" not found in {}", self.selector, self.file);
+        eprintln!("{} selector \"{}\" not found in {}", ui::failure("Error:"), self.selector, self.file);
 
         show_similar_selectors(&self.file, &document, &self.selector);
         process::exit(1);
@@ -110,8 +109,7 @@ impl Args {
               break;
             }
 
-            use super::color::*;
-            eprintln!("{RED}Error:{RESET} select field \"{}\" not found in {}", field.trim(), self.file);
+            eprintln!("{} select field \"{}\" not found in {}", ui::failure("Error:"), field.trim(), self.file);
             show_similar_selectors(&self.file, &document, &full_selector);
             process::exit(1);
           }
@@ -190,10 +188,9 @@ impl Args {
     }
 
     if is_glob && all_results.is_empty() && normalized_condition.is_none() {
-      use super::color::*;
-
       eprintln!(
-        "{RED}Error:{RESET} selector \"{}\" not found in any of the {} files matching \"{}\"",
+        "{} selector \"{}\" not found in any of the {} files matching \"{}\"",
+        ui::failure("Error:"),
         self.selector,
         files.len(),
         self.file

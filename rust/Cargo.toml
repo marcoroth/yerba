@@ -22,7 +22,7 @@ required-features = ["cli"]
 
 [features]
 default = ["cli"]
-cli = ["dep:clap", "dep:indoc", "glob", "schema"]
+cli = ["dep:clap", "dep:indoc", "dep:anstyle-query", "glob", "schema"]
 glob = ["dep:glob", "dep:rayon"]
 schema = ["dep:jsonschema"]
 
@@ -34,6 +34,7 @@ serde = { version = "1", features = ["derive"] }
 yaml_serde = "0.10"
 serde_json = { version = "1", features = ["preserve_order"] }
 clap = { version = "4", features = ["derive"], optional = true }
+anstyle-query = { version = "1", optional = true }
 indoc = { version = "2", optional = true }
 rayon = { version = "1", optional = true }
 jsonschema = { version = "0.29", default-features = false, optional = true }

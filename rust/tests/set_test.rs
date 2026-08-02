@@ -490,7 +490,9 @@ fn apps() -> String {
 fn test_set_where_touches_only_the_matching_item() {
   let mut document = parse(&apps());
 
-  let count = document.set_where("apps[]", "license", "AGPL-3.0", ".name == \"helios\"", false).unwrap();
+  let count = document
+    .set_where("apps[]", "license", "AGPL-3.0", ".name == \"helios\"", false, false)
+    .unwrap();
 
   assert_eq!(count, 1);
   assert_eq!(document.get_all("apps[].license"), vec!["MIT", "AGPL-3.0", "unknown"]);
@@ -500,7 +502,7 @@ fn test_set_where_touches_only_the_matching_item() {
 fn test_set_where_without_all_errors_on_multiple_matches() {
   let mut document = parse(&apps());
 
-  let result = document.set_where("apps[]", "license", "MIT", ".license == \"unknown\"", false);
+  let result = document.set_where("apps[]", "license", "MIT", ".license == \"unknown\"", false, false);
 
   assert!(result.is_err(), "two items match, so this is ambiguous without --all");
   assert_eq!(
@@ -514,7 +516,7 @@ fn test_set_where_without_all_errors_on_multiple_matches() {
 fn test_set_where_with_all_sets_every_match_and_nothing_else() {
   let mut document = parse(&apps());
 
-  let count = document.set_where("apps[]", "license", "MIT", ".license == \"unknown\"", true).unwrap();
+  let count = document.set_where("apps[]", "license", "MIT", ".license == \"unknown\"", true, false).unwrap();
 
   assert_eq!(count, 2);
   assert_eq!(document.get_all("apps[].license"), vec!["MIT", "MIT", "MIT"]);
@@ -525,7 +527,7 @@ fn test_set_where_no_match_is_a_no_op() {
   let mut document = parse(&apps());
   let before = document.to_string();
 
-  let count = document.set_where("apps[]", "license", "MIT", ".name == \"absent\"", true).unwrap();
+  let count = document.set_where("apps[]", "license", "MIT", ".name == \"absent\"", true, false).unwrap();
 
   assert_eq!(count, 0);
   assert_eq!(document.to_string(), before);
@@ -535,7 +537,52 @@ fn test_set_where_no_match_is_a_no_op() {
 fn test_set_where_rejects_an_absolute_condition() {
   let mut document = parse(&apps());
 
-  let result = document.set_where("apps[]", "license", "MIT", "name == \"helios\"", true);
+  let result = document.set_where("apps[]", "license", "MIT", "name == \"helios\"", true, false);
 
   assert!(result.is_err(), "conditions are tested per item, so they must be relative");
+}
+
+#[test]
+fn test_set_where_plain_writes_a_null_literal_over_a_quoted_value() {
+  let mut document = parse(&apps());
+
+  document
+    .set_where("apps[]", "license_file", "null", ".name == \"helios\"", false, true)
+    .unwrap();
+
+  assert!(document.to_string().contains("license_file: null"));
+  assert!(
+    !document.to_string().contains(r#"license_file: "null""#),
+    "plain must not inherit the previous quote style"
+  );
+}
+
+#[test]
+fn test_set_where_without_plain_preserves_quote_style() {
+  let mut document = parse(&apps());
+
+  document
+    .set_where("apps[]", "license_file", "COPYING", ".name == \"helios\"", false, false)
+    .unwrap();
+
+  assert!(document.to_string().contains(r#"license_file: "COPYING""#));
+}
+
+#[test]
+fn test_set_plain_writes_literals_over_quoted_scalars() {
+  let mut document = parse("a: \"x\"\nb: \"y\"");
+
+  document.set_plain("a", "null").unwrap();
+  document.set_plain("b", "true").unwrap();
+
+  assert_eq!(document.to_string(), "a: null\nb: true");
+}
+
+#[test]
+fn test_set_all_plain_writes_literals_over_quoted_values() {
+  let mut document = parse("items:\n  - a: \"x\"\n  - a: \"y\"\n");
+
+  document.set_all_plain("items[].a", "null").unwrap();
+
+  assert_eq!(document.to_string(), "items:\n  - a: null\n  - a: null\n");
 }

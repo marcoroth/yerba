@@ -62,9 +62,15 @@ fn value_span(node: &SyntaxNode) -> Option<ValueSpan> {
   })
 }
 
-fn scalar_edit(source: &str, node: &SyntaxNode, value: &str) -> Option<(TextRange, String)> {
+fn scalar_edit(source: &str, node: &SyntaxNode, value: &str, plain: bool) -> Option<(TextRange, String)> {
   if let Some(block_scalar) = node.descendants().find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR) {
-    return Some((block_scalar.text_range(), Document::block_scalar_replacement(source, &block_scalar, value)));
+    let replacement = if plain {
+      value.to_string()
+    } else {
+      Document::block_scalar_replacement(source, &block_scalar, value)
+    };
+
+    return Some((block_scalar.text_range(), replacement));
   }
 
   if holds_collection(node) {
@@ -73,7 +79,13 @@ fn scalar_edit(source: &str, node: &SyntaxNode, value: &str) -> Option<(TextRang
 
   let scalar_token = find_scalar_token(node)?;
 
-  Some((scalar_token.text_range(), scalar_replacement_text(value, scalar_token.kind())))
+  let replacement = if plain {
+    value.to_string()
+  } else {
+    scalar_replacement_text(value, scalar_token.kind())
+  };
+
+  Some((scalar_token.text_range(), replacement))
 }
 
 fn replacement_text(span: &ValueSpan, value: &str) -> String {
@@ -112,6 +124,14 @@ impl Document {
   }
 
   pub fn set_all(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
+    self.set_all_with(dot_path, value, false)
+  }
+
+  pub fn set_all_plain(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
+    self.set_all_with(dot_path, value, true)
+  }
+
+  fn set_all_with(&mut self, dot_path: &str, value: &str, plain: bool) -> Result<(), YerbaError> {
     let nodes = self.navigate_all_compact(dot_path);
 
     if nodes.is_empty() {
@@ -119,12 +139,12 @@ impl Document {
     }
 
     let source = self.source_text();
-    let edits = nodes.iter().filter_map(|node| scalar_edit(&source, node, value)).collect();
+    let edits = nodes.iter().filter_map(|node| scalar_edit(&source, node, value, plain)).collect();
 
     self.apply_edits(edits)
   }
 
-  pub fn set_where(&mut self, container_path: &str, relative_path: &str, value: &str, condition: &str, all: bool) -> Result<usize, YerbaError> {
+  pub fn set_where(&mut self, container_path: &str, relative_path: &str, value: &str, condition: &str, all: bool, plain: bool) -> Result<usize, YerbaError> {
     validate_item_condition(condition)?;
 
     let items = self.navigate_all_compact(container_path);
@@ -158,7 +178,7 @@ impl Document {
       return Err(YerbaError::AmbiguousSelector(selector, targets.len()));
     }
 
-    let edits: Vec<(TextRange, String)> = targets.iter().filter_map(|node| scalar_edit(&source, node, value)).collect();
+    let edits: Vec<(TextRange, String)> = targets.iter().filter_map(|node| scalar_edit(&source, node, value, plain)).collect();
     let count = edits.len();
 
     self.apply_edits(edits)?;

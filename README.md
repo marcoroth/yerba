@@ -169,6 +169,20 @@ Use `--condition` to only apply the change when a sibling field matches:
 yerba set config.yml "database.host" "0.0.0.0" --condition ".port == 5432"
 ```
 
+Over a wildcard selector the condition picks out *which* items to edit, the same way it filters in
+`get`. Items that do not match are left alone:
+
+```bash
+yerba set videos.yml "[].title" "New Title" --condition ".id == talk-1"
+```
+
+If the condition matches more than one item the command stops rather than guessing, so add `--all`
+when editing several is what you meant:
+
+```bash
+yerba set videos.yml "[].published" false --condition ".kind == draft" --all
+```
+
 Use `--all` to update all nodes matching a wildcard selector:
 
 ```bash

@@ -469,3 +469,73 @@ fn test_set_all_multiline_on_block_scalars() {
     "}
   );
 }
+
+fn apps() -> String {
+  indoc! {r#"
+    apps:
+      - name: "alpha"
+        license: "MIT"
+        license_file: "LICENSE"
+      - name: "helios"
+        license: "unknown"
+        license_file: "README.md"
+      - name: "zeta"
+        license: "unknown"
+        license_file: null
+  "#}
+  .to_string()
+}
+
+#[test]
+fn test_set_where_touches_only_the_matching_item() {
+  let mut document = parse(&apps());
+
+  let count = document.set_where("apps[]", "license", "AGPL-3.0", ".name == \"helios\"", false).unwrap();
+
+  assert_eq!(count, 1);
+  assert_eq!(document.get_all("apps[].license"), vec!["MIT", "AGPL-3.0", "unknown"]);
+}
+
+#[test]
+fn test_set_where_without_all_errors_on_multiple_matches() {
+  let mut document = parse(&apps());
+
+  let result = document.set_where("apps[]", "license", "MIT", ".license == \"unknown\"", false);
+
+  assert!(result.is_err(), "two items match, so this is ambiguous without --all");
+  assert_eq!(
+    document.get_all("apps[].license"),
+    vec!["MIT", "unknown", "unknown"],
+    "a rejected set must not edit anything"
+  );
+}
+
+#[test]
+fn test_set_where_with_all_sets_every_match_and_nothing_else() {
+  let mut document = parse(&apps());
+
+  let count = document.set_where("apps[]", "license", "MIT", ".license == \"unknown\"", true).unwrap();
+
+  assert_eq!(count, 2);
+  assert_eq!(document.get_all("apps[].license"), vec!["MIT", "MIT", "MIT"]);
+}
+
+#[test]
+fn test_set_where_no_match_is_a_no_op() {
+  let mut document = parse(&apps());
+  let before = document.to_string();
+
+  let count = document.set_where("apps[]", "license", "MIT", ".name == \"absent\"", true).unwrap();
+
+  assert_eq!(count, 0);
+  assert_eq!(document.to_string(), before);
+}
+
+#[test]
+fn test_set_where_rejects_an_absolute_condition() {
+  let mut document = parse(&apps());
+
+  let result = document.set_where("apps[]", "license", "MIT", "name == \"helios\"", true);
+
+  assert!(result.is_err(), "conditions are tested per item, so they must be relative");
+}

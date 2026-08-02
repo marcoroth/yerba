@@ -11,6 +11,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
     yerba set config.yml "database.host" "0.0.0.0" --if-exists
     yerba set config.yml "database.host" "0.0.0.0" --condition ".port == 5432"
     yerba set videos.yml "[0].title" "New Title"
+    yerba set videos.yml "[].title" "New Title" --condition ".id == talk-1"
     yerba set "data/**/event.yml" "website" "" --if-exists
     yerba set videos.yml "[].description" "" --all
   "#})
@@ -53,6 +54,9 @@ impl Args {
       }
     }
 
+    let leaf = self.selector.rsplit_once('.').map(|(_, leaf)| leaf).unwrap_or(&self.selector);
+    let per_item = yerba::Selector::parse(parent_path).has_brackets();
+
     for resolved_file in resolve_files(&self.file) {
       let mut document = parse_file(&resolved_file);
 
@@ -61,16 +65,16 @@ impl Args {
       } else if self.if_missing {
         !document.exists(&self.selector)
       } else if let Some(condition) = &self.condition {
-        document.evaluate_condition(parent_path, condition).unwrap_or(false)
+        per_item || document.evaluate_condition(parent_path, condition).unwrap_or(false)
       } else {
         true
       };
 
       if should_set {
-        let result = if self.all {
-          document.set_all(&self.selector, &self.value)
-        } else {
-          document.set(&self.selector, &self.value)
+        let result = match &self.condition {
+          Some(condition) if per_item => document.set_where(parent_path, leaf, &self.value, condition, self.all).map(|_| ()),
+          _ if self.all => document.set_all(&self.selector, &self.value),
+          _ => document.set(&self.selector, &self.value),
         };
 
         run_op_with_hint(

@@ -62,6 +62,20 @@ fn value_span(node: &SyntaxNode) -> Option<ValueSpan> {
   })
 }
 
+fn scalar_edit(source: &str, node: &SyntaxNode, value: &str) -> Option<(TextRange, String)> {
+  if let Some(block_scalar) = node.descendants().find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR) {
+    return Some((block_scalar.text_range(), Document::block_scalar_replacement(source, &block_scalar, value)));
+  }
+
+  if holds_collection(node) {
+    return value_span(node).map(|span| (span.range, replacement_text(&span, value)));
+  }
+
+  let scalar_token = find_scalar_token(node)?;
+
+  Some((scalar_token.text_range(), scalar_replacement_text(value, scalar_token.kind())))
+}
+
 fn replacement_text(span: &ValueSpan, value: &str) -> String {
   let mut text = if span.separated { format!(" {}", value) } else { value.to_string() };
 
@@ -105,21 +119,51 @@ impl Document {
     }
 
     let source = self.source_text();
-    let mut edits: Vec<(TextRange, String)> = Vec::new();
-
-    for node in nodes {
-      if let Some(block_scalar) = node.descendants().find(|child| child.kind() == SyntaxKind::BLOCK_SCALAR) {
-        edits.push((block_scalar.text_range(), Self::block_scalar_replacement(&source, &block_scalar, value)));
-      } else if holds_collection(&node) {
-        if let Some(span) = value_span(&node) {
-          edits.push((span.range, replacement_text(&span, value)));
-        }
-      } else if let Some(scalar_token) = find_scalar_token(&node) {
-        edits.push((scalar_token.text_range(), scalar_replacement_text(value, scalar_token.kind())));
-      }
-    }
+    let edits = nodes.iter().filter_map(|node| scalar_edit(&source, node, value)).collect();
 
     self.apply_edits(edits)
+  }
+
+  pub fn set_where(&mut self, container_path: &str, relative_path: &str, value: &str, condition: &str, all: bool) -> Result<usize, YerbaError> {
+    validate_item_condition(condition)?;
+
+    let items = self.navigate_all_compact(container_path);
+
+    if items.is_empty() {
+      return Err(YerbaError::SelectorNotFound(container_path.to_string()));
+    }
+
+    let source = self.source_text();
+    let mut targets: Vec<SyntaxNode> = Vec::new();
+
+    for item in &items {
+      if !self.evaluate_condition_on_node(item, condition) {
+        continue;
+      }
+
+      targets.extend(navigate_from_node(item, relative_path));
+    }
+
+    if targets.is_empty() {
+      return Ok(0);
+    }
+
+    if !all && targets.len() > 1 {
+      let selector = if container_path.is_empty() {
+        relative_path.to_string()
+      } else {
+        format!("{}.{}", container_path, relative_path)
+      };
+
+      return Err(YerbaError::AmbiguousSelector(selector, targets.len()));
+    }
+
+    let edits: Vec<(TextRange, String)> = targets.iter().filter_map(|node| scalar_edit(&source, node, value)).collect();
+    let count = edits.len();
+
+    self.apply_edits(edits)?;
+
+    Ok(count)
   }
 
   pub fn set_scalar_style(&mut self, dot_path: &str, style: &QuoteStyle) -> Result<(), YerbaError> {

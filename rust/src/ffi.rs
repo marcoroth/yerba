@@ -497,13 +497,11 @@ pub unsafe extern "C" fn yerba_document_set(
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
   let value_string = CStr::from_ptr(value).to_str().unwrap_or("");
 
-  let result = if all {
-    document.set_all(selector_string, value_string)
-  } else {
-    match value_type {
-      YerbaValueType::String => document.set(selector_string, value_string),
-      _ => document.set_plain(selector_string, value_string),
-    }
+  let result = match (all, value_type) {
+    (true, YerbaValueType::String) => document.set_all(selector_string, value_string),
+    (true, _) => document.set_all_plain(selector_string, value_string),
+    (false, YerbaValueType::String) => document.set(selector_string, value_string),
+    (false, _) => document.set_plain(selector_string, value_string),
   };
 
   match result {

@@ -288,6 +288,27 @@ class DocumentTest < Minitest::Spec
     assert_includes document.to_s, "timeout: null"
   end
 
+  test "set writes null for nil over a quoted value" do
+    document = Yerba::Document.parse(<<~YAML)
+      license_file: "README.md"
+    YAML
+    document.set("license_file", nil)
+
+    assert_includes document.to_s, "license_file: null"
+    refute_includes document.to_s, '"null"'
+    assert_nil Psych.load(document.to_s)["license_file"]
+  end
+
+  test "set keeps a quoted string that looks like null a string" do
+    document = Yerba::Document.parse(<<~YAML)
+      license_file: "README.md"
+    YAML
+    document.set("license_file", "null")
+
+    assert_includes document.to_s, 'license_file: "null"'
+    assert_equal "null", Psych.load(document.to_s)["license_file"]
+  end
+
   test "set returns self for chaining" do
     document = Yerba::Document.parse(<<~YAML)
       a: 1

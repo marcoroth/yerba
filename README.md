@@ -189,6 +189,14 @@ Use `--all` to update all nodes matching a wildcard selector:
 yerba set videos.yml "[].description" "" --all
 ```
 
+Values are written in the quote style already at the path, which keeps string edits tidy but would
+turn `null` into the string `"null"`. Use `--plain` to write a YAML literal instead:
+
+```bash
+yerba set config.yml "database.replica" null --plain
+yerba set config.yml "database.ssl" true --plain
+```
+
 ### `insert`
 
 Insert a new key into a map or a new item into a sequence. By default, new items are appended at the end.

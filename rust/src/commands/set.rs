@@ -14,6 +14,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
     yerba set videos.yml "[].title" "New Title" --condition ".id == talk-1"
     yerba set "data/**/event.yml" "website" "" --if-exists
     yerba set videos.yml "[].description" "" --all
+    yerba set config.yml "database.replica" null --plain
   "#})
 });
 
@@ -36,6 +37,8 @@ pub struct Args {
   condition: Option<String>,
   #[arg(long)]
   all: bool,
+  #[arg(long, help = "Write the value unquoted, for YAML literals like null, true or 42")]
+  plain: bool,
   #[arg(long)]
   dry_run: bool,
 }
@@ -72,8 +75,10 @@ impl Args {
 
       if should_set {
         let result = match &self.condition {
-          Some(condition) if per_item => document.set_where(parent_path, leaf, &self.value, condition, self.all).map(|_| ()),
+          Some(condition) if per_item => document.set_where(parent_path, leaf, &self.value, condition, self.all, self.plain).map(|_| ()),
+          _ if self.all && self.plain => document.set_all_plain(&self.selector, &self.value),
           _ if self.all => document.set_all(&self.selector, &self.value),
+          _ if self.plain => document.set_plain(&self.selector, &self.value),
           _ => document.set(&self.selector, &self.value),
         };
 

@@ -188,11 +188,10 @@ pub(crate) fn run_yerbafile(write: bool, files: Vec<String>) {
     process::exit(1);
   });
 
-  eprintln!("{}", ui::banner());
+  eprintln!("\n{}\n", ui::banner());
 
   eprintln!(
-    "{}{} {}\n",
-    ui::INDENT,
+    "{} {}\n",
     ui::strong("Using Yerbafile rules"),
     ui::subtle(format!("(from {})", yerbafile_path.display()))
   );

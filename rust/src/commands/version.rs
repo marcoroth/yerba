@@ -3,7 +3,7 @@ use super::ui;
 pub fn run() {
   println!("{}", ui::banner());
   println!(
-    "   {}{} {}{} {}{} {}{} {}{}",
+    "{}{} {}{} {}{} {}{} {}{}",
     ui::strong("Y"),
     ui::subtle("AML"),
     ui::strong("E"),

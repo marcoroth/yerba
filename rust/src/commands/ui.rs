@@ -110,10 +110,9 @@ pub fn strong(text: impl std::fmt::Display) -> String {
 }
 
 pub fn banner() -> String {
-  format!("🧉 {} {}", Style::fg(GREEN).bold().paint("yerba"), subtle(format!("v{}", yerba::version())))
+  format!("{} 🧉 {}", strong("Yerba"), subtle(format!("v{}", yerba::version())))
 }
 
-pub const INDENT: &str = "   ";
 pub const STATUS_INDENT: &str = "  ";
 
 pub mod glyph {

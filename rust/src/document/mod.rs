@@ -130,6 +130,7 @@ pub enum InsertPosition {
 pub struct Document {
   root: SyntaxNode,
   path: Option<PathBuf>,
+  revision: u64,
 }
 
 impl Document {
@@ -138,7 +139,19 @@ impl Document {
 
     check_duplicate_keys(&tree)?;
 
-    Ok(Document { root: tree, path: None })
+    Ok(Document {
+      root: tree,
+      path: None,
+      revision: 0,
+    })
+  }
+
+  pub fn revision(&self) -> u64 {
+    self.revision
+  }
+
+  pub fn set_revision(&mut self, revision: u64) {
+    self.revision = revision;
   }
 
   pub fn parse_file(path: impl AsRef<Path>) -> Result<Self, YerbaError> {
@@ -478,9 +491,11 @@ impl Document {
   fn reparse(&mut self, new_source: &str) -> Result<(), YerbaError> {
     let document = Self::parse(new_source)?;
     let path = self.path.take();
+    let revision = self.revision;
 
     *self = document;
     self.path = path;
+    self.revision = revision.wrapping_add(1);
 
     Ok(())
   }

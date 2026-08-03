@@ -47,6 +47,122 @@ class DocumentTest < Minitest::Spec
     YAML
   end
 
+  test "document.revision only changes when the document is edited" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      port: 5432
+    YAML
+
+    initial = document.revision
+
+    document.value_at("name")
+    document.to_s
+
+    assert_equal initial, document.revision
+
+    document.set("name", "Bob")
+
+    assert_operator document.revision, :>, initial
+
+    after_set = document.revision
+    document.delete("port")
+
+    assert_operator document.revision, :>, after_set
+  end
+
+  test "document.revision changes when content is replaced" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    initial = document.revision
+    document.replace_content!("name: Bob\n")
+
+    refute_equal initial, document.revision
+  end
+
+  test "document.revision is unchanged by reads" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+      items:
+        - name: first
+    YAML
+
+    initial = document.revision
+
+    document["database"]["host"].value
+    document["items"].to_a
+    document.value_at("database")
+    document.source("database.host")
+    document.location("database.host")
+    document.selectors
+    document.exists?("database.host")
+    document.to_s
+
+    assert_equal initial, document.revision
+  end
+
+  test "document.revision changes for every mutating entry point" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+      items:
+        - name: first
+    YAML
+
+    mutations = [
+      -> { document.set("database.host", "0.0.0.0") },
+      -> { document["database"]["host"] = "127.0.0.1" },
+      -> { document["database"]["host"].value = "example.com" },
+      -> { document["database"]["host"].quote_style = :double },
+      -> { document["items"] << { "name" => "second" } },
+      -> { document["items"].delete_at(1) },
+      -> { document.insert("database.port", 5432) },
+      -> { document.rename("database.port", "database.portnumber") },
+      -> { document.sort_keys("database", ["portnumber", "host"]) },
+      -> { document.delete("database.portnumber") },
+      -> { document["items"][0]["name"].delete },
+      -> { document.replace_content!("name: Alice\n") }
+    ]
+
+    mutations.each do |mutation|
+      before = document.revision
+
+      mutation.call
+
+      assert_operator document.revision, :>, before, "expected revision to advance"
+    end
+  end
+
+  test "document.revision is unchanged when an edit fails" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    initial = document.revision
+
+    assert_raises(Yerba::Error) { document.set("missing", "value") }
+
+    assert_equal initial, document.revision
+  end
+
+  test "document.revision is per document" do
+    first = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    second = Yerba::Document.parse(<<~YAML)
+      name: Bob
+    YAML
+
+    initial = second.revision
+
+    first.set("name", "Carol")
+
+    assert_equal initial, second.revision
+  end
+
   test "get returns string for plain string scalar" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice

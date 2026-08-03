@@ -225,6 +225,16 @@ pub unsafe extern "C" fn yerba_document_free(document: *mut Document) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_revision(document: *const Document) -> u64 {
+  (*document).revision()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_document_set_revision(document: *mut Document, revision: u64) {
+  (*document).set_revision(revision);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *const c_char) -> YerbaGetResult {
   let document = &*document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");

@@ -34,6 +34,7 @@ pub struct Args {
   /// Comma-separated map keys to separate from what follows them
   #[arg(long)]
   after: Option<String>,
+  /// Leave entries alone when their value is null, an empty collection, or an empty string
   #[arg(long)]
   skip_empty: bool,
   #[arg(long)]

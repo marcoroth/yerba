@@ -7,6 +7,13 @@ pub struct StyleEnforcement {
   pub value_style: Option<QuoteStyle>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct BlankLineOptions {
+  pub before: Vec<String>,
+  pub after: Vec<String>,
+  pub skip_empty: bool,
+}
+
 impl Document {
   pub fn enforce_styles(&mut self, enforcement: &StyleEnforcement) -> Result<(), YerbaError> {
     let source = self.source_text();
@@ -588,6 +595,10 @@ impl Document {
   }
 
   pub fn enforce_blank_lines(&mut self, dot_path: &str, blank_lines: usize) -> Result<(), YerbaError> {
+    self.enforce_blank_lines_with(dot_path, blank_lines, &BlankLineOptions::default())
+  }
+
+  pub fn enforce_blank_lines_with(&mut self, dot_path: &str, blank_lines: usize, options: &BlankLineOptions) -> Result<(), YerbaError> {
     let nodes = if dot_path.contains('[') {
       self.navigate_all_compact(dot_path)
     } else {
@@ -597,14 +608,44 @@ impl Document {
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
     for current_node in &nodes {
-      let entry_nodes: Vec<SyntaxNode> = match first_collection(current_node) {
-        Some(FirstCollection::Sequence(sequence)) => sequence.entries().map(|entry| entry.syntax().clone()).collect(),
-        Some(FirstCollection::Map(map)) => map.entries().map(|entry| entry.syntax().clone()).collect(),
+      let entries: Vec<BlankLineEntry> = match first_collection(current_node) {
+        Some(FirstCollection::Sequence(sequence)) => sequence
+          .entries()
+          .map(|entry| BlankLineEntry {
+            is_empty: is_empty_value(&node_to_yaml_value(entry.syntax())),
+            node: entry.syntax().clone(),
+            key: None,
+          })
+          .collect(),
+
+        Some(FirstCollection::Map(map)) => map
+          .entries()
+          .map(|entry| {
+            let value = entry
+              .value()
+              .map(|value_node| node_to_yaml_value(value_node.syntax()))
+              .unwrap_or(yaml_serde::Value::Null);
+
+            BlankLineEntry {
+              key: entry.key().and_then(|key_node| extract_scalar_text(key_node.syntax())),
+              is_empty: is_empty_value(&value),
+              node: entry.syntax().clone(),
+            }
+          })
+          .collect(),
+
         None => continue,
       };
 
-      for entry_node in entry_nodes.iter().skip(1) {
-        collect_blank_line_edits(entry_node, blank_lines, &mut edits);
+      for index in 1..entries.len() {
+        let entry = &entries[index];
+        let previous = &entries[index - 1];
+
+        if !should_adjust_gap(entry, previous, options) {
+          continue;
+        }
+
+        collect_blank_line_edits(&entry.node, blank_lines, &mut edits);
       }
     }
 
@@ -925,6 +966,39 @@ impl Document {
     self.apply_edits(edits)?;
 
     Ok(warnings)
+  }
+}
+
+struct BlankLineEntry {
+  node: SyntaxNode,
+  key: Option<String>,
+  is_empty: bool,
+}
+
+fn should_adjust_gap(entry: &BlankLineEntry, previous: &BlankLineEntry, options: &BlankLineOptions) -> bool {
+  let usable = |candidate: &BlankLineEntry| !options.skip_empty || !candidate.is_empty;
+
+  if options.before.is_empty() && options.after.is_empty() {
+    return usable(entry);
+  }
+
+  (matches_key(entry.key.as_deref(), &options.before) && usable(entry)) || (matches_key(previous.key.as_deref(), &options.after) && usable(previous))
+}
+
+fn matches_key(key: Option<&str>, keys: &[String]) -> bool {
+  match key {
+    Some(key) => keys.iter().any(|wanted| wanted == key),
+    None => false,
+  }
+}
+
+fn is_empty_value(value: &yaml_serde::Value) -> bool {
+  match value {
+    yaml_serde::Value::Null => true,
+    yaml_serde::Value::String(text) => text.is_empty(),
+    yaml_serde::Value::Sequence(entries) => entries.is_empty(),
+    yaml_serde::Value::Mapping(entries) => entries.is_empty(),
+    _ => false,
   }
 }
 

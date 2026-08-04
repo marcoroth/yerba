@@ -1842,3 +1842,133 @@ fn test_insert_step_with_plain_writes_a_literal() {
 
   assert!(document.to_string().contains("published: true"), "{}", document.to_string());
 }
+
+#[test]
+fn test_blank_lines_before_spaces_only_the_listed_keys() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    pipeline:
+      - blank_lines:
+          count: 0
+
+      - blank_lines:
+          count: 1
+          before:
+            - arguments
+            - options
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    name: link_to
+
+    gem: actionview
+    arguments:
+      - name: name
+    options:
+      - name: method
+  "})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "any/file.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+    name: link_to
+    gem: actionview
+
+    arguments:
+      - name: name
+
+    options:
+      - name: method
+  "}
+  );
+}
+
+#[test]
+fn test_blank_lines_without_before_spaces_every_entry() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    pipeline:
+      - blank_lines:
+          count: 1
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    name: link_to
+    gem: actionview
+  "})
+  .unwrap();
+
+  yerbafile.apply_to_document(&mut document, "any/file.yml").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+    name: link_to
+
+    gem: actionview
+  "}
+  );
+}
+
+#[test]
+fn test_blank_lines_skip_empty_keeps_placeholder_entries_packed() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    pipeline:
+      - blank_lines:
+          count: 0
+
+      - blank_lines:
+          count: 1
+          skip_empty: true
+          before:
+            - tag
+            - arguments
+            - options
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {"
+    name: image_tag
+    tag: null
+    arguments:
+      - name: source
+    options: []
+  "})
+  .unwrap();
+
+  yerbafile.apply_to_document(&mut document, "any/file.yml").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+    name: image_tag
+    tag: null
+
+    arguments:
+      - name: source
+    options: []
+  "}
+  );
+}

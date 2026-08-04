@@ -1,6 +1,14 @@
 mod support;
 use indoc::indoc;
 use support::parse;
+use yerba::BlankLineOptions;
+
+fn before(keys: &[&str]) -> BlankLineOptions {
+  BlankLineOptions {
+    before: keys.iter().map(|key| key.to_string()).collect(),
+    ..Default::default()
+  }
+}
 
 #[test]
 fn test_add_blank_lines_between_entries() {
@@ -386,6 +394,485 @@ fn test_blank_lines_map_normalizes_multiple() {
     indoc! {"
       host: localhost
       port: 5432
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_before_only_spaces_listed_keys() {
+  let mut document = parse(indoc! {"
+    name: link_to
+    gem: actionview
+    arguments:
+      - name: name
+    options:
+      - name: method
+  "});
+
+  document.enforce_blank_lines_with("", 1, &before(&["arguments", "options"])).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: link_to
+      gem: actionview
+
+      arguments:
+        - name: name
+
+      options:
+        - name: method
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_before_removes_blank_lines_from_unlisted_keys() {
+  let mut document = parse(indoc! {"
+    name: link_to
+
+    gem: actionview
+
+    arguments:
+      - name: name
+  "});
+
+  document.enforce_blank_lines_with("", 0, &before(&["gem"])).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: link_to
+      gem: actionview
+
+      arguments:
+        - name: name
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_before_ignores_the_first_entry() {
+  let mut document = parse(indoc! {"
+    name: link_to
+    gem: actionview
+  "});
+
+  document.enforce_blank_lines_with("", 1, &before(&["name"])).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: link_to
+      gem: actionview
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_before_never_matches_sequence_entries() {
+  let mut document = parse(indoc! {"
+    - id: a
+    - id: b
+  "});
+
+  document.enforce_blank_lines_with("", 1, &before(&["id"])).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: a
+      - id: b
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_before_applies_to_every_wildcard_match() {
+  let mut document = parse(indoc! {"
+    - name: first
+      options:
+        - a
+    - name: second
+      options:
+        - b
+  "});
+
+  document.enforce_blank_lines_with("[]", 1, &before(&["options"])).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - name: first
+
+        options:
+          - a
+      - name: second
+
+        options:
+          - b
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_without_filter_still_spaces_every_entry() {
+  let mut document = parse(indoc! {"
+    name: link_to
+    gem: actionview
+    arguments:
+      - name: name
+  "});
+
+  document.enforce_blank_lines_with("", 1, &before(&[])).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: link_to
+
+      gem: actionview
+
+      arguments:
+        - name: name
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_skip_empty_leaves_placeholder_entries_packed() {
+  let mut document = parse(indoc! {"
+    name: content_security_policy?
+    description: Returns whether a policy is present.
+    tag: null
+    arguments: []
+    options: []
+    special_behaviors: []
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        before: ["description", "tag", "arguments", "options", "special_behaviors"]
+          .iter()
+          .map(|key| key.to_string())
+          .collect(),
+        skip_empty: true,
+        ..Default::default()
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: content_security_policy?
+
+      description: Returns whether a policy is present.
+      tag: null
+      arguments: []
+      options: []
+      special_behaviors: []
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_skip_empty_still_spaces_populated_entries() {
+  let mut document = parse(indoc! {"
+    name: image_tag
+    tag: null
+    arguments:
+      - name: source
+    options: []
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        before: ["tag", "arguments", "options"].iter().map(|key| key.to_string()).collect(),
+        skip_empty: true,
+        ..Default::default()
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: image_tag
+      tag: null
+
+      arguments:
+        - name: source
+      options: []
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_skip_empty_treats_empty_string_as_empty() {
+  let mut document = parse(indoc! {"
+    name: helper
+    documentation_url: \"\"
+    signature: helper()
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        skip_empty: true,
+        ..Default::default()
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: helper
+      documentation_url: \"\"
+
+      signature: helper()
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_without_skip_empty_spaces_placeholders_too() {
+  let mut document = parse(indoc! {"
+    name: helper
+    tag: null
+    arguments: []
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        before: ["tag", "arguments"].iter().map(|key| key.to_string()).collect(),
+        skip_empty: false,
+        ..Default::default()
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: helper
+
+      tag: null
+
+      arguments: []
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_after_separates_a_block_from_the_empty_entries_that_follow() {
+  let mut document = parse(indoc! {"
+    name: tag
+    tag:
+      name: meta
+      is_void: true
+    arguments: []
+    options: []
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        before: ["tag", "arguments", "options"].iter().map(|key| key.to_string()).collect(),
+        after: vec!["tag".to_string()],
+        skip_empty: true,
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: tag
+
+      tag:
+        name: meta
+        is_void: true
+
+      arguments: []
+      options: []
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_after_is_suppressed_when_the_trigger_is_empty() {
+  let mut document = parse(indoc! {"
+    name: helper
+    tag: null
+    arguments: []
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        after: vec!["tag".to_string()],
+        skip_empty: true,
+        ..Default::default()
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: helper
+      tag: null
+      arguments: []
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_after_without_skip_empty_always_separates() {
+  let mut document = parse(indoc! {"
+    name: helper
+    tag: null
+    arguments: []
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        after: vec!["tag".to_string()],
+        ..Default::default()
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: helper
+      tag: null
+
+      arguments: []
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_before_and_after_the_same_key_sets_it_apart_on_both_sides() {
+  let mut document = parse(indoc! {"
+    name: helper
+    tag:
+      name: meta
+    arguments: []
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        before: vec!["tag".to_string()],
+        after: vec!["tag".to_string()],
+        skip_empty: true,
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      name: helper
+
+      tag:
+        name: meta
+
+      arguments: []
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_before_and_after_matching_the_same_gap_yields_one_blank_line() {
+  let mut document = parse(indoc! {"
+    tag:
+      name: meta
+    arguments:
+      - name: source
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        before: vec!["arguments".to_string()],
+        after: vec!["tag".to_string()],
+        skip_empty: true,
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tag:
+        name: meta
+
+      arguments:
+        - name: source
+    "}
+  );
+}
+
+#[test]
+fn test_blank_lines_overlapping_filters_normalize_existing_extra_blank_lines() {
+  let mut document = parse(indoc! {"
+    tag:
+      name: meta
+
+
+
+    arguments:
+      - name: source
+  "});
+
+  document
+    .enforce_blank_lines_with(
+      "",
+      1,
+      &BlankLineOptions {
+        before: vec!["arguments".to_string()],
+        after: vec!["tag".to_string()],
+        skip_empty: true,
+      },
+    )
+    .unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tag:
+        name: meta
+
+      arguments:
+        - name: source
     "}
   );
 }

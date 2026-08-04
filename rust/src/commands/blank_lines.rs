@@ -11,6 +11,8 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
     yerba blank-lines videos.yml "[]" 1
     yerba blank-lines videos.yml "[].speakers" 1
     yerba blank-lines config.yml "tags" 0
+    yerba blank-lines event.yml "" 1 --before "schedule,speakers"
+    yerba blank-lines event.yml "" 1 --after "location" --skip-empty
   "#})
 });
 
@@ -26,6 +28,14 @@ pub struct Args {
   first: String,
   /// Count (when selector is provided as first positional)
   second: Option<usize>,
+  /// Comma-separated map keys to separate from what precedes them
+  #[arg(long)]
+  before: Option<String>,
+  /// Comma-separated map keys to separate from what follows them
+  #[arg(long)]
+  after: Option<String>,
+  #[arg(long)]
+  skip_empty: bool,
   #[arg(long)]
   dry_run: bool,
 }
@@ -44,12 +54,22 @@ impl Args {
       std::process::exit(1);
     };
 
+    let options = yerba::BlankLineOptions {
+      before: split_keys(self.before.as_deref()),
+      after: split_keys(self.after.as_deref()),
+      skip_empty: self.skip_empty,
+    };
+
     for resolved_file in resolve_files(&self.file) {
       let mut document = parse_file(&resolved_file);
 
-      if document.enforce_blank_lines(selector, count).is_ok() {
+      if document.enforce_blank_lines_with(selector, count, &options).is_ok() {
         output(&resolved_file, &document, self.dry_run);
       }
     }
   }
+}
+
+fn split_keys(keys: Option<&str>) -> Vec<String> {
+  keys.map(|keys| keys.split(',').map(|key| key.trim().to_string()).collect()).unwrap_or_default()
 }

@@ -376,6 +376,52 @@ yerba blank-lines videos.yml "[]" 1
 yerba blank-lines config.yml "tags" 0
 ```
 
+By default every entry after the first is adjusted. Use `--before` to set apart only certain sections of a map and leave their neighbours alone:
+
+```bash
+yerba blank-lines event.yml "" 1 --before "schedule,speakers"
+```
+
+```yaml
+id: rubyconf-2024
+name: RubyConf 2024
+city: Chicago
+
+schedule:
+  - day: 1
+
+speakers:
+  - name: Alice
+```
+
+`--after` is the mirror image, separating a key from what follows it. Listing a key in both sets it apart on both sides:
+
+```bash
+yerba blank-lines event.yml "" 1 --before "location" --after "location"
+```
+
+Keys that are not listed keep whatever spacing they already have, so these flags add separators without reflowing the rest of the document. Sequence entries have no key and are never matched by a filter, which means `--before` and `--after` on a sequence are no-ops.
+
+Use `--skip-empty` to leave placeholder entries tucked against their neighbours. An entry counts as empty when its value is `null`, an empty collection, or an empty string:
+
+```bash
+yerba blank-lines event.yml "" 1 --before "location,speakers,sponsors" --after "location" --skip-empty
+```
+
+```yaml
+id: rubyconf-2024
+name: RubyConf 2024
+
+location:
+  city: Chicago
+  country: US
+
+speakers: []
+sponsors: []
+```
+
+The match is ignored when the entry that *triggered* it is empty, not the one on the other side of the gap. That is why `--after "location"` still separates a populated `location:` block from the empty entries below it, while a bare `location: null` would stay packed. Without `--skip-empty`, every listed key gets its blank line whether or not it holds anything.
+
 ### `directives`
 
 Add or remove the document start marker (`---`):
@@ -563,7 +609,7 @@ Available pipeline steps:
 - `sequence_indent` Enforce compact or indented sequence style
 - `sort_keys` Reorder keys to match a predefined list
 - `sort` Sort sequence items by field(s)
-- `blank_lines` Enforce blank lines between sequence entries
+- `blank_lines` Enforce blank lines between sequence entries, optionally limited to named map keys with `before` and to non-empty values with `skip_empty`
 - `set` Set a value (supports conditions, and `plain: true` for YAML literals)
 - `insert` Insert a new key or sequence item (`plain: true` for YAML literals and fragments)
 - `delete` Remove a key (supports conditions)

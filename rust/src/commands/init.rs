@@ -45,6 +45,12 @@ pub fn run() {
     #       # Enforce blank lines between sequence entries
     #       - blank_lines:
     #           count: 1
+    #           # skip_empty: true      # leave null/empty entries packed
+    #           # before:               # separate these keys from what precedes them
+    #           #   - schedule
+    #           #   - speakers
+    #           # after:                # separate these keys from what follows them
+    #           #   - location
     #
     #       # Set a value (with optional condition)
     #       - set:

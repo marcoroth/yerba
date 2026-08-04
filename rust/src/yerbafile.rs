@@ -59,6 +59,12 @@ pub struct BlankLinesConfig {
   #[serde(default)]
   pub path: Option<String>,
   pub count: usize,
+  #[serde(default)]
+  pub before: Vec<String>,
+  #[serde(default)]
+  pub after: Vec<String>,
+  #[serde(default)]
+  pub skip_empty: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -825,7 +831,13 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     PipelineStep::BlankLines(config) => {
       let full_path = resolve_step_path(base_path, config.path.as_deref());
 
-      document.enforce_blank_lines(&full_path, config.count)
+      let options = crate::BlankLineOptions {
+        before: config.before.clone(),
+        after: config.after.clone(),
+        skip_empty: config.skip_empty,
+      };
+
+      document.enforce_blank_lines_with(&full_path, config.count, &options)
     }
 
     PipelineStep::Sort(config) => {

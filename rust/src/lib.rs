@@ -13,7 +13,7 @@ mod yaml_writer;
 #[cfg(feature = "cli")]
 pub mod yerbafile;
 
-pub use document::style::StyleEnforcement;
+pub use document::style::{BlankLineOptions, StyleEnforcement};
 pub use document::{
   collect_selectors, validate_condition, validate_item_condition, Document, DuplicateInfo, InsertPosition, LocatedNode, Location, NodeInfo, NodeType, SortField,
 };

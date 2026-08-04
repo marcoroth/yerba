@@ -436,6 +436,14 @@ impl Yerbafile {
 
     let original = document.to_string();
 
+    if let Some(error) = control_character_error(&original) {
+      return RuleResult {
+        file: file.to_string(),
+        changed: false,
+        error: Some(error),
+      };
+    }
+
     if run_global {
       if let Err(error) = execute_pipeline(&mut document, &self.pipeline, None, file, self) {
         return RuleResult {
@@ -517,6 +525,14 @@ impl Yerbafile {
 
     let original = document.to_string();
 
+    if let Some(error) = control_character_error(&original) {
+      return RuleResult {
+        file: file.to_string(),
+        changed: false,
+        error: Some(error),
+      };
+    }
+
     if let Err(error) = execute_pipeline(&mut document, &self.pipeline, None, file, self) {
       return RuleResult {
         file: file.to_string(),
@@ -579,6 +595,10 @@ impl Yerbafile {
   pub fn apply_to_document(&self, document: &mut Document, file_path: &str) -> Result<bool, YerbaError> {
     let original = document.to_string();
 
+    if let Some(error) = control_character_error(&original) {
+      return Err(error);
+    }
+
     let relative_path = self.relativize_path(file_path);
     let match_path = relative_path.as_deref().unwrap_or(file_path);
 
@@ -606,6 +626,12 @@ impl Yerbafile {
 
     Ok(document.to_string() != original)
   }
+}
+
+fn control_character_error(source: &str) -> Option<YerbaError> {
+  let found = crate::validation::find_control_characters(source);
+
+  (!found.is_empty()).then_some(YerbaError::ControlCharacters(found))
 }
 
 fn execute_pipeline(document: &mut Document, steps: &[PipelineStep], base_path: Option<&str>, file: &str, yerbafile: &Yerbafile) -> Result<(), YerbaError> {

@@ -10,6 +10,7 @@ pub enum YerbaError {
   IndexOutOfBounds(usize, usize),
   UnknownKeys(Vec<String>),
   DuplicateValues(Vec<crate::DuplicateInfo>),
+  ControlCharacters(Vec<crate::ControlCharacter>),
   #[cfg(feature = "schema")]
   SchemaValidation(Vec<crate::schema::ValidationError>),
   DuplicateKey {
@@ -73,6 +74,19 @@ impl std::fmt::Display for YerbaError {
           .collect();
 
         write!(f, "found {} {}: {}", duplicates.len(), noun, details.join(", "))
+      }
+
+      YerbaError::ControlCharacters(found) => {
+        let noun = if found.len() == 1 { "character" } else { "characters" };
+        let details: Vec<String> = found.iter().map(|control| format!("    {}", control)).collect();
+
+        write!(
+          f,
+          "found {} control {} that YAML parsers reject:\n{}\n\n  Control characters must be removed, or escaped as \\xNN inside a double-quoted value.\n",
+          found.len(),
+          noun,
+          details.join("\n")
+        )
       }
 
       YerbaError::IndexOutOfBounds(index, length) => {
@@ -147,6 +161,16 @@ impl GitHubAnnotations for YerbaError {
           file: file.to_string(),
           line: error.line,
           message: error.to_string(),
+        })
+        .collect(),
+
+      YerbaError::ControlCharacters(found) => found
+        .iter()
+        .map(|control| GitHubAnnotation {
+          level: "error ",
+          file: file.to_string(),
+          line: Some(control.line),
+          message: format!("control character U+{:04X} at column {}", control.character as u32, control.column),
         })
         .collect(),
 

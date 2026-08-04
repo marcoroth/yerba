@@ -580,6 +580,18 @@ This makes it easy to enforce project-wide YAML conventions in CI:
 yerba check
 ```
 
+Every checked file is also scanned for control characters, whatever the pipeline says. Yerba's parser accepts them but libyaml does not, so without this a file could pass `check` in CI and then fail to load in the application that reads it. Offending characters are reported with their line and column:
+
+```console
+$ yerba check
+  ✗ data/rubyconf-taiwan/videos.yml
+    found 2 control characters that YAML parsers reject:
+    U+0008 at line 152, column 34
+    U+0008 at line 154, column 12
+```
+
+Tabs, newlines and carriage returns are fine, and so are characters written escaped as `\xNN` inside a double-quoted value — only literal ones are reported.
+
 ## Ruby API
 
 Yerba includes a native C extension (backed by the same Rust core) that provides a full Ruby API for YAML editing.

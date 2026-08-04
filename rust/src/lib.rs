@@ -8,6 +8,7 @@ mod quote_style;
 pub mod schema;
 pub mod selector;
 mod syntax;
+mod validation;
 mod yaml_writer;
 #[cfg(feature = "cli")]
 pub mod yerbafile;
@@ -24,6 +25,7 @@ pub use syntax::{
   is_quoted_scalar, is_raw_yaml_text, is_single_quotable, is_valid_inline_value, needs_quoting, needs_quoting_in_flow, quote_if_needed, quote_scalar,
   ScalarValue, YerbaValueType,
 };
+pub use validation::{find_control_characters, ControlCharacter};
 pub use yaml_writer::json_to_yaml_text;
 #[cfg(feature = "cli")]
 pub use yerbafile::Yerbafile;

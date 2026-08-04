@@ -2,7 +2,8 @@ mod support;
 use indoc::indoc;
 use support::parse;
 use yerba::{
-  is_inline_scalar_safe, is_plain_safe, is_plain_safe_in_flow, is_quoted_scalar, is_valid_inline_value, needs_quoting, quote_if_needed, quote_scalar, InsertPosition,
+  is_inline_scalar_safe, is_plain_safe, is_plain_safe_in_flow, is_quoted_scalar, is_valid_inline_value, needs_quoting, quote_if_needed, quote_scalar,
+  InsertPosition,
 };
 
 #[test]

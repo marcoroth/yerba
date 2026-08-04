@@ -414,6 +414,31 @@ static VALUE document_resolve_selectors(VALUE self, VALUE path) {
   return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
 }
 
+/* Yerba.quote_scalar(value, style = nil) → YAML text for value, quoted when the style cannot carry it. */
+static VALUE yerba_s_quote_scalar(int argc, VALUE *argv, VALUE self) {
+  VALUE value, style_value;
+  rb_scan_args(argc, argv, "11", &value, &style_value);
+
+  StringValue(value);
+
+  const char *style = NULL;
+
+  if (!NIL_P(style_value)) {
+    VALUE style_string = rb_obj_is_kind_of(style_value, rb_cString) ? style_value : rb_sym2str(style_value);
+    style = StringValueCStr(style_string);
+  }
+
+  char *quoted = yerba_quote_scalar(RSTRING_PTR(value), (size_t)RSTRING_LEN(value), style);
+
+  if (quoted == NULL) return value;
+
+  VALUE result = make_utf8_string(quoted);
+
+  yerba_string_free(quoted);
+
+  return result;
+}
+
 /* document.get_quote_style(path) → :plain, :single, :double, :literal, etc. or nil */
 static VALUE document_get_quote_style(VALUE self, VALUE path) {
   struct Document *document = get_document(self);
@@ -574,6 +599,7 @@ static VALUE document_find(int argc, VALUE *argv, VALUE self) {
    The caller must provide a number_buffer of at least 64 bytes. */
 struct TypedValue {
   const char *text;
+  size_t length;
   YerbaValueType type;
 };
 
@@ -598,14 +624,21 @@ static struct TypedValue ruby_to_typed_value(VALUE value, char *number_buffer) {
     result.text = number_buffer;
     result.type = YERBA_VALUE_TYPE_FLOAT;
   } else {
-    result.text = StringValueCStr(value);
+    StringValue(value);
+
+    result.text = RSTRING_PTR(value);
+    result.length = (size_t)RSTRING_LEN(value);
     result.type = YERBA_VALUE_TYPE_STRING;
+
+    return result;
   }
+
+  result.length = strlen(result.text);
 
   return result;
 }
 
-/* document.set(path, value, condition: nil, if_exists: false, if_missing: false) */
+/* document.set(path, value, condition: nil, if_exists: false, if_missing: false, plain: false, all: false) */
 static VALUE document_set(int argc, VALUE *argv, VALUE self) {
   VALUE path, value, opts;
   rb_scan_args(argc, argv, "2:", &path, &value, &opts);
@@ -625,43 +658,58 @@ static VALUE document_set(int argc, VALUE *argv, VALUE self) {
   char number_buffer[64];
   struct TypedValue typed_value = ruby_to_typed_value(value, number_buffer);
   bool all = false;
+  bool plain = false;
 
   if (!NIL_P(opts)) {
     VALUE v_all = rb_hash_aref(opts, ID2SYM(rb_intern("all")));
+    VALUE v_plain = rb_hash_aref(opts, ID2SYM(rb_intern("plain")));
 
     if (RTEST(v_all)) all = true;
+    if (RTEST(v_plain)) plain = true;
   }
 
-  YerbaResult result = yerba_document_set(document, StringValueCStr(path), typed_value.text, typed_value.type, all);
+  YerbaResult result = yerba_document_set(document, StringValueCStr(path), typed_value.text, typed_value.length, typed_value.type, plain, all);
   check_result(result);
 
   return self;
 }
 
-/* document.insert(path, value, before: nil, after: nil, at: nil) */
+/* document.insert(path, value, before: nil, after: nil, at: nil, plain: false, style: nil) */
 static VALUE document_insert(int argc, VALUE *argv, VALUE self) {
   VALUE path, value, opts;
   rb_scan_args(argc, argv, "2:", &path, &value, &opts);
 
   const char *before = NULL;
   const char *after = NULL;
+  const char *style = NULL;
   long long at = -1;
+  bool plain = false;
 
   if (!NIL_P(opts)) {
     VALUE v_before = rb_hash_aref(opts, ID2SYM(rb_intern("before")));
     VALUE v_after = rb_hash_aref(opts, ID2SYM(rb_intern("after")));
     VALUE v_at = rb_hash_aref(opts, ID2SYM(rb_intern("at")));
+    VALUE v_plain = rb_hash_aref(opts, ID2SYM(rb_intern("plain")));
+    VALUE v_style = rb_hash_aref(opts, ID2SYM(rb_intern("style")));
 
     if (!NIL_P(v_before)) before = StringValueCStr(v_before);
     if (!NIL_P(v_after)) after = StringValueCStr(v_after);
     if (!NIL_P(v_at)) at = NUM2LL(v_at);
+    if (RTEST(v_plain)) plain = true;
+
+    if (!NIL_P(v_style)) {
+      VALUE style_string = rb_obj_is_kind_of(v_style, rb_cString) ? v_style : rb_sym2str(v_style);
+      style = StringValueCStr(style_string);
+    }
   }
 
   char number_buffer[64];
   struct TypedValue typed_value = ruby_to_typed_value(value, number_buffer);
 
   struct Document *document = get_document(self);
-  YerbaResult result = yerba_document_insert(document, StringValueCStr(path), typed_value.text, typed_value.type, before, after, at);
+  YerbaResult result =
+      yerba_document_insert(document, StringValueCStr(path), typed_value.text, typed_value.length, typed_value.type, plain, style,
+                            before, after, at);
   check_result(result);
 
   return self;
@@ -1122,6 +1170,7 @@ void Init_yerba(void) {
   rb_require("json");
 
   rb_mYerba = rb_define_module("Yerba");
+  rb_define_module_function(rb_mYerba, "quote_scalar", yerba_s_quote_scalar, -1);
   rb_eError = rb_define_class_under(rb_mYerba, "Error", rb_eStandardError);
   rb_ePathNotFoundError = rb_define_class_under(rb_mYerba, "PathNotFoundError", rb_eError);
   rb_eParseError = rb_define_class_under(rb_mYerba, "ParseError", rb_eError);

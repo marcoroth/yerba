@@ -304,18 +304,6 @@ pub fn is_flow_collection(value: &str) -> bool {
   (value.starts_with('[') && value.ends_with(']')) || (value.starts_with('{') && value.ends_with('}'))
 }
 
-pub fn is_raw_yaml_text(value: &str) -> bool {
-  value.contains('\n') || value.starts_with("- ") || is_quoted_scalar(value) || is_flow_collection(value)
-}
-
-pub fn is_valid_inline_value(value: &str) -> bool {
-  if value.is_empty() {
-    return true;
-  }
-
-  is_raw_yaml_text(value) || is_plain_safe(value)
-}
-
 pub fn is_inline_scalar_safe(value: &str) -> bool {
   if value.is_empty() {
     return true;
@@ -336,19 +324,20 @@ pub fn needs_quoting_in_flow(value: &str) -> bool {
   is_yaml_non_string(value) || !is_plain_safe_in_flow(value)
 }
 
-pub fn quote_if_needed(value: &str) -> String {
-  if is_raw_yaml_text(value) {
-    return value.to_string();
-  }
-
-  quote_scalar(value)
-}
-
 pub fn quote_scalar(value: &str) -> String {
   if needs_quoting(value) {
     format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR)
   } else {
     value.to_string()
+  }
+}
+
+pub fn quote_scalar_styled(value: &str, style: Option<&str>) -> String {
+  match style {
+    Some("double") => format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR),
+    Some("single") if is_single_quotable(value) => format_scalar_value(value, SyntaxKind::SINGLE_QUOTED_SCALAR),
+
+    _ => quote_scalar(value),
   }
 }
 

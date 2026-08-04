@@ -1,7 +1,7 @@
 use super::*;
 
 fn is_plain_writable(value: &str) -> bool {
-  crate::syntax::is_inline_scalar_safe(value) && !crate::syntax::is_yaml_non_string(value)
+  crate::syntax::is_plain_safe(value) && !crate::syntax::is_yaml_non_string(value)
 }
 
 fn scalar_replacement_text(value: &str, kind: SyntaxKind) -> String {
@@ -111,26 +111,7 @@ fn replacement_text(span: &ValueSpan, value: &str) -> String {
 
 impl Document {
   pub fn set(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    let current_node = self.navigate(dot_path)?;
-
-    if let Some(block_scalar) = current_node.descendants().find(|node| node.kind() == SyntaxKind::BLOCK_SCALAR) {
-      let source = self.source_text();
-      let new_text = Self::block_scalar_replacement(&source, &block_scalar, value);
-
-      return self.apply_edit(block_scalar.text_range(), &new_text);
-    }
-
-    if holds_collection(&current_node) {
-      let span = value_span(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
-
-      return self.apply_edit(span.range, &replacement_text(&span, value));
-    }
-
-    let scalar_token = find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
-
-    let new_text = scalar_replacement_text(value, scalar_token.kind());
-
-    self.replace_token(&scalar_token, &new_text)
+    self.set_with(dot_path, value, false)
   }
 
   pub fn set_all(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
@@ -218,22 +199,39 @@ impl Document {
   }
 
   pub fn set_plain(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
+    self.set_with(dot_path, value, true)
+  }
+
+  fn set_with(&mut self, dot_path: &str, value: &str, plain: bool) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
     if let Some(block_scalar) = current_node.descendants().find(|node| node.kind() == SyntaxKind::BLOCK_SCALAR) {
-      let range = block_scalar.text_range();
-      return self.apply_edit(range, value);
+      if plain {
+        return self.apply_edit(block_scalar.text_range(), value);
+      }
+
+      let source = self.source_text();
+      let new_text = Self::block_scalar_replacement(&source, &block_scalar, value);
+
+      return self.apply_edit(block_scalar.text_range(), &new_text);
     }
 
     if holds_collection(&current_node) {
       let span = value_span(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+      let replacement = if plain { value.to_string() } else { crate::syntax::quote_scalar(value) };
 
-      return self.apply_edit(span.range, &replacement_text(&span, value));
+      return self.apply_edit(span.range, &replacement_text(&span, &replacement));
     }
 
     let scalar_token = find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
 
-    self.replace_token(&scalar_token, value)
+    if plain {
+      return self.replace_token(&scalar_token, value);
+    }
+
+    let new_text = scalar_replacement_text(value, scalar_token.kind());
+
+    self.replace_token(&scalar_token, &new_text)
   }
 
   fn block_scalar_replacement(source: &str, block_scalar: &SyntaxNode, value: &str) -> String {

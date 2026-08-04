@@ -1,10 +1,7 @@
 mod support;
 use indoc::indoc;
 use support::parse;
-use yerba::{
-  is_inline_scalar_safe, is_plain_safe, is_plain_safe_in_flow, is_quoted_scalar, is_valid_inline_value, needs_quoting, quote_if_needed, quote_scalar,
-  InsertPosition,
-};
+use yerba::{is_inline_scalar_safe, is_plain_safe, is_plain_safe_in_flow, is_quoted_scalar, needs_quoting, quote_scalar, InsertPosition};
 
 #[test]
 fn test_plain_safe_accepts_ordinary_strings() {
@@ -98,11 +95,11 @@ fn test_needs_quoting_covers_type_and_structure() {
 }
 
 #[test]
-fn test_quote_if_needed_escapes_backslashes_and_quotes() {
-  assert_eq!(quote_if_needed("a: b"), "\"a: b\"");
-  assert_eq!(quote_if_needed("say \"hi\": now"), "\"say \\\"hi\\\": now\"");
-  assert_eq!(quote_if_needed("back\\slash: x"), "\"back\\\\slash: x\"");
-  assert_eq!(quote_if_needed("plain"), "plain");
+fn test_quote_scalar_escapes_backslashes_and_quotes() {
+  assert_eq!(quote_scalar("a: b"), "\"a: b\"");
+  assert_eq!(quote_scalar("say \"hi\": now"), "\"say \\\"hi\\\": now\"");
+  assert_eq!(quote_scalar("back\\slash: x"), "\"back\\\\slash: x\"");
+  assert_eq!(quote_scalar("plain"), "plain");
 }
 
 #[test]
@@ -121,41 +118,23 @@ fn test_is_quoted_scalar() {
 }
 
 #[test]
-fn test_is_valid_inline_value_keeps_raw_yaml_text_intact() {
-  assert!(is_valid_inline_value("plain"));
-  assert!(is_valid_inline_value("\"quoted: text\""));
-  assert!(is_valid_inline_value("[]"));
-  assert!(is_valid_inline_value("[a, b]"));
-  assert!(is_valid_inline_value("{}"));
-  assert!(is_valid_inline_value("{k: v}"));
-  assert!(is_valid_inline_value("host: localhost\nport: 5432"));
-  assert!(is_valid_inline_value("- ruby\n- rails"));
-  // A single-entry block sequence is still a fragment, not a string.
-  assert!(is_valid_inline_value("- new"));
-
-  assert!(is_valid_inline_value(""));
-
-  assert!(!is_valid_inline_value("One Record: Concurrency"));
-  assert!(!is_valid_inline_value("#hashstart"));
-  assert!(!is_valid_inline_value("  padded  "));
-}
-
-#[test]
 fn test_is_inline_scalar_safe_rejects_block_only_fragments() {
   assert!(is_inline_scalar_safe(""));
   assert!(is_inline_scalar_safe("plain"));
   assert!(is_inline_scalar_safe("[]"));
   assert!(is_inline_scalar_safe("[a, b]"));
+  assert!(is_inline_scalar_safe("{}"));
   assert!(is_inline_scalar_safe("{k: v}"));
   assert!(is_inline_scalar_safe("\"a: b\""));
+  assert!(is_inline_scalar_safe("\"quoted: text\""));
 
-  assert!(is_valid_inline_value("- new"));
   assert!(!is_inline_scalar_safe("- new"));
-
-  assert!(is_valid_inline_value("host: localhost\nport: 5432"));
+  assert!(!is_inline_scalar_safe("- ruby\n- rails"));
   assert!(!is_inline_scalar_safe("host: localhost\nport: 5432"));
 
   assert!(!is_inline_scalar_safe("One Record: Concurrency"));
+  assert!(!is_inline_scalar_safe("#hashstart"));
+  assert!(!is_inline_scalar_safe("  padded  "));
 }
 
 #[test]
@@ -312,12 +291,13 @@ fn test_set_all_promotes_plain_targets() {
 }
 
 #[test]
-fn test_set_leaves_assembled_yaml_text_alone() {
+fn test_set_treats_yaml_looking_text_as_a_string() {
   let mut flow = parse("name: Alice\ntags: old\n");
 
   flow.set("tags", "[]").unwrap();
 
-  assert_eq!(flow.to_string(), "name: Alice\ntags: []\n");
+  assert_eq!(flow.to_string(), "name: Alice\ntags: \"[]\"\n");
+  assert_eq!(flow.get_value("tags"), Some(yaml_serde::Value::String("[]".to_string())));
 
   let mut sequence = parse("name: Alice\ntags: old\n");
 
@@ -330,14 +310,29 @@ fn test_set_leaves_assembled_yaml_text_alone() {
 
   quoted.set("tags", "\"a: b\"").unwrap();
 
+  assert_eq!(quoted.get_value("tags"), Some(yaml_serde::Value::String("\"a: b\"".to_string())));
+}
+
+#[test]
+fn test_set_plain_writes_assembled_yaml_text_verbatim() {
+  let mut flow = parse("name: Alice\ntags: old\n");
+
+  flow.set_plain("tags", "[]").unwrap();
+
+  assert_eq!(flow.to_string(), "name: Alice\ntags: []\n");
+  assert_eq!(flow.get_value("tags"), Some(yaml_serde::Value::Sequence(vec![])));
+
+  let mut quoted = parse("name: Alice\ntags: old\n");
+
+  quoted.set_plain("tags", "\"a: b\"").unwrap();
+
   assert_eq!(quoted.to_string(), "name: Alice\ntags: \"a: b\"\n");
+  assert_eq!(quoted.get_value("tags"), Some(yaml_serde::Value::String("a: b".to_string())));
 }
 
 #[test]
 fn test_quote_scalar_keeps_yaml_looking_text_as_a_string() {
-  assert_eq!(quote_if_needed("- ruby\n- rails"), "- ruby\n- rails");
-  assert_eq!(quote_if_needed("[a, b]"), "[a, b]");
-
+  assert_eq!(quote_scalar("- ruby\n- rails"), "\"- ruby\\n- rails\"");
   assert_eq!(quote_scalar("- not a list"), "\"- not a list\"");
   assert_eq!(quote_scalar("[a, b]"), "\"[a, b]\"");
   assert_eq!(quote_scalar("{k: v}"), "\"{k: v}\"");

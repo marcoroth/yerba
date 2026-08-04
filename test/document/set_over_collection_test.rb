@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "yaml"
 
 class DocumentSetOverCollectionTest < Minitest::Spec
   test "assigning a string over a map replaces the map" do
@@ -164,5 +165,33 @@ class DocumentSetOverCollectionTest < Minitest::Spec
     document.root["age"] = 6
 
     assert_equal "name: \"y\"\nage: 6\n", document.to_s
+  end
+
+  test "every collection shape assigned over a key stays parseable" do
+    shapes = {
+      "one-key hash" => { "country" => "DE" },
+      "multi-key hash" => { "a" => 1, "b" => 2 },
+      "empty hash" => {},
+      "one-item array" => ["x"],
+      "empty array" => [],
+    }
+
+    shapes.each do |label, value|
+      document = Yerba::Document.parse("venue:\n  city: B\nname: x\n")
+      document.root.set("venue", value)
+
+      loaded = YAML.safe_load(document.to_s)
+
+      assert_equal "x", loaded["name"], "#{label} lost a sibling key:\n#{document}"
+    end
+  end
+
+  test "a flow collection assigned over a key keeps the key in place" do
+    document = Yerba::Document.parse("venue:\n  city: B\nname: x\n")
+
+    document.root.set("venue", { "country" => "DE" }, style: :flow)
+
+    assert_equal({ "country" => "DE" }, YAML.safe_load(document.to_s)["venue"])
+    assert document.to_s.start_with?("venue:"), document.to_s
   end
 end

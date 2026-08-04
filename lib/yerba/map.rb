@@ -32,11 +32,11 @@ module Yerba
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
         coerced = coerce_value(value, style: style)
-        is_block_value = coerced.is_a?(String) && (coerced.include?("\n") || coerced.start_with?("- "))
+
+        is_collection = value.is_a?(Array) || value.is_a?(Hash)
+        is_block_value = is_collection && !coerced.start_with?("{", "[")
 
         if document.exists?(new_path) && is_block_value
-          # Block-style collections can't replace a scalar via set().
-          # Delete the key and re-insert at the same position.
           all_keys = keys
           key_index = all_keys.index(key.to_s)
           after_key = key_index&.positive? ? all_keys[key_index - 1] : nil
@@ -44,14 +44,14 @@ module Yerba
           document.delete(new_path)
 
           if after_key
-            document.insert(new_path, coerced, after: after_key)
+            document.insert(new_path, coerced, after: after_key, plain: true)
           else
-            document.insert(new_path, coerced)
+            document.insert(new_path, coerced, plain: true)
           end
         elsif document.exists?(new_path)
-          document.set(new_path, coerced)
+          document.set(new_path, coerced, plain: is_collection)
         else
-          document.insert(new_path, coerced)
+          document.insert(new_path, coerced, plain: is_collection)
         end
       else
         @data[key] = value
@@ -62,7 +62,10 @@ module Yerba
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
 
-        document.insert(new_path, coerce_value(value, style: style), before: before, after: after)
+        coerced = coerce_value(value, style: style)
+        is_collection = value.is_a?(Array) || value.is_a?(Hash)
+
+        document.insert(new_path, coerced, before: before, after: after, plain: is_collection)
       else
         @data[key] = value
       end

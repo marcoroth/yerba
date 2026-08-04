@@ -485,23 +485,34 @@ pub unsafe extern "C" fn yerba_document_find(document: *const Document, path: *c
   CString::new(json).unwrap_or_default().into_raw()
 }
 
+unsafe fn borrow_value<'a>(value: *const c_char, length: usize) -> &'a str {
+  if value.is_null() {
+    return "";
+  }
+
+  std::str::from_utf8(std::slice::from_raw_parts(value as *const u8, length)).unwrap_or("")
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn yerba_document_set(
   document: *mut Document,
   path: *const c_char,
   value: *const c_char,
+  value_length: usize,
   value_type: YerbaValueType,
+  plain: bool,
   all: bool,
 ) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
-  let value_string = CStr::from_ptr(value).to_str().unwrap_or("");
+  let value_string = borrow_value(value, value_length);
+  let verbatim = plain || value_type != YerbaValueType::String;
 
-  let result = match (all, value_type) {
-    (true, YerbaValueType::String) => document.set_all(selector_string, value_string),
-    (true, _) => document.set_all_plain(selector_string, value_string),
-    (false, YerbaValueType::String) => document.set(selector_string, value_string),
-    (false, _) => document.set_plain(selector_string, value_string),
+  let result = match (all, verbatim) {
+    (true, false) => document.set_all(selector_string, value_string),
+    (true, true) => document.set_all_plain(selector_string, value_string),
+    (false, false) => document.set(selector_string, value_string),
+    (false, true) => document.set_plain(selector_string, value_string),
   };
 
   match result {
@@ -515,17 +526,25 @@ pub unsafe extern "C" fn yerba_document_insert(
   document: *mut Document,
   path: *const c_char,
   value: *const c_char,
+  value_length: usize,
   value_type: YerbaValueType,
+  plain: bool,
+  style: *const c_char,
   before: *const c_char,
   after: *const c_char,
   at: i64,
 ) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
-  let raw_value = CStr::from_ptr(value).to_str().unwrap_or("");
+  let raw_value = borrow_value(value, value_length);
 
   let value_string = match value_type {
-    YerbaValueType::String => crate::syntax::quote_if_needed(raw_value),
+    YerbaValueType::String if !plain => {
+      let style = if style.is_null() { None } else { CStr::from_ptr(style).to_str().ok() };
+
+      crate::syntax::quote_scalar_styled(raw_value, style)
+    }
+
     _ => raw_value.to_string(),
   };
 
@@ -839,6 +858,21 @@ pub unsafe extern "C" fn yerba_document_to_string(document: *const Document) -> 
   let content = document.to_string();
 
   CString::new(content).unwrap_or_default().into_raw()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_quote_scalar(value: *const c_char, length: usize, style: *const c_char) -> *mut c_char {
+  let bytes = std::slice::from_raw_parts(value as *const u8, length);
+
+  let Ok(value) = std::str::from_utf8(bytes) else {
+    return std::ptr::null_mut();
+  };
+
+  let style = if style.is_null() { None } else { CStr::from_ptr(style).to_str().ok() };
+
+  CString::new(crate::syntax::quote_scalar_styled(value, style))
+    .map(|string| string.into_raw())
+    .unwrap_or(std::ptr::null_mut())
 }
 
 #[no_mangle]

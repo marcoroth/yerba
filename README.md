@@ -758,6 +758,42 @@ Insert new keys with positional control:
 document["database"].insert("ssl", true, after: "host")
 ```
 
+A `String` is written as a value, not as YAML text, and quoted whenever writing it plain would change what it means. This is the same rule the CLI's `insert` and `set` follow, so `"key: value"` stays one string instead of becoming a nested map:
+
+```ruby
+document["notes"] = "key: value"   # => notes: "key: value"
+document["lines"] = "line\nbreak"  # => lines: "line\nbreak"
+document["item"]  = "- a"          # => item: "- a"
+document["tags"]  = "[a, b]"       # => tags: "[a, b]"
+```
+
+Other types are written as the YAML literal they stand for, so the value you read back is the value you wrote:
+
+```ruby
+document["port"]    = 5432   # => port: 5432
+document["ssl"]     = true   # => ssl: true
+document["replica"] = nil    # => replica: null
+```
+
+Both `set` and `insert` take `plain: true` when the value is YAML text you built yourself, to write it verbatim instead:
+
+```ruby
+document.set("tags", "[a, b]", plain: true)  # => tags: [a, b]
+```
+
+```ruby
+document.insert("tags", "- ruby\n- rails", plain: true)
+# tags:
+#   - ruby
+#   - rails
+```
+
+Use `style:` to pick the quote style for the inserted value. A style that cannot carry the value falls back to double quotes rather than writing something that reads back differently:
+
+```ruby
+document.insert("city", "Berlin", style: :double)  # => city: "Berlin"
+```
+
 Set arrays and hashes as values, they default to block style:
 
 ```ruby
@@ -861,6 +897,16 @@ Read and set the quote style on individual scalars:
 scalar = document["database"]["host"]
 scalar.quote_style # => :double
 scalar.quote_style = :single
+```
+
+`Yerba.quote_scalar` writes a value as YAML text without needing a document, using the rule the insert APIs follow. Pass a style to ask for one, and it is honoured unless the value cannot survive it:
+
+```ruby
+Yerba.quote_scalar("plain")            # => "plain"
+Yerba.quote_scalar("key: value")       # => "\"key: value\""
+Yerba.quote_scalar("12345")            # => "\"12345\""
+Yerba.quote_scalar("ok", :single)      # => "'ok'"
+Yerba.quote_scalar("a\nb", :single)    # => "\"a\\nb\""
 ```
 
 ### Collection Style

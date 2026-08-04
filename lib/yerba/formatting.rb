@@ -3,16 +3,7 @@
 module Yerba
   module Formatting
     def self.quote(value, style)
-      case style
-      when :double
-        escaped = value.to_s.gsub("\\", "\\\\").gsub('"', '\\"')
-        "\"#{escaped}\""
-      when :single
-        escaped = value.to_s.gsub("'", "''")
-        "'#{escaped}'"
-      else
-        value.to_s
-      end
+      Yerba.quote_scalar(value.to_s, style)
     end
 
     def self.to_yaml_value(value)
@@ -72,6 +63,7 @@ module Yerba
       when true then "true"
       when false then "false"
       when nil then "null"
+      when String then Yerba.quote_scalar(value)
       else value.to_s
       end
     end

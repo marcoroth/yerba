@@ -60,10 +60,9 @@ module Yerba
         when Hash
           document.insert_object(@selector, item)
         when Scalar
-          document.insert(@selector, item.to_yaml)
+          document.insert(@selector, item.to_yaml, plain: true)
         else
-          formatted = format_for_insert(item.to_s)
-          document.insert(@selector, formatted)
+          document.insert(@selector, item.to_s, style: detect_quote_style)
         end
       else
         @data << item
@@ -423,10 +422,6 @@ module Yerba
       end
 
       current
-    end
-
-    def format_for_insert(value)
-      Formatting.quote(value, detect_quote_style)
     end
 
     def detect_quote_style

@@ -10,6 +10,8 @@ pub fn json_to_yaml_text(value: &Value, quote_style: &QuoteStyle, indent: usize)
       map
         .iter()
         .map(|(k, v)| match v {
+          Value::Array(arr) if arr.is_empty() => format!("{}{}: []", prefix, k),
+
           Value::Array(arr) => {
             let items: Vec<String> = arr
               .iter()
@@ -25,6 +27,8 @@ pub fn json_to_yaml_text(value: &Value, quote_style: &QuoteStyle, indent: usize)
 
             format!("{}{}:\n{}", prefix, k, items.join("\n"))
           }
+
+          Value::Object(inner_map) if inner_map.is_empty() => format!("{}{}: {{}}", prefix, k),
 
           Value::Object(_) => {
             let inner = json_to_yaml_text(v, quote_style, indent + 2);
@@ -149,31 +153,15 @@ fn format_yaml_scalar(value: &Value, quote_style: &QuoteStyle) -> String {
     Value::Bool(boolean) => boolean.to_string(),
     Value::Number(number) => number.to_string(),
     Value::String(string) => match quote_style {
-      QuoteStyle::Double => {
-        let escaped = string.replace('\\', "\\\\").replace('"', "\\\"");
-
-        format!("\"{}\"", escaped)
-      }
-
-      QuoteStyle::Single => {
+      QuoteStyle::Single if crate::syntax::is_single_quotable(string) => {
         let escaped = string.replace('\'', "''");
 
         format!("'{}'", escaped)
       }
 
-      QuoteStyle::Plain => {
-        if crate::syntax::needs_quoting(string) {
-          crate::syntax::format_scalar_value(string, yaml_parser::SyntaxKind::DOUBLE_QUOTED_SCALAR)
-        } else {
-          string.clone()
-        }
-      }
+      QuoteStyle::Plain if !crate::syntax::needs_quoting(string) => string.clone(),
 
-      _ => {
-        let escaped = string.replace('\\', "\\\\").replace('"', "\\\"");
-
-        format!("\"{}\"", escaped)
-      }
+      _ => crate::syntax::format_scalar_value(string, yaml_parser::SyntaxKind::DOUBLE_QUOTED_SCALAR),
     },
 
     Value::Array(array) => {

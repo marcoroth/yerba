@@ -1972,3 +1972,71 @@ fn test_blank_lines_skip_empty_keeps_placeholder_entries_packed() {
   "}
   );
 }
+
+#[test]
+fn test_escapes_step_spells_characters_literally() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - escapes: {}
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let mut document = yerba::Document::parse("title: \"a \\U0001F971 b\"\nkeep: \"x\\x08y\"\n").unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "talks.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(document.to_string(), "title: \"a 🥱 b\"\nkeep: \"x\\x08y\"\n");
+}
+
+#[test]
+fn test_escapes_step_scopes_by_path() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - escapes:
+              path: "[].title"
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let mut document = yerba::Document::parse("- title: \"\\U0001F971\"\n  note: \"\\U0001F971\"\n").unwrap();
+
+  yerbafile.apply_to_document(&mut document, "talks.yml").unwrap();
+
+  assert_eq!(document.to_string(), "- title: \"🥱\"\n  note: \"\\U0001F971\"\n");
+}
+
+#[test]
+fn test_escapes_step_is_a_no_op_when_nothing_is_escaped() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - escapes: {}
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let mut document = yerba::Document::parse("title: plain\nother: \"quoted\"\n").unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "talks.yml").unwrap();
+
+  assert!(!changed);
+}

@@ -618,6 +618,7 @@ Available pipeline steps:
 - `directives` Add or remove the document start marker (`---`), with optional `max` validation
 - `unique` Find or remove duplicate items in a sequence
 - `schema` Validate against a JSON schema (with optional `path` for scoping)
+- `escapes` Spell escaped characters literally where the quote style can carry them (with optional `path` for scoping)
 - `final_newline` Enforce exact number of trailing newlines (`count: 1` by default, strips extras)
 
 This makes it easy to enforce project-wide YAML conventions in CI:
@@ -625,6 +626,24 @@ This makes it easy to enforce project-wide YAML conventions in CI:
 ```bash
 yerba check
 ```
+
+The `escapes` step rewrites double-quoted values in the form yerba would write them, so a character the style can carry is spelled out rather than escaped. Text that arrives from an API or a scraper often carries `\U0001F631` where an emoji belongs, or a long value wrapped across two lines. Both read back correctly either way, but neither is pleasant to review in a diff:
+
+```yaml
+pipeline:
+  - escapes: {}
+```
+
+```diff
+-  title: "Deploying on a Friday \U0001F631"
++  title: "Deploying on a Friday 😱"
+
+-  summary: "Why the deploy went out on a Friday, and
+-    what we changed afterwards"
++  summary: "Why the deploy went out on a Friday, and what we changed afterwards"
+```
+
+Escapes that have to stay do: a control character, a quote or a backslash is still written escaped, since the value would not read back the same otherwise. Plain, single-quoted and block scalars are left alone, and a `path` scopes the step to part of the document.
 
 Every checked file is also scanned for control characters, whatever the pipeline says. Yerba's parser accepts them but libyaml does not, so without this a file could pass `check` in CI and then fail to load in the application that reads it. Offending characters are reported with their line and column:
 

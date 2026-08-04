@@ -779,6 +779,41 @@ impl Document {
     self.enforce_quotes_at(style, None)
   }
 
+  pub fn decode_escapes(&mut self, dot_path: Option<&str>) -> Result<usize, YerbaError> {
+    let scope_ranges: Vec<TextRange> = match dot_path {
+      Some(path) if !path.is_empty() => self.navigate_all_compact(path).iter().map(|node| node.text_range()).collect(),
+      _ => vec![self.root.text_range()],
+    };
+
+    let mut edits: Vec<(TextRange, String)> = Vec::new();
+
+    for element in self.root.descendants_with_tokens() {
+      let Some(token) = element.into_token() else { continue };
+
+      if token.kind() != SyntaxKind::DOUBLE_QUOTED_SCALAR {
+        continue;
+      }
+
+      if !scope_ranges.iter().any(|range| range.contains_range(token.text_range())) {
+        continue;
+      }
+
+      let Some(value) = raw_scalar_value(&token) else { continue };
+
+      let rewritten = format_scalar_value(&value, SyntaxKind::DOUBLE_QUOTED_SCALAR);
+
+      if rewritten != token.text() {
+        edits.push((token.text_range(), rewritten));
+      }
+    }
+
+    let count = edits.len();
+
+    self.apply_edits(edits)?;
+
+    Ok(count)
+  }
+
   pub fn enforce_quotes_at(&mut self, style: &QuoteStyle, dot_path: Option<&str>) -> Result<Vec<String>, YerbaError> {
     let source = self.source_text();
 

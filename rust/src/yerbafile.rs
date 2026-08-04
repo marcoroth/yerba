@@ -42,6 +42,7 @@ pub enum PipelineStep {
   Unique(UniqueConfig),
   Schema(SchemaConfig),
   FinalNewline(FinalNewlineConfig),
+  Escapes(EscapesConfig),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -106,6 +107,12 @@ pub struct SchemaConfig {
 pub struct FinalNewlineConfig {
   #[serde(default = "default_one")]
   pub count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct EscapesConfig {
+  #[serde(default)]
+  pub path: Option<String>,
 }
 
 fn default_one() -> usize {
@@ -205,13 +212,18 @@ impl<'de> Deserialize<'de> for PipelineStep {
       return Ok(PipelineStep::Schema(config));
     }
 
+    if let Some(value) = mapping.get(yaml_serde::Value::String("escapes".to_string())) {
+      let config: EscapesConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
+      return Ok(PipelineStep::Escapes(config));
+    }
+
     if let Some(value) = mapping.get(yaml_serde::Value::String("final_newline".to_string())) {
       let config: FinalNewlineConfig = yaml_serde::from_value(value.clone()).map_err(serde::de::Error::custom)?;
       return Ok(PipelineStep::FinalNewline(config));
     }
 
     Err(serde::de::Error::custom(
-      "unknown pipeline step: expected sort_keys, quote_style, collection_style, sequence_indent, set, insert, delete, rename, remove, blank_lines, sort, directives, unique, schema, or final_newline",
+      "unknown pipeline step: expected sort_keys, quote_style, collection_style, sequence_indent, set, insert, delete, rename, remove, blank_lines, sort, directives, unique, schema, escapes, or final_newline",
     ))
   }
 }
@@ -901,6 +913,13 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     }
 
     PipelineStep::FinalNewline(config) => document.enforce_final_newline(config.count),
+
+    PipelineStep::Escapes(config) => {
+      let full_path = resolve_step_path(base_path, config.path.as_deref());
+      let scope = if full_path.is_empty() { None } else { Some(full_path.as_str()) };
+
+      document.decode_escapes(scope).map(|_| ())
+    }
   }
 }
 

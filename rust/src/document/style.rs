@@ -819,11 +819,7 @@ impl Document {
               let is_multiline = trimmed.contains('\n');
 
               let new_text = match style {
-                QuoteStyle::Double => {
-                  let escaped = trimmed.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
-
-                  format!("\"{}\"", escaped)
-                }
+                QuoteStyle::Double => format_scalar_value(trimmed, SyntaxKind::DOUBLE_QUOTED_SCALAR),
 
                 QuoteStyle::Single => {
                   if is_multiline {
@@ -879,7 +875,7 @@ impl Document {
 
           let offset: usize = token.text_range().start().into();
           let line_prefix = &source[line_start_at(&source, offset)..offset];
-          let indent = line_prefix.len() - line_prefix.trim_start().len() + 2;
+          let indent = block_scalar_indent(line_prefix);
           let indent_str = " ".repeat(indent);
           let header = style.block_header();
 
@@ -930,6 +926,21 @@ impl Document {
 
     Ok(warnings)
   }
+}
+
+fn block_scalar_indent(line_prefix: &str) -> usize {
+  let mut column = 0;
+  let bytes = line_prefix.as_bytes();
+
+  while column < bytes.len() {
+    match bytes[column] {
+      b' ' => column += 1,
+      b'-' if bytes.get(column + 1) == Some(&b' ') => column += 2,
+      _ => break,
+    }
+  }
+
+  column + 2
 }
 
 fn inline_quote_replacement(raw_value: &str, current_kind: SyntaxKind, style: &QuoteStyle) -> Option<String> {

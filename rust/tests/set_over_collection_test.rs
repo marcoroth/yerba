@@ -176,6 +176,27 @@ fn test_set_all_replaces_every_matching_collection() {
 }
 
 #[test]
+fn test_set_all_over_a_collection_quotes_like_set_does() {
+  let mut single = parse("venue:\n  city: B\n");
+  let mut all = parse("- venue:\n    city: B\n- venue:\n    city: L\n");
+
+  single.set("venue", "[a, b]").unwrap();
+  all.set_all("[].venue", "[a, b]").unwrap();
+
+  assert_eq!(single.get_value("venue"), Some(yaml_serde::Value::String("[a, b]".to_string())));
+  assert_eq!(all.to_string(), "- venue: \"[a, b]\"\n- venue: \"[a, b]\"\n");
+}
+
+#[test]
+fn test_set_all_plain_over_a_collection_writes_yaml_text() {
+  let mut document = parse("- venue:\n    city: B\n- venue:\n    city: L\n");
+
+  document.set_all_plain("[].venue", "[a, b]").unwrap();
+
+  assert_eq!(document.to_string(), "- venue: [a, b]\n- venue: [a, b]\n");
+}
+
+#[test]
 fn test_setting_a_scalar_is_unchanged() {
   let mut document = parse("name: x\nage: 5\n");
 

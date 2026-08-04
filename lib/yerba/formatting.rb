@@ -46,9 +46,13 @@ module Yerba
         return "{}" if value.empty?
 
         value.map { |key, value|
-          if value.is_a?(Hash) || value.is_a?(Array)
-            inner = to_block_yaml_value(value, indent + 1)
-            "#{prefix}#{key}:\n#{inner}"
+          case value
+          when Array, Hash
+            if value.empty?
+              "#{prefix}#{key}: #{to_yaml_value(value)}"
+            else
+              "#{prefix}#{key}:\n#{to_block_yaml_value(value, indent + 1)}"
+            end
           else
             "#{prefix}#{key}: #{to_scalar_value(value)}"
           end

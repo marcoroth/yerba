@@ -67,4 +67,22 @@ class DocumentBuildScalarTest < Minitest::Spec
 
     assert_equal "12345", YAML.safe_load(document.to_s).dig(0, "version")
   end
+
+  test "an empty sequence under a key survives Document.from" do
+    document = Yerba::Document.from({ "talks" => [], "id" => "x" })
+
+    assert_equal({ "talks" => [], "id" => "x" }, YAML.safe_load(document.to_s))
+  end
+
+  test "an empty mapping under a key survives Document.from" do
+    document = Yerba::Document.from({ "meta" => {}, "id" => "x" })
+
+    assert_equal({ "meta" => {}, "id" => "x" }, YAML.safe_load(document.to_s))
+  end
+
+  test "an empty collection nested in a sequence survives Document.from" do
+    document = Yerba::Document.from([{ "id" => "t", "speakers" => [] }])
+
+    assert_equal([{ "id" => "t", "speakers" => [] }], YAML.safe_load(document.to_s))
+  end
 end

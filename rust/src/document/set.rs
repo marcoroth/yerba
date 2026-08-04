@@ -84,7 +84,9 @@ fn scalar_edit(source: &str, node: &SyntaxNode, value: &str, plain: bool) -> Opt
   }
 
   if holds_collection(node) {
-    return value_span(node).map(|span| (span.range, replacement_text(&span, value)));
+    let replacement = if plain { value.to_string() } else { crate::syntax::quote_scalar(value) };
+
+    return value_span(node).map(|span| (span.range, replacement_text(&span, &replacement)));
   }
 
   let scalar_token = find_scalar_token(node)?;

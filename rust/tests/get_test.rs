@@ -185,6 +185,29 @@ fn test_get_with_bracket_index() {
   assert_eq!(document.get("[0].title"), Some("A".to_string()));
   assert_eq!(document.get("[1].title"), Some("B".to_string()));
   assert_eq!(document.get("[2].title"), None);
+  assert_eq!(document.get("[-1].title"), Some("B".to_string()));
+  assert_eq!(document.get("[-3].title"), None);
+}
+
+#[test]
+fn test_get_with_negative_bracket_indexes() {
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+      - rails
+    items:
+      - name: first
+      - name: last
+  "});
+
+  assert_eq!(document.get("tags[-1]"), Some("rails".to_string()));
+  assert_eq!(document.get("tags[-2]"), Some("ruby".to_string()));
+  assert_eq!(document.get("tags[-3]"), None);
+  assert_eq!(document.get("items[-1].name"), Some("last".to_string()));
+  assert_eq!(document.get("tags[-1267650600228229401496703205376]"), None);
+  assert_eq!(document.get("tags[1267650600228229401496703205376]"), None);
+  assert!(document.is_valid_selector("tags[-1]"));
+  assert_eq!(document.resolve_selectors("tags[-1]"), vec!["tags[1]"]);
 }
 
 #[test]
@@ -876,6 +899,13 @@ fn test_select_field_array_index() {
     yerba::json::resolve_select_field(&yaml, ".tags[2]"),
     serde_json::Value::String("yaml".to_string())
   );
+
+  assert_eq!(
+    yerba::json::resolve_select_field(&yaml, ".tags[-1]"),
+    serde_json::Value::String("yaml".to_string())
+  );
+
+  assert_eq!(yerba::json::resolve_select_field(&yaml, ".tags[-4]"), serde_json::Value::Null);
 }
 
 #[test]

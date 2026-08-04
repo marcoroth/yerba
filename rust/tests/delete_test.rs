@@ -174,6 +174,31 @@ fn test_delete_nested_sequence_item_by_index() {
 }
 
 #[test]
+fn test_delete_nested_sequence_item_by_index_from_end() {
+  let mut document = parse(indoc! {"
+    tags:
+      - ruby
+      - rust
+      - go
+  "});
+
+  let error = document.delete("tags[-4]").unwrap_err();
+
+  assert_eq!(error.to_string(), "selector not found: tags[-4]");
+
+  document.delete("tags[-1]").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      tags:
+        - ruby
+        - rust
+    "}
+  );
+}
+
+#[test]
 fn test_delete_only_sequence_item_replaces_with_empty_sequence() {
   let mut document = parse(indoc! {"
     tags:

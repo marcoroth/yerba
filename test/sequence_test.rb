@@ -177,6 +177,41 @@ class SequenceTest < Minitest::Spec
     assert_instance_of Yerba::Scalar, document["items"][0]["name"]
   end
 
+  test "sequence negative indexes follow Array semantics" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rails
+    YAML
+    sequence = document["tags"]
+
+    assert_equal "rails", sequence[-1].value
+    assert_equal "tags[1]", sequence[-1].selector
+    assert_equal "ruby", sequence[-2].value
+    assert_nil sequence[-3]
+    assert_nil sequence[-(2**100)]
+    assert_equal "rails", document["tags[-1]"].value
+    assert_equal "rails", document.value_at("tags[-1]")
+    assert_equal "rails", document.fetch("tags[-1]").value
+    assert document.valid_selector?("tags[-1]")
+
+    last_tag = sequence[-1]
+    sequence << "go"
+    last_tag.value = "yaml"
+
+    assert_equal "yaml", document.value_at("tags[1]")
+    assert_equal "go", document.value_at("tags[2]")
+  end
+
+  test "sequence negative indexes support flow and empty sequences" do
+    flow_document = Yerba::Document.parse("tags: [ruby, rails]\n")
+    empty_document = Yerba::Document.parse("tags: []\n")
+
+    assert_equal "rails", flow_document["tags"][-1].value
+    assert_equal "tags[1]", flow_document["tags"][-1].selector
+    assert_nil empty_document["tags"][-1]
+  end
+
   test "assignment through sequence index" do
     document = Yerba::Document.parse(<<~YAML)
       items:
@@ -1097,6 +1132,22 @@ class SequenceTest < Minitest::Spec
     assert_equal "ruby", result.value
   end
 
+  test "fetch supports negative indexes and rejects indexes below the lower bound" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rails
+    YAML
+    sequence = document["tags"]
+
+    assert_equal "rails", sequence.fetch(-1).value
+    assert_equal "ruby", sequence.fetch(-2).value
+
+    error = assert_raises(IndexError) { sequence.fetch(-3) }
+
+    assert_includes error.message, "index -3 outside of sequence bounds"
+  end
+
   test "fetch raises for out-of-bounds index" do
     document = Yerba::Document.parse(<<~YAML)
       tags:
@@ -1138,6 +1189,31 @@ class SequenceTest < Minitest::Spec
     assert_equal "Rust", result.value
   end
 
+  test "dig supports a negative sequence index" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: Ruby
+        - name: Rust
+    YAML
+
+    result = document["items"].dig(-1, "name")
+
+    assert_instance_of Yerba::Scalar, result
+    assert_equal "Rust", result.value
+  end
+
+  test "full selectors support root and nested negative indexes" do
+    root_document = Yerba::Document.parse("- ruby\n- rails\n")
+    nested_document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: Ruby
+        - name: Rust
+    YAML
+
+    assert_equal "rails", root_document["[-1]"].value
+    assert_equal "Rust", nested_document["items[-1].name"].value
+  end
+
   test "dig returns nil for missing path" do
     document = Yerba::Document.parse(<<~YAML)
       items:
@@ -1169,6 +1245,19 @@ class SequenceTest < Minitest::Spec
 
     assert_equal "ruby", document["tags"].value_at(0)
     assert_equal "rust", document["tags"].value_at(1)
+  end
+
+  test "value_at supports negative indexes" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rails
+    YAML
+    sequence = document["tags"]
+
+    assert_equal "rails", sequence.value_at(-1)
+    assert_equal "ruby", sequence.value_at(-2)
+    assert_nil sequence.value_at(-3)
   end
 
   test "value_at returns hash for map item" do

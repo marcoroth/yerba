@@ -716,6 +716,26 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
       }
     }
 
+    SelectorSegment::IndexFromEnd(_) => {
+      if let Some(sequence) = find_block_sequence(node) {
+        segment
+          .sequence_index(sequence.entries().count())
+          .and_then(|index| sequence.entries().nth(index))
+          .map(|entry| vec![entry.syntax().clone()])
+          .unwrap_or_default()
+      } else if let Some(sequence) = find_flow_sequence(node) {
+        let entries = flow_sequence_entries(&sequence);
+
+        segment
+          .sequence_index(entries.len())
+          .and_then(|index| entries.into_iter().nth(index))
+          .map(|entry| vec![entry])
+          .unwrap_or_default()
+      } else {
+        Vec::new()
+      }
+    }
+
     SelectorSegment::AllKeys => {
       if let Some(map) = find_block_map(node) {
         map.entries().filter_map(|entry| entry.value().map(|value| value.syntax().clone())).collect()

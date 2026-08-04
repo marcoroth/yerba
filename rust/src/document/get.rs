@@ -46,6 +46,15 @@ impl Document {
       if char == '[' {
         normalized.push('[');
 
+        if chars.peek() == Some(&'-') {
+          let mut lookahead = chars.clone();
+          lookahead.next();
+
+          if lookahead.peek().map(|char| char.is_ascii_digit()).unwrap_or(false) {
+            chars.next();
+          }
+        }
+
         while chars.peek().map(|char| char.is_ascii_digit()).unwrap_or(false) {
           chars.next();
         }

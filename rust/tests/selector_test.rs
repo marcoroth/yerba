@@ -1,3 +1,5 @@
+use std::num::NonZeroU128;
+
 use yerba::selector::{Selector, SelectorSegment};
 
 #[test]
@@ -62,6 +64,49 @@ fn test_parse_index() {
 
   assert_eq!(path, Selector::Absolute(vec![SelectorSegment::Index(0)]));
   assert!(path.ends_with_bracket());
+}
+
+#[test]
+fn test_parse_index_from_end() {
+  let path = Selector::parse("tags[-1]");
+
+  assert_eq!(
+    path,
+    Selector::Absolute(vec![
+      SelectorSegment::Key("tags".to_string()),
+      SelectorSegment::IndexFromEnd(NonZeroU128::new(1).unwrap()),
+    ])
+  );
+  assert_eq!(path.to_selector_string(), "tags[-1]");
+  assert!(path.ends_with_bracket());
+}
+
+#[test]
+fn test_parse_negative_zero_as_first_index() {
+  let path = Selector::parse("[-0]");
+
+  assert_eq!(path, Selector::Absolute(vec![SelectorSegment::Index(0)]));
+  assert_eq!(path.to_selector_string(), "[0]");
+}
+
+#[test]
+fn test_parse_extreme_negative_index_as_out_of_range() {
+  let path = Selector::parse("[-1267650600228229401496703205376]");
+
+  assert_eq!(
+    path,
+    Selector::Absolute(vec![SelectorSegment::IndexFromEnd(
+      NonZeroU128::new(1_267_650_600_228_229_401_496_703_205_376).unwrap(),
+    )])
+  );
+  assert_eq!(path.to_selector_string(), "[-1267650600228229401496703205376]");
+}
+
+#[test]
+fn test_parse_extreme_positive_index_as_out_of_range() {
+  let path = Selector::parse("[1267650600228229401496703205376]");
+
+  assert_eq!(path, Selector::Absolute(vec![SelectorSegment::Index(usize::MAX)]));
 }
 
 #[test]

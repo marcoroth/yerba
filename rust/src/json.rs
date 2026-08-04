@@ -77,9 +77,9 @@ pub fn resolve_select_field(value: &yaml_serde::Value, field: &str) -> serde_jso
           }
         }
 
-        SelectorSegment::Index(index) => {
+        SelectorSegment::Index(_) | SelectorSegment::IndexFromEnd(_) => {
           if let yaml_serde::Value::Sequence(sequence) = current {
-            if let Some(item) = sequence.get(*index) {
+            if let Some(item) = segment.sequence_index(sequence.len()).and_then(|index| sequence.get(index)) {
               next_values.push(item.clone());
             }
           }

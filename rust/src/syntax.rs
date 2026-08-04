@@ -33,7 +33,7 @@ pub fn detect_yaml_type(scalar: &ScalarValue) -> YerbaValueType {
 
 pub fn raw_scalar_value(token: &SyntaxToken) -> Option<String> {
   match token.kind() {
-    SyntaxKind::PLAIN_SCALAR => Some(token.text().to_string()),
+    SyntaxKind::PLAIN_SCALAR => Some(fold_flow_scalar(token.text())),
 
     SyntaxKind::DOUBLE_QUOTED_SCALAR => {
       let text = token.text();
@@ -65,8 +65,16 @@ pub fn extract_scalar(node: &SyntaxNode) -> Option<ScalarValue> {
     .filter_map(|element| element.into_token())
     .find(|token| token.kind() == SyntaxKind::BLOCK_SCALAR_TEXT)?;
 
+  let dedented = dedent_block_scalar(block_token.text());
+
+  let folded = node
+    .descendants()
+    .find(|descendant| descendant.kind() == SyntaxKind::BLOCK_SCALAR)
+    .map(|scalar| scalar.text().to_string().trim_start().starts_with('>'))
+    .unwrap_or(false);
+
   Some(ScalarValue {
-    text: dedent_block_scalar(block_token.text()),
+    text: if folded { fold_flow_scalar(&dedented) } else { dedented },
     kind: SyntaxKind::BLOCK_SCALAR_TEXT,
     file_path: None,
     selector: None,
@@ -363,7 +371,7 @@ pub fn dedent_block_scalar(text: &str) -> String {
   dedented.trim().to_string()
 }
 
-fn push_hex_escape(result: &mut String, characters: &mut std::str::Chars<'_>, digits: usize) {
+fn push_hex_escape(result: &mut String, characters: &mut Scan<'_>, digits: usize) {
   let escape: String = characters.clone().take(digits).collect();
 
   let decoded = (escape.len() == digits && escape.chars().all(|character| character.is_ascii_hexdigit()))
@@ -390,11 +398,87 @@ fn push_hex_escape(result: &mut String, characters: &mut std::str::Chars<'_>, di
   }
 }
 
+type Scan<'a> = std::iter::Peekable<std::str::Chars<'a>>;
+
+fn skip_spaces(characters: &mut Scan<'_>) {
+  while matches!(characters.peek(), Some(' ' | '\t')) {
+    characters.next();
+  }
+}
+
+fn fold_break(result: &mut String, characters: &mut Scan<'_>) {
+  while result.ends_with(' ') || result.ends_with('\t') {
+    result.pop();
+  }
+
+  let mut breaks = 1;
+
+  loop {
+    skip_spaces(characters);
+
+    match characters.peek() {
+      Some('\n') => {
+        characters.next();
+        breaks += 1;
+      }
+
+      Some('\r') => {
+        characters.next();
+        characters.next_if_eq(&'\n');
+        breaks += 1;
+      }
+
+      _ => break,
+    }
+  }
+
+  if breaks == 1 {
+    result.push(' ');
+  } else {
+    result.extend(std::iter::repeat_n('\n', breaks - 1));
+  }
+}
+
+pub fn fold_flow_scalar(text: &str) -> String {
+  if !text.contains('\n') && !text.contains('\r') {
+    return text.to_string();
+  }
+
+  let mut result = String::with_capacity(text.len());
+  let mut characters = text.chars().peekable();
+
+  while let Some(character) = characters.next() {
+    match character {
+      '\n' => fold_break(&mut result, &mut characters),
+
+      '\r' => {
+        characters.next_if_eq(&'\n');
+        fold_break(&mut result, &mut characters);
+      }
+
+      _ => result.push(character),
+    }
+  }
+
+  result
+}
+
 pub fn unescape_double_quoted(text: &str) -> String {
   let mut result = String::with_capacity(text.len());
-  let mut chars = text.chars();
+  let mut chars = text.chars().peekable();
 
   while let Some(character) = chars.next() {
+    if character == '\n' {
+      fold_break(&mut result, &mut chars);
+      continue;
+    }
+
+    if character == '\r' {
+      chars.next_if_eq(&'\n');
+      fold_break(&mut result, &mut chars);
+      continue;
+    }
+
     if character == '\\' {
       match chars.next() {
         Some('n') => result.push('\n'),
@@ -416,7 +500,13 @@ pub fn unescape_double_quoted(text: &str) -> String {
         Some('x') => push_hex_escape(&mut result, &mut chars, 2),
         Some('u') => push_hex_escape(&mut result, &mut chars, 4),
         Some('U') => push_hex_escape(&mut result, &mut chars, 8),
-        Some('\n') => {} // line continuation: skip newline and leading whitespace
+        Some('\n') => skip_spaces(&mut chars),
+
+        Some('\r') => {
+          chars.next_if_eq(&'\n');
+          skip_spaces(&mut chars);
+        }
+
         Some(other) => {
           result.push('\\');
           result.push(other);
@@ -432,7 +522,7 @@ pub fn unescape_double_quoted(text: &str) -> String {
 }
 
 pub fn unescape_single_quoted(text: &str) -> String {
-  text.replace("''", "'")
+  fold_flow_scalar(&text.replace("''", "'"))
 }
 
 pub fn line_at(source: &str, offset: usize) -> usize {

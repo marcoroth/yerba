@@ -8,13 +8,13 @@ use super::{output, parse_file, resolve_files, run_op};
 
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
-    yerba insert config.yml "database.ssl" true
-    yerba insert config.yml "database.ssl" true --after "host"
-    yerba insert config.yml "database.ssl" true --before "port"
+    yerba insert config.yml "database.ssl" true --plain
+    yerba insert config.yml "database.ssl" true --plain --after "host"
+    yerba insert config.yml "database.ssl" true --plain --before "port"
     yerba insert config.yml "tags" "yaml"
     yerba insert config.yml "tags" "yaml" --at 0
     yerba insert config.yml "tags" "yaml" --after "ruby"
-    yerba insert speakers.yml "" "name: Bob" --after ".name == Alice"
+    yerba insert speakers.yml "" "name: Bob" --plain --after ".name == Alice"
     yerba insert videos.yml "[0].speakers" "Diana" --before ".name == Charlie"
     yerba insert videos.yml "" --from "new_talk.yml" --after ".id == first-talk"
   "#})
@@ -39,6 +39,8 @@ pub struct Args {
   after: Option<String>,
   #[arg(long)]
   at: Option<usize>,
+  #[arg(long, help = "Write the value as raw YAML, for literals like null, true or 42 and for map or sequence fragments")]
+  plain: bool,
   #[arg(long)]
   dry_run: bool,
 }
@@ -67,8 +69,12 @@ impl Args {
           .trim()
           .to_string()
       }
-    } else if let Some(val) = self.value {
-      val
+    } else if let Some(value) = self.value {
+      if self.plain {
+        value
+      } else {
+        yerba::quote_scalar(&value)
+      }
     } else {
       eprintln!("{} either a value argument or --from is required", ui::failure("Error:"));
 

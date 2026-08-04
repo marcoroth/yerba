@@ -246,6 +246,8 @@ pub struct SetConfig {
   pub value: String,
   #[serde(default)]
   pub condition: Option<String>,
+  #[serde(default)]
+  pub plain: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -254,6 +256,8 @@ pub struct InsertConfig {
   pub value: String,
   #[serde(default)]
   pub condition: Option<String>,
+  #[serde(default)]
+  pub plain: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -574,6 +578,7 @@ impl Yerbafile {
 
   pub fn apply_to_document(&self, document: &mut Document, file_path: &str) -> Result<bool, YerbaError> {
     let original = document.to_string();
+
     let relative_path = self.relativize_path(file_path);
     let match_path = relative_path.as_deref().unwrap_or(file_path);
 
@@ -704,7 +709,11 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         }
       }
 
-      document.set(&full_path, &config.value)
+      if config.plain {
+        document.set_plain(&full_path, &config.value)
+      } else {
+        document.set(&full_path, &config.value)
+      }
     }
 
     PipelineStep::Insert(config) => {
@@ -718,7 +727,13 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         }
       }
 
-      document.insert_into(&full_path, &config.value, crate::InsertPosition::Last)
+      let value = if config.plain {
+        config.value.clone()
+      } else {
+        crate::syntax::quote_scalar(&config.value)
+      };
+
+      document.insert_into(&full_path, &value, crate::InsertPosition::Last)
     }
 
     PipelineStep::Delete(config) => {

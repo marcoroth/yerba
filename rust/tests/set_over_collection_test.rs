@@ -182,7 +182,16 @@ fn test_setting_a_scalar_is_unchanged() {
   document.set("name", "y").unwrap();
   document.set("age", "6").unwrap();
 
-  assert_eq!(document.to_string(), "name: y\nage: 6\n");
+  assert_eq!(document.to_string(), "name: y\nage: \"6\"\n");
+}
+
+#[test]
+fn test_setting_a_number_plain_keeps_it_a_number() {
+  let mut document = parse("name: x\nage: 5\n");
+
+  document.set_plain("age", "6").unwrap();
+
+  assert_eq!(document.to_string(), "name: x\nage: 6\n");
 }
 
 #[test]

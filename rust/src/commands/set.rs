@@ -15,6 +15,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
     yerba set "data/**/event.yml" "website" "" --if-exists
     yerba set videos.yml "[].description" "" --all
     yerba set config.yml "database.replica" null --plain
+    yerba set videos.yml "[].published" false --plain --all
   "#})
 });
 

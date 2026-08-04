@@ -21,8 +21,8 @@ pub use quote_style::{KeyStyle, QuoteStyle};
 pub use selector::Selector;
 pub use syntax::{
   detect_yaml_type, escape_double_quoted, is_control_character, is_flow_collection, is_inline_scalar_safe, is_plain_safe, is_plain_safe_in_flow,
-  is_quoted_scalar, is_raw_yaml_text, is_single_quotable, is_valid_inline_value, needs_quoting, needs_quoting_in_flow, quote_if_needed, ScalarValue,
-  YerbaValueType,
+  is_quoted_scalar, is_raw_yaml_text, is_single_quotable, is_valid_inline_value, needs_quoting, needs_quoting_in_flow, quote_if_needed, quote_scalar,
+  ScalarValue, YerbaValueType,
 };
 pub use yaml_writer::json_to_yaml_text;
 #[cfg(feature = "cli")]

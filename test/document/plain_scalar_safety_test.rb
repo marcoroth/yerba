@@ -99,15 +99,48 @@ class PlainScalarSafetyTest < Minitest::Spec
     end
   end
 
-  test "a string that looks like another type is not yet preserved by set" do
+  test "set preserves a string that looks like another type" do
     document = Yerba::Document.parse(<<~YAML)
       flag: placeholder
     YAML
 
     document.set("flag", "true")
 
-    assert_includes document.to_s, "flag: true"
-    assert_equal true, Psych.load(document.to_s)["flag"]
+    assert_includes document.to_s, 'flag: "true"'
+    assert_equal "true", Psych.load(document.to_s)["flag"]
+  end
+
+  test "set writes a typed value as a YAML literal" do
+    document = Yerba::Document.parse(<<~YAML)
+      flag: placeholder
+      count: placeholder
+      replica: placeholder
+    YAML
+
+    document.set("flag", true)
+    document.set("count", 12_345)
+    document.set("replica", nil)
+
+    loaded = Psych.load(document.to_s)
+
+    assert_equal true, loaded["flag"]
+    assert_equal 12_345, loaded["count"]
+    assert_nil loaded["replica"]
+  end
+
+  test "set preserves a string regardless of what the field held before" do
+    document = Yerba::Document.parse(<<~YAML)
+      flag: false
+      count: 5
+    YAML
+
+    document.set("flag", "true")
+    document.set("count", "10")
+
+    loaded = Psych.load(document.to_s)
+
+    assert_equal "true", loaded["flag"]
+    assert_equal "10", loaded["count"]
   end
 
   test "insert does preserve a string that looks like another type" do

@@ -180,7 +180,7 @@ If the condition matches more than one item the command stops rather than guessi
 when editing several is what you meant:
 
 ```bash
-yerba set videos.yml "[].published" false --condition ".kind == draft" --all
+yerba set videos.yml "[].published" false --plain --condition ".kind == draft" --all
 ```
 
 Use `--all` to update all nodes matching a wildcard selector:
@@ -189,8 +189,7 @@ Use `--all` to update all nodes matching a wildcard selector:
 yerba set videos.yml "[].description" "" --all
 ```
 
-Values are written in the quote style already at the path, which keeps string edits tidy but would
-turn `null` into the string `"null"`. Use `--plain` to write a YAML literal instead:
+Values are written in the quote style already at the path, which keeps string edits tidy. A value is quoted anyway when writing it plain would not read back as the string you passed, so `yes` becomes `"yes"` and `12345` becomes `"12345"` — whatever the field held before. Use `--plain` to write a YAML literal instead:
 
 ```bash
 yerba set config.yml "database.replica" null --plain
@@ -202,23 +201,30 @@ yerba set config.yml "database.ssl" true --plain
 Insert a new key into a map or a new item into a sequence. By default, new items are appended at the end.
 
 ```bash
-yerba insert config.yml "database.ssl" true
+yerba insert config.yml "database.ssl" true --plain
 yerba insert config.yml "tags" "yaml"
 ```
 
 Control placement with `--before`, `--after`, or `--at`:
 
 ```bash
-yerba insert config.yml "database.ssl" true --after "host"
-yerba insert config.yml "database.ssl" true --before "port"
+yerba insert config.yml "database.ssl" true --plain --after "host"
+yerba insert config.yml "database.ssl" true --plain --before "port"
 yerba insert config.yml "tags" "yaml" --at 0
 yerba insert config.yml "tags" "yaml" --after "ruby"
+```
+
+Values are written as strings, and quoted whenever writing them plain would change what they mean. `"Conf 2018: A Talk"` stays one string instead of becoming a nested map, and `"12345"` stays a string instead of becoming a number. Use `--plain` to write a YAML literal or a map or sequence fragment instead:
+
+```bash
+yerba insert config.yml "database.ssl" true --plain
+yerba insert speakers.yml "" "name: Bob" --plain --after ".name == Alice"
 ```
 
 For sequences of maps, use conditions to position relative to other items:
 
 ```bash
-yerba insert speakers.yml "" "name: Bob" --after ".name == Alice"
+yerba insert speakers.yml "" "name: Bob" --plain --after ".name == Alice"
 yerba insert videos.yml "[0].speakers" "Diana" --before ".name == Charlie"
 ```
 
@@ -558,8 +564,8 @@ Available pipeline steps:
 - `sort_keys` Reorder keys to match a predefined list
 - `sort` Sort sequence items by field(s)
 - `blank_lines` Enforce blank lines between sequence entries
-- `set` Set a value (supports conditions)
-- `insert` Insert a new key or sequence item
+- `set` Set a value (supports conditions, and `plain: true` for YAML literals)
+- `insert` Insert a new key or sequence item (`plain: true` for YAML literals and fragments)
 - `delete` Remove a key (supports conditions)
 - `rename` Rename a key
 - `remove` Remove an item from a sequence

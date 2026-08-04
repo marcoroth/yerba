@@ -1792,3 +1792,53 @@ fn test_apply_refuses_an_absolute_condition_under_a_parent_instead_of_deleting_e
   assert!(error.to_string().contains("must be relative"), "{}", error);
   assert!(document.to_string().contains("https://real.com"));
 }
+
+#[test]
+fn test_insert_step_quotes_a_value_that_would_change_the_structure() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - insert:
+              path: "[0].raw_title"
+              value: "Conf 2018: A Talk"
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let mut document = yerba::Document::parse("- title: Hello\n  id: x\n").unwrap();
+
+  yerbafile.apply_to_document(&mut document, "talks.yml").unwrap();
+
+  assert!(document.to_string().contains("raw_title: \"Conf 2018: A Talk\""), "{}", document.to_string());
+  assert_eq!(document.get("[0].id"), Some("x".to_string()));
+}
+
+#[test]
+fn test_insert_step_with_plain_writes_a_literal() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - insert:
+              path: "[0].published"
+              value: "true"
+              plain: true
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let mut document = yerba::Document::parse("- title: Hello\n").unwrap();
+
+  yerbafile.apply_to_document(&mut document, "talks.yml").unwrap();
+
+  assert!(document.to_string().contains("published: true"), "{}", document.to_string());
+}

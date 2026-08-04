@@ -214,9 +214,22 @@ fn test_set_all_updates_all_matching_nodes() {
   document.set_all("[].description", "").unwrap();
 
   let output = document.to_string();
-  assert!(output.contains("description: \n") || output.contains("description:\n"));
+  assert!(output.contains("description: \"\"\n"), "an empty string stays a string, use --plain for a null");
   assert!(!output.contains("some text"));
   assert!(!output.contains("other text"));
+}
+
+#[test]
+fn test_set_all_plain_clears_a_field_to_null() {
+  let mut document = parse(indoc! {"
+    - title: Hello
+      description: some text
+  "});
+
+  document.set_all_plain("[].description", "").unwrap();
+
+  let output = document.to_string();
+  assert!(output.contains("description: \n") || output.contains("description:\n"));
 }
 
 #[test]

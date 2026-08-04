@@ -341,7 +341,11 @@ pub fn quote_if_needed(value: &str) -> String {
     return value.to_string();
   }
 
-if needs_quoting(value) {
+  quote_scalar(value)
+}
+
+pub fn quote_scalar(value: &str) -> String {
+  if needs_quoting(value) {
     format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR)
   } else {
     value.to_string()

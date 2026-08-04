@@ -1,7 +1,17 @@
 use super::*;
 
+fn is_plain_writable(value: &str) -> bool {
+  crate::syntax::is_inline_scalar_safe(value) && !crate::syntax::is_yaml_non_string(value)
+}
+
 fn scalar_replacement_text(value: &str, kind: SyntaxKind) -> String {
-  if kind == SyntaxKind::PLAIN_SCALAR && !crate::syntax::is_inline_scalar_safe(value) {
+  let representable = match kind {
+    SyntaxKind::PLAIN_SCALAR => is_plain_writable(value),
+    SyntaxKind::SINGLE_QUOTED_SCALAR => crate::syntax::is_single_quotable(value),
+    _ => true,
+  };
+
+  if !representable {
     return format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR);
   }
 

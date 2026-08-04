@@ -2,7 +2,7 @@ mod support;
 use indoc::indoc;
 use support::parse;
 use yerba::{
-  is_inline_scalar_safe, is_plain_safe, is_plain_safe_in_flow, is_quoted_scalar, is_valid_inline_value, needs_quoting, quote_if_needed, InsertPosition,
+  is_inline_scalar_safe, is_plain_safe, is_plain_safe_in_flow, is_quoted_scalar, is_valid_inline_value, needs_quoting, quote_if_needed, quote_scalar, InsertPosition,
 };
 
 #[test]
@@ -330,4 +330,88 @@ fn test_set_leaves_assembled_yaml_text_alone() {
   quoted.set("tags", "\"a: b\"").unwrap();
 
   assert_eq!(quoted.to_string(), "name: Alice\ntags: \"a: b\"\n");
+}
+
+#[test]
+fn test_quote_scalar_keeps_yaml_looking_text_as_a_string() {
+  assert_eq!(quote_if_needed("- ruby\n- rails"), "- ruby\n- rails");
+  assert_eq!(quote_if_needed("[a, b]"), "[a, b]");
+
+  assert_eq!(quote_scalar("- not a list"), "\"- not a list\"");
+  assert_eq!(quote_scalar("[a, b]"), "\"[a, b]\"");
+  assert_eq!(quote_scalar("{k: v}"), "\"{k: v}\"");
+  assert_eq!(quote_scalar("\"already\""), "\"\\\"already\\\"\"");
+  assert_eq!(quote_scalar("line one\nline two"), "\"line one\\nline two\"");
+}
+
+#[test]
+fn test_quote_scalar_protects_values_that_would_change_type() {
+  assert_eq!(quote_scalar("yes"), "\"yes\"");
+  assert_eq!(quote_scalar("12345"), "\"12345\"");
+  assert_eq!(quote_scalar("null"), "\"null\"");
+  assert_eq!(quote_scalar("~"), "\"~\"");
+  assert_eq!(quote_scalar("Conf 2018: A Talk"), "\"Conf 2018: A Talk\"");
+  assert_eq!(quote_scalar("Ruby #1 talk"), "\"Ruby #1 talk\"");
+  assert_eq!(quote_scalar("&anchorish"), "\"&anchorish\"");
+
+  assert_eq!(quote_scalar("A Perfectly Ordinary Title"), "A Perfectly Ordinary Title");
+}
+
+#[test]
+fn test_set_quotes_every_value_that_would_not_read_back_as_a_string() {
+  let mut document = parse(indoc! {"
+    title: Hello
+    count: 5
+    published: true
+  "});
+
+  document.set("title", "yes").unwrap();
+  document.set("count", "10").unwrap();
+  document.set("published", "false").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      title: "yes"
+      count: "10"
+      published: "false"
+    "#}
+  );
+}
+
+#[test]
+fn test_set_plain_writes_the_literal_for_every_field() {
+  let mut document = parse(indoc! {"
+    count: 5
+    published: true
+  "});
+
+  document.set_plain("count", "10").unwrap();
+  document.set_plain("published", "false").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      count: 10
+      published: false
+    "}
+  );
+}
+
+#[test]
+fn test_set_plain_still_retypes_a_field_on_request() {
+  let mut document = parse("replica: none\n");
+
+  document.set_plain("replica", "null").unwrap();
+
+  assert_eq!(document.to_string(), "replica: null\n");
+}
+
+#[test]
+fn test_set_upgrades_a_single_quoted_field_that_cannot_hold_the_value() {
+  let mut document = parse("note: 'old'\n");
+
+  document.set("note", "line one\nline two").unwrap();
+
+  assert_eq!(document.to_string(), "note: \"line one\\nline two\"\n");
 }

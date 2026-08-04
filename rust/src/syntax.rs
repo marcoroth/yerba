@@ -168,10 +168,7 @@ pub fn find_scalar_token(node: &SyntaxNode) -> Option<SyntaxToken> {
 
 pub fn format_scalar_value(value: &str, kind: SyntaxKind) -> String {
   match kind {
-    SyntaxKind::DOUBLE_QUOTED_SCALAR => {
-      let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
-      format!("\"{}\"", escaped)
-    }
+    SyntaxKind::DOUBLE_QUOTED_SCALAR => format!("\"{}\"", escape_double_quoted(value)),
 
     SyntaxKind::SINGLE_QUOTED_SCALAR => {
       let escaped = value.replace('\'', "''");
@@ -180,6 +177,32 @@ pub fn format_scalar_value(value: &str, kind: SyntaxKind) -> String {
 
     _ => value.to_string(),
   }
+}
+
+pub fn is_control_character(character: char) -> bool {
+  matches!(character as u32, 0x00..=0x08 | 0x0b | 0x0c | 0x0e..=0x1f | 0x7f | 0x80..=0x84 | 0x86..=0x9f)
+}
+
+pub fn is_single_quotable(value: &str) -> bool {
+  !value.contains('\n') && !value.contains('\r') && !value.chars().any(is_control_character)
+}
+
+pub fn escape_double_quoted(value: &str) -> String {
+  let mut result = String::with_capacity(value.len());
+
+  for character in value.chars() {
+    match character {
+      '\\' => result.push_str("\\\\"),
+      '"' => result.push_str("\\\""),
+      '\n' => result.push_str("\\n"),
+      '\r' => result.push_str("\\r"),
+      '\t' => result.push_str("\\t"),
+      _ if is_control_character(character) => result.push_str(&format!("\\x{:02x}", character as u32)),
+      _ => result.push(character),
+    }
+  }
+
+  result
 }
 
 const LEADING_INDICATORS: [char; 16] = ['#', '&', '*', '!', '|', '>', '\'', '"', '%', '@', '`', ',', '[', ']', '{', '}'];
@@ -191,6 +214,10 @@ pub fn is_plain_safe(value: &str) -> bool {
   }
 
   if value.contains('\n') || value.contains('\t') {
+    return false;
+  }
+
+  if value.chars().any(is_control_character) {
     return false;
   }
 
@@ -314,7 +341,7 @@ pub fn quote_if_needed(value: &str) -> String {
     return value.to_string();
   }
 
-  if needs_quoting(value) {
+if needs_quoting(value) {
     format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR)
   } else {
     value.to_string()
@@ -343,6 +370,33 @@ pub fn dedent_block_scalar(text: &str) -> String {
   dedented.trim().to_string()
 }
 
+fn push_hex_escape(result: &mut String, characters: &mut std::str::Chars<'_>, digits: usize) {
+  let escape: String = characters.clone().take(digits).collect();
+
+  let decoded = (escape.len() == digits && escape.chars().all(|character| character.is_ascii_hexdigit()))
+    .then(|| u32::from_str_radix(&escape, 16).ok().and_then(char::from_u32))
+    .flatten();
+
+  match decoded {
+    Some(character) => {
+      for _ in 0..digits {
+        characters.next();
+      }
+
+      result.push(character);
+    }
+
+    None => {
+      result.push('\\');
+      result.push(match digits {
+        2 => 'x',
+        4 => 'u',
+        _ => 'U',
+      });
+    }
+  }
+}
+
 pub fn unescape_double_quoted(text: &str) -> String {
   let mut result = String::with_capacity(text.len());
   let mut chars = text.chars();
@@ -363,6 +417,12 @@ pub fn unescape_double_quoted(text: &str) -> String {
         Some('v') => result.push('\u{0b}'),
         Some(' ') => result.push(' '),
         Some('_') => result.push('\u{a0}'),
+        Some('N') => result.push('\u{85}'),
+        Some('L') => result.push('\u{2028}'),
+        Some('P') => result.push('\u{2029}'),
+        Some('x') => push_hex_escape(&mut result, &mut chars, 2),
+        Some('u') => push_hex_escape(&mut result, &mut chars, 4),
+        Some('U') => push_hex_escape(&mut result, &mut chars, 8),
         Some('\n') => {} // line continuation: skip newline and leading whitespace
         Some(other) => {
           result.push('\\');

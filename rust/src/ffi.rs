@@ -560,7 +560,13 @@ pub unsafe extern "C" fn yerba_document_insert(
     InsertPosition::Last
   };
 
-  match document.insert_into(selector_string, &value_string, position) {
+  let result = if plain {
+    document.insert_fragment_into(selector_string, &value_string, position)
+  } else {
+    document.insert_into(selector_string, &value_string, position)
+  };
+
+  match result {
     Ok(()) => YerbaResult::ok(),
     Err(e) => YerbaResult::err(&e.to_string()),
   }

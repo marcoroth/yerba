@@ -194,4 +194,30 @@ class DocumentSetOverCollectionTest < Minitest::Spec
     assert_equal({ "country" => "DE" }, YAML.safe_load(document.to_s)["venue"])
     assert document.to_s.start_with?("venue:"), document.to_s
   end
+
+  {
+    "[]= over an existing key" => ->(document) { document["venue"] = { "country" => "DE" } },
+    "[]= on a new key" => ->(document) { document["place"] = { "country" => "DE" } },
+    "Map#insert on a new key" => ->(document) { document.root.insert("place", { "country" => "DE" }) },
+  }.each do |label, assign|
+    test "a one-key hash is a mapping when assigned by #{label}" do
+      document = Yerba::Document.parse("venue: old\nname: x\n")
+
+      assign.call(document)
+
+      loaded = YAML.safe_load(document.to_s)
+      written = loaded["place"] || loaded["venue"]
+
+      assert_equal({ "country" => "DE" }, written, document.to_s)
+      assert_equal "x", loaded["name"], document.to_s
+    end
+  end
+
+  test "a string that looks like a mapping is still a string" do
+    document = Yerba::Document.parse("venue: old\nname: x\n")
+
+    document["venue"] = "country: DE"
+
+    assert_equal "country: DE", YAML.safe_load(document.to_s)["venue"]
+  end
 end

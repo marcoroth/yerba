@@ -89,6 +89,14 @@ impl Document {
   }
 
   pub fn insert_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
+    self.insert_with(dot_path, value, position, false)
+  }
+
+  pub fn insert_fragment_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
+    self.insert_with(dot_path, value, position, true)
+  }
+
+  fn insert_with(&mut self, dot_path: &str, value: &str, position: InsertPosition, fragment: bool) -> Result<(), YerbaError> {
     Self::validate_path(dot_path)?;
     self.refuse_flow_target(dot_path)?;
 
@@ -180,7 +188,7 @@ impl Document {
         };
 
         let indent = " ".repeat(start_col);
-        let new_entry_text = Self::format_map_entry(key, value, &indent);
+        let new_entry_text = Self::format_map_entry(key, value, &indent, fragment);
 
         match &position {
           InsertPosition::After(target_key) => {
@@ -218,7 +226,7 @@ impl Document {
       return Ok(());
     }
 
-    self.insert_map_key(parent_path, key, value, position)
+    self.insert_map_key(parent_path, key, value, position, fragment)
   }
 
   fn insert_sequence_item(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
@@ -339,7 +347,7 @@ impl Document {
     }
   }
 
-  fn insert_map_key(&mut self, dot_path: &str, key: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
+  fn insert_map_key(&mut self, dot_path: &str, key: &str, value: &str, position: InsertPosition, fragment: bool) -> Result<(), YerbaError> {
     let current_node = self.navigate(dot_path)?;
 
     let map = match find_block_map(&current_node) {
@@ -378,7 +386,7 @@ impl Document {
       .map(|entry| preceding_whitespace_indent(entry.syntax()))
       .unwrap_or_default();
 
-    let new_entry_text = Self::format_map_entry(key, value, &indent);
+    let new_entry_text = Self::format_map_entry(key, value, &indent, fragment);
 
     match position {
       InsertPosition::Last => {
@@ -422,7 +430,7 @@ impl Document {
         self.insert_after_node(target_entry.syntax(), &new_text)
       }
 
-      InsertPosition::BeforeCondition(_) | InsertPosition::AfterCondition(_) => self.insert_map_key(dot_path, key, value, InsertPosition::Last),
+      InsertPosition::BeforeCondition(_) | InsertPosition::AfterCondition(_) => self.insert_map_key(dot_path, key, value, InsertPosition::Last, fragment),
 
       InsertPosition::FromSortOrder(order) => {
         let new_key_position = order.iter().position(|ordered_key| ordered_key == key);
@@ -447,7 +455,7 @@ impl Document {
           None => InsertPosition::Last,
         };
 
-        self.insert_map_key(dot_path, key, value, resolved)
+        self.insert_map_key(dot_path, key, value, resolved, fragment)
       }
     }
   }
@@ -566,8 +574,8 @@ impl Document {
     Some((trailing[comment_start..].to_string(), rowan::TextSize::from((start + line_end) as u32)))
   }
 
-  fn format_map_entry(key: &str, value: &str, indent: &str) -> String {
-    let is_block_value = value.contains('\n') || value.starts_with("- ");
+  fn format_map_entry(key: &str, value: &str, indent: &str, fragment: bool) -> String {
+    let is_block_value = value.contains('\n') || value.starts_with("- ") || (fragment && is_block_collection(value));
 
     if !is_block_value {
       if crate::syntax::is_inline_scalar_safe(value) {
@@ -635,4 +643,8 @@ impl Document {
       format!("- {}", value)
     }
   }
+}
+
+fn is_block_collection(value: &str) -> bool {
+  !crate::syntax::is_flow_collection(value) && !crate::syntax::is_quoted_scalar(value) && !crate::syntax::is_plain_safe(value)
 }

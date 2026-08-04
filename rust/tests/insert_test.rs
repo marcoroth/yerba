@@ -1042,3 +1042,32 @@ fn test_insert_at_index_preserves_inline_comment() {
     "#}
   );
 }
+
+#[test]
+fn test_a_one_key_mapping_fragment_is_inserted_as_a_mapping() {
+  let mut document = parse("name: Alice\n");
+
+  document.insert_fragment_into("venue", "country: DE", InsertPosition::Last).unwrap();
+
+  assert_eq!(document.to_string(), "name: Alice\nvenue:\n  country: DE\n");
+  assert_eq!(document.get_value("venue.country"), Some(yaml_serde::Value::String("DE".to_string())));
+}
+
+#[test]
+fn test_the_same_text_stays_a_string_when_it_is_a_value() {
+  let mut document = parse("name: Alice\n");
+
+  document.insert_into("venue", "country: DE", InsertPosition::Last).unwrap();
+
+  assert_eq!(document.to_string(), "name: Alice\nvenue: \"country: DE\"\n");
+  assert_eq!(document.get_value("venue"), Some(yaml_serde::Value::String("country: DE".to_string())));
+}
+
+#[test]
+fn test_a_flow_collection_fragment_stays_inline() {
+  let mut document = parse("name: Alice\n");
+
+  document.insert_fragment_into("venue", "{country: DE}", InsertPosition::Last).unwrap();
+
+  assert_eq!(document.to_string(), "name: Alice\nvenue: {country: DE}\n");
+}

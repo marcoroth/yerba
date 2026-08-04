@@ -2,5 +2,5 @@ use yerba::version;
 
 #[test]
 fn test_version() {
-  assert_eq!(version(), "0.8.1");
+  assert_eq!(version(), "0.9.0");
 }

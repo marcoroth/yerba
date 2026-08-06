@@ -167,10 +167,14 @@ static VALUE document_replace_content(VALUE self, VALUE content) {
   }
 
   struct Document *old_document = get_document(self);
+  uint64_t revision = 0;
 
   if (old_document) {
+    revision = yerba_document_revision(old_document);
     yerba_document_free(old_document);
   }
+
+  yerba_document_set_revision(result.document, revision + 1);
 
   RTYPEDDATA_DATA(self) = result.document;
 
@@ -238,6 +242,7 @@ static VALUE node_from_get_result(YerbaGetResult result, VALUE self, VALUE path)
 
       VALUE kwargs = rb_hash_new();
       rb_hash_aset(kwargs, ID2SYM(rb_intern("value")), value);
+      rb_hash_aset(kwargs, ID2SYM(rb_intern("revision")), ULL2NUM(yerba_document_revision(get_document(self))));
 
       return rb_funcallv_kw(rb_path2class("Yerba::Scalar"), rb_intern("from_document"), 5, (VALUE[]){ self, path, location, key, kwargs }, RB_PASS_KEYWORDS);
     }
@@ -324,6 +329,11 @@ static VALUE document_source(VALUE self, VALUE path) {
   yerba_string_free(text);
 
   return result;
+}
+
+/* document.revision → Integer, bumped on every edit */
+static VALUE document_revision(VALUE self) {
+  return ULL2NUM(yerba_document_revision(get_document(self)));
 }
 
 /* document.get_value(path) → parsed Ruby object (Hash/Array/String/Integer/etc) */
@@ -1189,6 +1199,7 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "[]", document_bracket, 1);
   rb_define_method(rb_cDocument, "node_at", document_bracket, 1);
   rb_define_method(rb_cDocument, "value_at", document_get_value, 1);
+  rb_define_method(rb_cDocument, "revision", document_revision, 0);
   rb_define_method(rb_cDocument, "get_all", document_get_all, 1);
   rb_define_method(rb_cDocument, "location", document_location, -1);
   rb_define_method(rb_cDocument, "locations", document_locations, 1);

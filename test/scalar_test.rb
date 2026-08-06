@@ -268,6 +268,404 @@ class ScalarTest < Minitest::Spec
     Yerba::Document.clear_cache!
   end
 
+  test "scalar.value reflects later document edits" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+    YAML
+
+    scalar = document["host"]
+
+    assert_equal "localhost", scalar.value
+
+    document.set("host", "0.0.0.0")
+
+    assert_equal "0.0.0.0", scalar.value
+  end
+
+  test "scalar.value reflects later document edits for falsy values" do
+    document = Yerba::Document.parse(<<~YAML)
+      enabled: true
+      name: Alice
+    YAML
+
+    enabled = document["enabled"]
+    name = document["name"]
+
+    assert_equal true, enabled.value
+    assert_equal "Alice", name.value
+
+    document.set("enabled", false)
+    document.set("name", nil)
+
+    assert_equal false, enabled.value
+    assert_nil name.value
+  end
+
+  test "scalar.value reflects edits made through another scalar" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+    YAML
+
+    scalar = document["host"]
+    other = document["host"]
+
+    other.value = "0.0.0.0"
+
+    assert_equal "0.0.0.0", scalar.value
+  end
+
+  test "scalar.value is nil after the node is deleted" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+      port: 5432
+    YAML
+
+    scalar = document["host"]
+
+    assert_equal "localhost", scalar.value
+
+    document.delete("host")
+
+    assert_nil scalar.value
+  end
+
+  test "scalar.value reflects file edits made through another scalar" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("name: Alice\n")
+    file.close
+
+    scalar = Yerba::Scalar.from(file_path: file.path, selector: "name", value: "Alice")
+    other = Yerba::Scalar.from(file_path: file.path, selector: "name")
+
+    other.value = "Bob"
+
+    assert_equal "Bob", scalar.value
+  ensure
+    file&.unlink
+    Yerba::Document.clear_cache!
+  end
+
+  test "scalar.value falls back to the captured value when the file is gone" do
+    scalar = Yerba::Scalar.from(file_path: "/tmp/does-not-exist.yml", selector: "name", value: "Alice")
+
+    assert_equal "Alice", scalar.value
+  end
+
+  test "scalar.value reflects edits made through document[]=" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+    YAML
+
+    scalar = document["host"]
+
+    assert_equal "localhost", scalar.value
+
+    document["host"] = "0.0.0.0"
+
+    assert_equal "0.0.0.0", scalar.value
+  end
+
+  test "scalar.value reflects edits made through the enclosing map" do
+    document = Yerba::Document.parse(<<~YAML)
+      database:
+        host: localhost
+    YAML
+
+    scalar = document["database"]["host"]
+
+    assert_equal "localhost", scalar.value
+
+    document["database"]["host"] = "0.0.0.0"
+
+    assert_equal "0.0.0.0", scalar.value
+  end
+
+  test "scalar.value reflects edits made to a sibling key" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+      port: 5432
+    YAML
+
+    host = document["host"]
+
+    assert_equal "localhost", host.value
+
+    document.set("port", 5433)
+
+    assert_equal "localhost", host.value
+    assert_equal 5433, document["port"].value
+  end
+
+  test "scalar.value reflects a key that is deleted and added back" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+      port: 5432
+    YAML
+
+    scalar = document["host"]
+
+    assert_equal "localhost", scalar.value
+
+    document.delete("host")
+
+    assert_nil scalar.value
+
+    document["host"] = "0.0.0.0"
+
+    assert_equal "0.0.0.0", scalar.value
+  end
+
+  test "scalar.value reflects appends to the enclosing sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: first
+    YAML
+
+    scalar = document["items"][0]["name"]
+
+    assert_equal "first", scalar.value
+
+    document["items"] << { "name" => "second" }
+
+    assert_equal "first", scalar.value
+    assert_equal "second", document["items"][1]["name"].value
+  end
+
+  test "scalar.value follows its index when sequence items are removed" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: first
+        - name: second
+    YAML
+
+    scalar = document["items"][1]["name"]
+
+    assert_equal "second", scalar.value
+
+    document["items"].delete_at(0)
+
+    assert_nil scalar.value
+    assert_equal "second", document["items"][0]["name"].value
+  end
+
+  test "scalar.value reflects renamed keys" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+    YAML
+
+    scalar = document["host"]
+
+    assert_equal "localhost", scalar.value
+
+    document.rename("host", "hostname")
+
+    assert_nil scalar.value
+    assert_equal "localhost", document["hostname"].value
+  end
+
+  test "scalar.value reflects sorted keys" do
+    document = Yerba::Document.parse(<<~YAML)
+      port: 5432
+      host: localhost
+    YAML
+
+    scalar = document["host"]
+
+    assert_equal "localhost", scalar.value
+
+    document.sort_keys("", ["host", "port"])
+
+    assert_equal "localhost", scalar.value
+  end
+
+  test "scalar.value is unaffected by a quote style change" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    scalar = document["name"]
+
+    assert_equal "Alice", scalar.value
+
+    scalar.quote_style = :double
+
+    assert_equal "Alice", scalar.value
+    assert_equal :double, scalar.quote_style
+  end
+
+  test "scalar.value is nil after the scalar deletes itself" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+      port: 5432
+    YAML
+
+    scalar = document["host"]
+
+    assert_equal "localhost", scalar.value
+
+    scalar.delete
+
+    assert_nil scalar.value
+  end
+
+  test "scalar conversions reflect later document edits" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      port: 5432
+    YAML
+
+    name = document["name"]
+    port = document["port"]
+
+    assert_equal "Alice", name.to_s
+    assert_equal "Alice", name.to_yaml
+    assert_equal 5432, port.to_i
+    assert_equal 5432.0, port.to_f
+    assert_equal "Alice", name
+
+    document.set("name", "Bob")
+    document.set("port", 5433)
+
+    assert_equal "Bob", name.to_s
+    assert_equal "Bob", name.to_yaml
+    assert_equal 5433, port.to_i
+    assert_equal 5433.0, port.to_f
+    assert_equal "Bob", name
+    refute_equal "Alice", name
+  end
+
+  test "scalar.inspect reflects later document edits" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+    YAML
+
+    scalar = document["host"]
+
+    assert_includes scalar.inspect, "localhost"
+
+    document.set("host", "0.0.0.0")
+
+    assert_includes scalar.inspect, "0.0.0.0"
+    refute_includes scalar.inspect, "localhost"
+  end
+
+  test "key scalars keep their value across document edits" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+    YAML
+
+    scalar = document["host"]
+
+    assert_equal "host", scalar.key.value
+
+    document.set("host", "0.0.0.0")
+
+    assert_equal "host", scalar.key.value
+  end
+
+  test "standalone scalars keep their value" do
+    scalar = Yerba::Scalar.new("hello")
+
+    assert_equal "hello", scalar.value
+    assert_equal "hello", scalar.value
+
+    scalar.value = "goodbye"
+
+    assert_equal "goodbye", scalar.value
+  end
+
+  test "scalars from the same document all see an edit" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+    YAML
+
+    scalars = Array.new(3) { document["host"] }
+
+    scalars.each { |scalar| assert_equal "localhost", scalar.value }
+
+    document.set("host", "0.0.0.0")
+
+    scalars.each { |scalar| assert_equal "0.0.0.0", scalar.value }
+  end
+
+  test "scalars from different documents cache independently" do
+    first = Yerba::Document.parse(<<~YAML)
+      host: first
+    YAML
+
+    second = Yerba::Document.parse(<<~YAML)
+      host: second
+    YAML
+
+    first_scalar = first["host"]
+    second_scalar = second["host"]
+
+    first.set("host", "changed")
+
+    assert_equal "changed", first_scalar.value
+    assert_equal "second", second_scalar.value
+  end
+
+  test "scalar.value re-reads once per edit" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+    YAML
+
+    scalar = document["host"]
+    reads = 0
+
+    document.define_singleton_method(:value_at) do |selector|
+      reads += 1
+      super(selector)
+    end
+
+    5.times do |index|
+      document.set("host", "host#{index}")
+
+      3.times { assert_equal "host#{index}", scalar.value }
+    end
+
+    assert_equal 5, reads
+  end
+
+  test "scalar.value reuses the cached value while the document is unchanged" do
+    document = Yerba::Document.parse(<<~YAML)
+      host: localhost
+    YAML
+
+    scalar = document["host"]
+    reads = 0
+
+    document.define_singleton_method(:value_at) do |selector|
+      reads += 1
+      super(selector)
+    end
+
+    3.times { assert_equal "localhost", scalar.value }
+
+    assert_equal 0, reads
+
+    document.set("host", "0.0.0.0")
+
+    3.times { assert_equal "0.0.0.0", scalar.value }
+
+    assert_equal 1, reads
+  end
+
+  test "scalar.value reflects content replaced wholesale" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+    YAML
+
+    scalar = document["name"]
+
+    assert_equal "Alice", scalar.value
+
+    document.replace_content!("name: Bob\n")
+
+    assert_equal "Bob", scalar.value
+  end
+
   test "Scalar.from delete lazily loads document" do
     file = Tempfile.new(["test", ".yml"])
     file.write("name: Alice\nport: 5432\n")

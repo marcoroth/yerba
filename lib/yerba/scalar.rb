@@ -12,7 +12,16 @@ module Yerba
     end
 
     def value
-      @value ||= document&.value_at(@selector)
+      return @value unless @selector && readable_document?
+
+      revision = document.revision
+
+      unless @revision == revision
+        @value = document.value_at(@selector)
+        @revision = revision
+      end
+
+      @value
     end
 
     def quote_style
@@ -28,6 +37,7 @@ module Yerba
     def value=(new_value)
       document&.set(@selector, new_value)
 
+      @revision = nil
       @value = new_value
     end
     alias set value=
@@ -74,9 +84,17 @@ module Yerba
 
     private
 
-    def init_from(value: nil, quote_style: nil, **)
+    def readable_document?
+      return true unless @document.nil?
+      return false if @file_path.nil?
+
+      File.exist?(@file_path)
+    end
+
+    def init_from(value: nil, quote_style: nil, revision: nil, **)
       @value = value
       @quote_style = quote_style
+      @revision = revision
     end
   end
 end

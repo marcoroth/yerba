@@ -1,6 +1,6 @@
 use super::*;
 
-fn key_of(node: &SyntaxNode, source: &str) -> (Option<String>, Location) {
+fn key_of(node: &SyntaxNode, index: &LineIndex) -> (Option<String>, Location) {
   node
     .parent()
     .and_then(|parent| {
@@ -13,7 +13,7 @@ fn key_of(node: &SyntaxNode, source: &str) -> (Option<String>, Location) {
 
       let key_text = extract_scalar_text(&key_node)?;
       let key_range = key_node.text_range();
-      let key_location = compute_location(source, key_range.start().into(), key_range.end().into());
+      let key_location = compute_location_indexed(index, key_range.start().into(), key_range.end().into());
 
       Some((key_text, key_location))
     })
@@ -151,7 +151,7 @@ impl Document {
   }
 
   pub fn get_all_located(&self, dot_path: &str) -> Vec<LocatedNode> {
-    let source = self.source_text();
+    let index = LineIndex::new(&self.source_text());
     let file_path = self.path.as_ref().map(|p| p.to_string_lossy().to_string());
 
     self
@@ -160,8 +160,8 @@ impl Document {
       .map(|node| {
         let range = node.text_range();
         let offset: usize = range.start().into();
-        let line = line_at(&source, offset);
-        let location = compute_location(&source, offset, range.end().into());
+        let line = index.line_at(offset);
+        let location = compute_location_indexed(&index, offset, range.end().into());
         let selector = node_selector(node);
         let is_scalar = !node
           .descendants()
@@ -184,7 +184,7 @@ impl Document {
           }
         };
 
-        let (key_name, key_location) = key_of(node, &source);
+        let (key_name, key_location) = key_of(node, &index);
 
         LocatedNode {
           node_type: node_type.to_string(),
@@ -286,7 +286,7 @@ impl Document {
         let range = node.text_range();
         let location = compute_location(source, range.start().into(), range.end().into());
 
-        let (key_name, key_location) = key_of(&node, source);
+        let (key_name, key_location) = key_of(&node, &LineIndex::new(source));
 
         (location, key_name, key_location)
       }

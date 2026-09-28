@@ -47,7 +47,7 @@ use crate::syntax::{
   column_at, dedent_block_scalar, extract_scalar, extract_scalar_text, find_block_map, find_block_sequence, find_entry_by_key, find_flow_entry_by_key,
   find_flow_map, find_flow_sequence, find_scalar_token, first_collection, flow_map_entries, flow_sequence_entries, format_scalar_value, in_flow_collection,
   is_map_key, is_yaml_non_string, line_at, line_start_at, preceding_whitespace_indent, preceding_whitespace_token, raw_scalar_value, removal_range,
-  FirstCollection, ScalarValue,
+  FirstCollection, LineIndex, ScalarValue,
 };
 
 #[derive(Debug, Clone)]
@@ -600,6 +600,20 @@ pub(crate) fn compute_location(source: &str, start_offset: usize, end_offset: us
     start_column: column_at(source, start),
     end_line: line_at(source, end),
     end_column: column_at(source, end),
+  }
+}
+
+pub(crate) fn compute_location_indexed(index: &LineIndex, start_offset: usize, end_offset: usize) -> Location {
+  let start = start_offset.min(index.source_length());
+  let end = end_offset.min(index.source_length());
+
+  Location {
+    start_offset: start,
+    end_offset: end,
+    start_line: index.line_at(start),
+    start_column: index.column_at(start),
+    end_line: index.line_at(end),
+    end_column: index.column_at(end),
   }
 }
 

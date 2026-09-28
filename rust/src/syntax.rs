@@ -537,6 +537,36 @@ pub fn column_at(source: &str, offset: usize) -> usize {
   offset - line_start_at(source, offset)
 }
 
+/// Precomputed line starts, for answering many `line_at`/`column_at` lookups
+/// against the same source without rescanning it each time.
+pub struct LineIndex {
+  line_starts: Vec<usize>,
+  length: usize,
+}
+
+impl LineIndex {
+  pub fn new(source: &str) -> Self {
+    let line_starts = std::iter::once(0).chain(source.match_indices('\n').map(|(position, _)| position + 1)).collect();
+
+    Self {
+      line_starts,
+      length: source.len(),
+    }
+  }
+
+  pub fn source_length(&self) -> usize {
+    self.length
+  }
+
+  pub fn line_at(&self, offset: usize) -> usize {
+    self.line_starts.partition_point(|&start| start <= offset)
+  }
+
+  pub fn column_at(&self, offset: usize) -> usize {
+    offset - self.line_starts[self.line_at(offset) - 1]
+  }
+}
+
 pub fn preceding_whitespace_indent(node: &SyntaxNode) -> String {
   if let Some(token) = preceding_whitespace_token(node) {
     let text = token.text();

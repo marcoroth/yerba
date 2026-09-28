@@ -226,3 +226,29 @@ fn test_get_all_located_matches_node_info_locations() {
     }
   }
 }
+
+#[test]
+fn test_locations_reflect_edits_after_being_read() {
+  let mut document = parse(indoc! {"
+    a: 1
+    b: 2
+    c: 3
+    d: 4
+  "});
+
+  assert_eq!(document.get_node_info("b").location.start_line, 2);
+  assert_eq!(document.get_all_located("*")[1].line, 2);
+
+  document
+    .insert_into(
+      "long_key_name",
+      "a much longer value than the others",
+      yerba::InsertPosition::Before("b".to_string()),
+    )
+    .unwrap();
+
+  let b = document.get_node_info("b").location;
+
+  assert_eq!((b.start_line, b.start_column), (3, 3));
+  assert_eq!(document.get_all_located("*")[2].line, 3);
+}

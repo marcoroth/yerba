@@ -13,7 +13,7 @@ fn key_of(node: &SyntaxNode, index: &LineIndex) -> (Option<String>, Location) {
 
       let key_text = extract_scalar_text(&key_node)?;
       let key_range = key_node.text_range();
-      let key_location = compute_location_indexed(index, key_range.start().into(), key_range.end().into());
+      let key_location = compute_location(index, key_range.start().into(), key_range.end().into());
 
       Some((key_text, key_location))
     })
@@ -151,7 +151,7 @@ impl Document {
   }
 
   pub fn get_all_located(&self, dot_path: &str) -> Vec<LocatedNode> {
-    let index = LineIndex::new(&self.source_text());
+    let index = self.line_index();
     let file_path = self.path.as_ref().map(|p| p.to_string_lossy().to_string());
 
     self
@@ -161,7 +161,7 @@ impl Document {
         let range = node.text_range();
         let offset: usize = range.start().into();
         let line = index.line_at(offset);
-        let location = compute_location_indexed(&index, offset, range.end().into());
+        let location = compute_location(index, offset, range.end().into());
         let selector = node_selector(node);
         let is_scalar = !node
           .descendants()
@@ -184,7 +184,7 @@ impl Document {
           }
         };
 
-        let (key_name, key_location) = key_of(node, &index);
+        let (key_name, key_location) = key_of(node, index);
 
         LocatedNode {
           node_type: node_type.to_string(),
@@ -212,9 +212,9 @@ impl Document {
 
   pub fn get_node_info(&self, dot_path: &str) -> NodeInfo {
     let selector = crate::selector::Selector::parse(dot_path);
-    let source = self.source_text();
+    let index = self.line_index();
 
-    let (location, key_name, key_location) = self.resolve_location(dot_path, &source);
+    let (location, key_name, key_location) = self.resolve_location(dot_path);
 
     if selector.has_wildcard() {
       let values = self.get_all_typed(dot_path);
@@ -244,14 +244,14 @@ impl Document {
         let (node_type, entry_location, entry_key_name, entry_key_location) = if self.navigate(dot_path).is_err() {
           if let Some(entry_node) = self.find_entry(dot_path) {
             let range = entry_node.text_range();
-            let entry_location = compute_location(&source, range.start().into(), range.end().into());
+            let entry_location = compute_location(index, range.start().into(), range.end().into());
 
             let (node, location) = yaml_parser::ast::BlockMapEntry::cast(entry_node.clone())
               .and_then(|entry| {
                 entry.key().and_then(|key_node| {
                   let key_text = extract_scalar_text(key_node.syntax())?;
                   let key_range = key_node.syntax().text_range();
-                  let key_location = compute_location(&source, key_range.start().into(), key_range.end().into());
+                  let key_location = compute_location(index, key_range.start().into(), key_range.end().into());
 
                   Some((key_text, key_location))
                 })
@@ -280,13 +280,13 @@ impl Document {
     }
   }
 
-  fn resolve_location(&self, dot_path: &str, source: &str) -> (Location, Option<String>, Location) {
+  fn resolve_location(&self, dot_path: &str) -> (Location, Option<String>, Location) {
     match self.navigate(dot_path) {
       Ok(node) => {
         let range = node.text_range();
-        let location = compute_location(source, range.start().into(), range.end().into());
+        let location = compute_location(self.line_index(), range.start().into(), range.end().into());
 
-        let (key_name, key_location) = key_of(&node, &LineIndex::new(source));
+        let (key_name, key_location) = key_of(&node, self.line_index());
 
         (location, key_name, key_location)
       }

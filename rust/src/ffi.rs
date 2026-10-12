@@ -218,6 +218,11 @@ const EMPTY_LOCATION: YerbaLocation = YerbaLocation {
 };
 
 #[no_mangle]
+pub unsafe extern "C" fn yerba_document_generation(document: *const Document) -> u64 {
+  (*document).generation()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn yerba_document_free(document: *mut Document) {
   if !document.is_null() {
     drop(Box::from_raw(document));

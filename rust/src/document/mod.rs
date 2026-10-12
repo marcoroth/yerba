@@ -31,6 +31,7 @@ pub struct LocatedNode {
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use rowan::ast::AstNode;
 use rowan::{TextRange, TextSize};
@@ -126,10 +127,13 @@ pub enum InsertPosition {
   FromSortOrder(Vec<String>),
 }
 
+static NEXT_GENERATION: AtomicU64 = AtomicU64::new(1);
+
 #[derive(Debug)]
 pub struct Document {
   root: SyntaxNode,
   path: Option<PathBuf>,
+  generation: u64,
 }
 
 impl Document {
@@ -138,7 +142,15 @@ impl Document {
 
     check_duplicate_keys(&tree)?;
 
-    Ok(Document { root: tree, path: None })
+    Ok(Document {
+      root: tree,
+      path: None,
+      generation: NEXT_GENERATION.fetch_add(1, Ordering::Relaxed),
+    })
+  }
+
+  pub fn generation(&self) -> u64 {
+    self.generation
   }
 
   pub fn parse_file(path: impl AsRef<Path>) -> Result<Self, YerbaError> {

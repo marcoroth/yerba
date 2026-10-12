@@ -339,6 +339,23 @@ static VALUE document_get_value(VALUE self, VALUE path) {
   return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
 }
 
+/* document.values → the whole document as Ruby objects, cached until the document changes */
+static VALUE document_values(VALUE self) {
+  struct Document *document = get_document(self);
+  VALUE generation = ULL2NUM(yerba_document_generation(document));
+
+  if (rb_equal(rb_ivar_get(self, rb_intern("values_generation")), generation)) {
+    return rb_ivar_get(self, rb_intern("values"));
+  }
+
+  VALUE values = document_get_value(self, make_utf8_string(""));
+
+  rb_ivar_set(self, rb_intern("values"), values);
+  rb_ivar_set(self, rb_intern("values_generation"), generation);
+
+  return values;
+}
+
 /* document.selectors → ["database", "database.host", "tags", "tags[]", ...] */
 static VALUE document_selectors(VALUE self) {
   struct Document *document = get_document(self);
@@ -1189,6 +1206,7 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "[]", document_bracket, 1);
   rb_define_method(rb_cDocument, "node_at", document_bracket, 1);
   rb_define_method(rb_cDocument, "value_at", document_get_value, 1);
+  rb_define_method(rb_cDocument, "values", document_values, 0);
   rb_define_method(rb_cDocument, "get_all", document_get_all, 1);
   rb_define_method(rb_cDocument, "location", document_location, -1);
   rb_define_method(rb_cDocument, "locations", document_locations, 1);

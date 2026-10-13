@@ -342,6 +342,64 @@ pub unsafe extern "C" fn yerba_selector_has_wildcard(path: *const c_char) -> boo
   crate::selector::Selector::parse(selector_string).has_wildcard()
 }
 
+/// Parses a selector into JSON: `{"relative": bool, "segments": [...]}`.
+///
+/// Keys are encoded as strings, indexes as integers, `[]` as `{"all": "items"}` and `*` as `{"all": "keys"}`.
+#[no_mangle]
+pub unsafe extern "C" fn yerba_selector_parse(path: *const c_char) -> *mut c_char {
+  use crate::selector::{Selector, SelectorSegment};
+
+  let selector_string = CStr::from_ptr(path).to_str().unwrap_or("");
+  let selector = Selector::parse(selector_string);
+
+  let segments: Vec<serde_json::Value> = selector
+    .segments()
+    .iter()
+    .map(|segment| match segment {
+      SelectorSegment::Key(key) => serde_json::json!(key),
+      SelectorSegment::Index(index) => serde_json::json!(index),
+      SelectorSegment::AllItems => serde_json::json!({ "all": "items" }),
+      SelectorSegment::AllKeys => serde_json::json!({ "all": "keys" }),
+    })
+    .collect();
+
+  let json = serde_json::json!({ "relative": selector.is_relative(), "segments": segments });
+
+  CString::new(json.to_string()).unwrap_or_default().into_raw()
+}
+
+/// Builds a selector string from a JSON array of segments, encoded like `yerba_selector_parse` returns them.
+#[no_mangle]
+pub unsafe extern "C" fn yerba_selector_build(segments_json: *const c_char, relative: bool) -> *mut c_char {
+  use crate::selector::{Selector, SelectorSegment};
+
+  let json_string = CStr::from_ptr(segments_json).to_str().unwrap_or("[]");
+  let values: Vec<serde_json::Value> = serde_json::from_str(json_string).unwrap_or_default();
+
+  let segments: Vec<SelectorSegment> = values
+    .iter()
+    .filter_map(|value| match value {
+      serde_json::Value::String(key) => Some(SelectorSegment::Key(key.clone())),
+      serde_json::Value::Number(number) => number.as_u64().map(|index| SelectorSegment::Index(index as usize)),
+      serde_json::Value::Object(object) => match object.get("all").and_then(|all| all.as_str()) {
+        Some("items") => Some(SelectorSegment::AllItems),
+        Some("keys") => Some(SelectorSegment::AllKeys),
+        _ => None,
+      },
+      _ => None,
+    })
+    .collect();
+
+  let selector_string = Selector::Absolute(segments).to_selector_string();
+  let selector_string = if relative && !selector_string.is_empty() {
+    format!(".{}", selector_string)
+  } else {
+    selector_string
+  };
+
+  CString::new(selector_string).unwrap_or_default().into_raw()
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn yerba_document_keys(document: *const Document, path: *const c_char) -> *mut c_char {
   let document = &*document;

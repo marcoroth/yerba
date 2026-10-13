@@ -1167,6 +1167,30 @@ static VALUE collection_s_find(int argc, VALUE *argv, VALUE self) {
   return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
 }
 
+/* Selector.native_parse(selector) → {"relative" => bool, "segments" => [...]} */
+static VALUE selector_s_native_parse(VALUE klass, VALUE selector) {
+  char *json = yerba_selector_parse(StringValueCStr(selector));
+
+  if (!json) return Qnil;
+
+  VALUE json_string = make_utf8_string(json);
+  yerba_string_free(json);
+
+  return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+}
+
+/* Selector.native_build(segments_json, relative) → selector string */
+static VALUE selector_s_native_build(VALUE klass, VALUE segments_json, VALUE relative) {
+  char *result = yerba_selector_build(StringValueCStr(segments_json), RTEST(relative));
+
+  if (!result) return rb_str_new_cstr("");
+
+  VALUE selector = make_utf8_string(result);
+  yerba_string_free(result);
+
+  return selector;
+}
+
 /* Yerbafile.locate(directory = nil) → path string or nil */
 static VALUE yerbafile_s_locate(int argc, VALUE *argv, VALUE klass) {
   VALUE directory;
@@ -1192,6 +1216,10 @@ void Init_yerba(void) {
   rb_ePathNotFoundError = rb_define_class_under(rb_mYerba, "PathNotFoundError", rb_eError);
   rb_eParseError = rb_define_class_under(rb_mYerba, "ParseError", rb_eError);
   rb_ePathValidationError = rb_define_class_under(rb_mYerba, "PathValidationError", rb_eError);
+
+  VALUE rb_cSelector = rb_define_class_under(rb_mYerba, "Selector", rb_cObject);
+  rb_define_private_method(rb_singleton_class(rb_cSelector), "native_parse", selector_s_native_parse, 1);
+  rb_define_private_method(rb_singleton_class(rb_cSelector), "native_build", selector_s_native_build, 2);
 
   VALUE rb_cCollection = rb_define_class_under(rb_mYerba, "Collection", rb_cObject);
   rb_define_singleton_method(rb_cCollection, "get", collection_s_get, 2);

@@ -4,6 +4,7 @@ require "fileutils"
 
 require_relative "yerba/version"
 require_relative "yerba/location"
+require_relative "yerba/selector"
 require_relative "yerba/formatting"
 require_relative "yerba/node"
 require_relative "yerba/scalar"

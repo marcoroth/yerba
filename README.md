@@ -1165,6 +1165,33 @@ scalars.first.value = "New Title"
 scalars.first.document.save!
 ```
 
+### Parsing Selectors
+
+`Yerba::Selector` splits a selector into its segments, using the same parser as the rest of Yerba. Keys are Strings, indexes Integers, `[]` is `:all_items` and `*` is `:all_keys`:
+
+```ruby
+selector = Yerba::Selector.parse("[3].talks[1]")
+
+selector.segments   # => [3, "talks", 1]
+selector.parent     # => "[3].talks"
+selector.join("speakers", 0).to_s  # => "[3].talks[1].speakers[0]"
+
+Yerba::Selector.parse("[].speakers[]").segments  # => [:all_items, "speakers", :all_items]
+Yerba::Selector.parse(".title").relative?        # => true
+
+Yerba::Selector.build([3, "talks", 1]).to_s      # => "[3].talks[1]"
+```
+
+`dig` looks a concrete selector up in plain Ruby values, such as the cached `Document#values`, without calling into the native extension. Use it when reading many values from the same document:
+
+```ruby
+values = document.values
+
+Yerba::Selector.parse("[3].talks[1].title").dig(values)  # => same as document.value_at("[3].talks[1].title")
+```
+
+Parsed selectors are cached per string, so parsing the same selector again is free.
+
 ### Saving
 
 Write changes back to the original file:

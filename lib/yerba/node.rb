@@ -1,7 +1,31 @@
 # frozen_string_literal: true
 
 module Yerba
+  module NodeTree
+    protected
+
+    def tree_node?
+      !@tree.nil? && @tree.equal?(document.nodes)
+    end
+
+    def tree_children
+      @children
+    end
+
+    def valueless?
+      @valueless == true
+    end
+
+    def attach_tree(tree, children, valueless)
+      @tree = tree
+      @children = children
+      @valueless = valueless
+    end
+  end
+
   module Node
+    include NodeTree
+
     attr_reader :selector, :location, :key
 
     def file_path
@@ -24,6 +48,17 @@ module Yerba
       return nil unless connected? && @selector
 
       document.source(@selector)
+    end
+
+    def children
+      tree = current_children
+
+      case tree
+      when Hash
+        tree.transform_values { |child| child&.dup }
+      when Array
+        tree.map { |child| child&.dup }
+      end
     end
 
     module ClassMethods
@@ -57,6 +92,12 @@ module Yerba
     end
 
     private
+
+    def current_children
+      node = tree_node? ? self : document&.[](@selector)
+
+      node.tree_children if node.is_a?(Node) && node.tree_node?
+    end
 
     def init_node(document, selector, location, key, file_path, line)
       @document = document

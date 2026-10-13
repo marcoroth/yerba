@@ -12,6 +12,8 @@ module Yerba
     end
 
     def value
+      return @value.is_a?(String) ? @value.dup : @value if @tree
+
       @value ||= document&.value_at(@selector)
     end
 

@@ -356,6 +356,44 @@ static VALUE document_values(VALUE self) {
   return values;
 }
 
+/* document.native_node_records → [[parent, type, selector, key, value, has_value, location, key_location], ...] */
+static VALUE document_node_records(VALUE self) {
+  YerbaNodeList list = yerba_document_nodes(get_document(self));
+  VALUE records = rb_ary_new_capa((long)list.length);
+
+  for (size_t i = 0; i < list.length; i++) {
+    YerbaNodeRecord record = list.records[i];
+    VALUE type;
+
+    switch (record.node_type) {
+      case NODE_TYPE_SCALAR: type = ID2SYM(rb_intern("scalar")); break;
+      case NODE_TYPE_MAP: type = ID2SYM(rb_intern("map")); break;
+      case NODE_TYPE_SEQUENCE: type = ID2SYM(rb_intern("sequence")); break;
+      default: type = Qnil; break;
+    }
+
+    rb_ary_push(records, rb_ary_new_from_args(8,
+      LONG2NUM(record.parent),
+      type,
+      make_utf8_string(record.selector),
+      record.key_name ? make_utf8_string(record.key_name) : Qnil,
+      typed_value_to_ruby(record.value),
+      record.has_value ? Qtrue : Qfalse,
+      location_to_ruby(record.location),
+      record.key_name ? location_to_ruby(record.key_location) : Qnil
+    ));
+  }
+
+  yerba_node_list_free(list);
+
+  return records;
+}
+
+/* document.native_generation → changes whenever the document is edited */
+static VALUE document_generation(VALUE self) {
+  return ULL2NUM(yerba_document_generation(get_document(self)));
+}
+
 /* document.selectors → ["database", "database.host", "tags", "tags[]", ...] */
 static VALUE document_selectors(VALUE self) {
   struct Document *document = get_document(self);
@@ -1234,7 +1272,10 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "[]", document_bracket, 1);
   rb_define_method(rb_cDocument, "node_at", document_bracket, 1);
   rb_define_method(rb_cDocument, "value_at", document_get_value, 1);
+  rb_define_private_method(rb_cDocument, "native_node_at", document_bracket, 1);
   rb_define_method(rb_cDocument, "values", document_values, 0);
+  rb_define_private_method(rb_cDocument, "native_node_records", document_node_records, 0);
+  rb_define_private_method(rb_cDocument, "native_generation", document_generation, 0);
   rb_define_method(rb_cDocument, "get_all", document_get_all, 1);
   rb_define_method(rb_cDocument, "location", document_location, -1);
   rb_define_method(rb_cDocument, "locations", document_locations, 1);

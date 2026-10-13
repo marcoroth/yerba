@@ -2,6 +2,8 @@
 
 module Yerba
   class Document
+    include NodeTree
+
     ROOT_SELECTOR = ""
 
     def self.cache
@@ -74,6 +76,14 @@ module Yerba
       return false unless @path && @loaded_mtime
 
       File.mtime(@path) != @loaded_mtime
+    end
+
+    def nodes
+      generation = native_generation
+      return @nodes if @nodes_generation == generation
+
+      @nodes_generation = generation
+      @nodes = build_nodes(native_node_records)
     end
 
     def dig(*keys)
@@ -176,6 +186,55 @@ module Yerba
     end
 
     private
+
+    def build_nodes(records)
+      built = []
+
+      records.each do |parent, type, selector, key_name, value, has_value, location, key_location|
+        key = Scalar.from_document(nil, nil, key_location, nil, value: key_name) if key_name
+        node = build_node(type, selector, location, key, value)
+
+        node.attach_tree(built.first || node, tree_container(type), !has_value) if type
+        add_child(built[parent], key_name, node) unless parent.negative?
+
+        built << node
+      end
+
+      built.each { |node| node&.tree_children&.freeze }
+      built.first
+    end
+
+    def build_node(type, selector, location, key, value)
+      case type
+      when :scalar
+        Scalar.from_document(self, selector, location, key, value: value)
+      when :map
+        Map.from_document(self, selector, location, key)
+      when :sequence
+        Sequence.from_document(self, selector, location, key)
+      else
+        native_node_at(selector)
+      end
+    end
+
+    def tree_container(type)
+      case type
+      when :map
+        {}
+      when :sequence
+        []
+      end
+    end
+
+    def add_child(parent, key_name, node)
+      children = parent.tree_children
+
+      if children.is_a?(Hash)
+        children[key_name] = node
+      else
+        children << node
+      end
+    end
 
     def empty_root?
       root.is_a?(Scalar) && root.value.nil?

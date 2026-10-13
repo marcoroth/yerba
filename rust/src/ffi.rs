@@ -67,6 +67,24 @@ pub struct YerbaLocation {
 }
 
 #[repr(C)]
+pub struct YerbaNodeRecord {
+  pub parent: isize,
+  pub node_type: NodeType,
+  pub selector: *mut c_char,
+  pub key_name: *mut c_char,
+  pub value: YerbaTypedValue,
+  pub has_value: bool,
+  pub location: YerbaLocation,
+  pub key_location: YerbaLocation,
+}
+
+#[repr(C)]
+pub struct YerbaNodeList {
+  pub records: *mut YerbaNodeRecord,
+  pub length: usize,
+}
+
+#[repr(C)]
 pub struct YerbaGetResult {
   pub is_list: bool,
   pub node_type: NodeType,
@@ -955,6 +973,65 @@ pub unsafe extern "C" fn yerba_string_free(s: *mut c_char) {
 pub unsafe extern "C" fn yerba_result_free(result: YerbaResult) {
   if !result.error.is_null() {
     drop(CString::from_raw(result.error));
+  }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_document_nodes(document: *const Document) -> YerbaNodeList {
+  let document = &*document;
+
+  let records: Vec<YerbaNodeRecord> = document
+    .node_records()
+    .into_iter()
+    .map(|record| YerbaNodeRecord {
+      parent: record.parent.map(|parent| parent as isize).unwrap_or(-1),
+      node_type: record.node_type,
+      selector: CString::new(record.selector).unwrap_or_default().into_raw(),
+      key_name: record
+        .key_name
+        .map(|name| CString::new(name).unwrap_or_default().into_raw())
+        .unwrap_or(ptr::null_mut()),
+      value: match record.scalar {
+        Some(scalar) => YerbaTypedValue {
+          value_type: crate::syntax::detect_yaml_type(&scalar),
+          text: CString::new(scalar.text).unwrap_or_default().into_raw(),
+        },
+        None => YerbaTypedValue {
+          text: ptr::null_mut(),
+          value_type: YerbaValueType::Null,
+        },
+      },
+      has_value: record.has_value,
+      location: location_to_ffi(record.location),
+      key_location: location_to_ffi(record.key_location),
+    })
+    .collect();
+
+  let mut records = records.into_boxed_slice();
+  let list = YerbaNodeList {
+    records: records.as_mut_ptr(),
+    length: records.len(),
+  };
+
+  std::mem::forget(records);
+
+  list
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn yerba_node_list_free(list: YerbaNodeList) {
+  if list.records.is_null() {
+    return;
+  }
+
+  let records = Box::from_raw(std::ptr::slice_from_raw_parts_mut(list.records, list.length));
+
+  for record in records.iter() {
+    for pointer in [record.selector, record.key_name, record.value.text] {
+      if !pointer.is_null() {
+        drop(CString::from_raw(pointer));
+      }
+    }
   }
 }
 

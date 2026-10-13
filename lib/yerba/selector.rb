@@ -15,6 +15,7 @@ module Yerba
   class Selector
     ALL_KEYS = :all_keys
     ALL_ITEMS = :all_items
+    CACHE_LIMIT = 10_000
 
     attr_reader :segments
 
@@ -24,6 +25,7 @@ module Yerba
       string = selector.to_s
 
       cache[string] ||= begin
+        cache.clear if cache.size >= CACHE_LIMIT
         parsed = native_parse(string)
 
         new(parsed["segments"].map { |segment| decode(segment) }, relative: parsed["relative"], source: string)

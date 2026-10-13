@@ -43,6 +43,13 @@ class SelectorTest < Minitest::Spec
     assert_same Yerba::Selector.parse("[0].talks[2]"), Yerba::Selector.parse("[0].talks[2]")
   end
 
+  test "keeps the cache below its limit" do
+    (Yerba::Selector::CACHE_LIMIT + 10).times { |index| Yerba::Selector.parse("[#{index}].name") }
+
+    assert_operator Yerba::Selector.send(:cache).size, :<=, Yerba::Selector::CACHE_LIMIT
+    assert_equal [3, "name"], Yerba::Selector.parse("[3].name").segments
+  end
+
   test "parse returns a selector untouched" do
     selector = Yerba::Selector.parse("[0]")
 

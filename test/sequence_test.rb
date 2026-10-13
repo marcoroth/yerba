@@ -1083,6 +1083,53 @@ class SequenceTest < Minitest::Spec
     Yerba::Document.clear_cache!
   end
 
+  test "first and last return a single node without a count" do
+    document = Yerba::Document.parse("tags:\n  - ruby\n  - rust\n  - go\n")
+
+    assert_equal "ruby", document["tags"].first.value
+    assert_equal "go", document["tags"].last.value
+    assert_nil Yerba::Document.parse("tags: []\n")["tags"].first
+  end
+
+  test "first and last take a count" do
+    tags = Yerba::Document.parse("tags:\n  - ruby\n  - rust\n  - go\n")["tags"]
+
+    assert_equal ["ruby", "rust"], tags.first(2).map(&:value)
+    assert_equal ["rust", "go"], tags.last(2).map(&:value)
+    assert_equal ["ruby", "rust", "go"], tags.last(5).map(&:value)
+    assert_empty tags.first(0)
+    assert_empty tags.last(0)
+    assert_raises(ArgumentError) { tags.first(-1) }
+    assert_raises(ArgumentError) { tags.last(-1) }
+  end
+
+  test "first and last take a count on a disconnected sequence" do
+    tags = Yerba::Sequence.new(["ruby", "rust", "go"])
+
+    assert_equal ["ruby", "rust"], tags.first(2)
+    assert_equal ["rust", "go"], tags.last(2)
+  end
+
+  test "first and last take a count on query results" do
+    document = Yerba::Document.parse(<<~YAML)
+      - name: Alice
+        kind: speaker
+      - name: Bob
+        kind: organizer
+      - name: Charlie
+        kind: speaker
+      - name: Dana
+        kind: speaker
+    YAML
+
+    results = document.root.where(kind: "speaker")
+
+    assert_equal "Alice", results.first["name"].value
+    assert_equal "Dana", results.last["name"].value
+    assert_equal(["Alice", "Charlie"], results.first(2).map { |node| node["name"].value })
+    assert_equal(["Charlie", "Dana"], results.last(2).map { |node| node["name"].value })
+  end
+
   test "fetch returns node for valid index" do
     document = Yerba::Document.parse(<<~YAML)
       tags:

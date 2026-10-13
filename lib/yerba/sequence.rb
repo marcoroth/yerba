@@ -227,12 +227,18 @@ module Yerba
     end
     alias size length
 
-    def first
-      self[0]
+    def first(count = nil)
+      return self[0] if count.nil?
+
+      super
     end
 
-    def last
-      self[length - 1] # rubocop:disable Style/NegativeArrayIndex
+    def last(count = nil)
+      size = length
+      return self[size - 1] if count.nil?
+      raise ArgumentError, "negative array size" if count.negative?
+
+      ([size - count, 0].max...size).map { |index| self[index] }
     end
 
     def remove(value)

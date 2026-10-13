@@ -21,12 +21,16 @@ module Yerba
       @sequence[index] if index
     end
 
-    def first
-      self[0]
+    def first(count = nil)
+      return self[0] if count.nil?
+
+      @indices.first(count).map { |index| @sequence[index] }
     end
 
-    def last
-      self[-1]
+    def last(count = nil)
+      return self[-1] if count.nil?
+
+      @indices.last(count).map { |index| @sequence[index] }
     end
 
     def length

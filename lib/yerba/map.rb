@@ -93,6 +93,12 @@ module Yerba
         return self
       end
 
+      if (tree = current_children)
+        tree.each_key { |name| yield name, tree[name]&.dup }
+
+        return self
+      end
+
       names = keys
       values = document.get_all(@selector.empty? ? "*" : "#{@selector}.*")
 
@@ -124,6 +130,9 @@ module Yerba
 
     def value_at(key)
       if connected?
+        child = current_children&.[](key.to_s)
+        return child.value if child.is_a?(Scalar)
+
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
         document.value_at(new_path)
       else

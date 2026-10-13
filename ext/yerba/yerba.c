@@ -1269,10 +1269,8 @@ void Init_yerba(void) {
   rb_define_method(rb_cDocument, "initialize", document_initialize, -1);
   rb_define_method(rb_cDocument, "replace_content!", document_replace_content, 1);
   rb_define_singleton_method(rb_cDocument, "parse", document_s_parse, 1);
-  rb_define_method(rb_cDocument, "[]", document_bracket, 1);
-  rb_define_method(rb_cDocument, "node_at", document_bracket, 1);
-  rb_define_method(rb_cDocument, "value_at", document_get_value, 1);
   rb_define_private_method(rb_cDocument, "native_node_at", document_bracket, 1);
+  rb_define_private_method(rb_cDocument, "native_value_at", document_get_value, 1);
   rb_define_method(rb_cDocument, "values", document_values, 0);
   rb_define_private_method(rb_cDocument, "native_node_records", document_node_records, 0);
   rb_define_private_method(rb_cDocument, "native_generation", document_generation, 0);

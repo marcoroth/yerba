@@ -78,12 +78,46 @@ module Yerba
       File.mtime(@path) != @loaded_mtime
     end
 
+    def [](selector)
+      return native_node_at(selector) unless selector.is_a?(String)
+
+      parsed = Selector.parse(selector)
+      matches = find_nodes(parsed)
+      return native_node_at(selector) if matches.nil?
+
+      matches = matches.map { |match| match&.dup }
+      parsed.wildcard? ? matches.compact : matches.first
+    end
+    alias node_at []
+
+    def value_at(selector)
+      return native_value_at(selector) unless selector.is_a?(String) || selector.is_a?(Selector)
+
+      parsed = Selector.parse(selector)
+      matches = find_nodes(parsed) unless parsed.wildcard?
+      return native_value_at(selector) if matches.nil?
+
+      node = matches.first
+      return nil if node.nil?
+
+      node.is_a?(Scalar) && node.tree_node? ? node.value : native_value_at(selector)
+    end
+
     def nodes
       generation = native_generation
       return @nodes if @nodes_generation == generation
 
       @nodes_generation = generation
       @nodes = build_nodes(native_node_records)
+    end
+
+    def length_at(selector)
+      parsed = Selector.parse(selector)
+      matches = find_nodes(parsed) unless parsed.wildcard?
+      return Array(value_at(selector)).length if matches.nil?
+
+      children = matches.first&.tree_children
+      children.is_a?(Array) ? children.length : 0
     end
 
     def dig(*keys)
@@ -233,6 +267,47 @@ module Yerba
         children[key_name] = node
       else
         children << node
+      end
+    end
+
+    def find_nodes(selector)
+      return nil if selector.relative? || malformed?(selector.to_s) || nodes.nil?
+
+      wildcard = selector.wildcard?
+
+      selector.segments.reduce([nodes]) do |current, segment|
+        current.flat_map do |node|
+          children = node&.tree_node? ? node.tree_children : nil
+          matches = children && child_matches(children, segment)
+          return nil if matches.nil?
+
+          wildcard && children.is_a?(Hash) ? matches.reject { |match| valueless_entry?(match) } : matches
+        end
+      end
+    end
+
+    def valueless_entry?(node)
+      node.valueless?
+    end
+
+    def malformed?(selector)
+      selector.end_with?(".") || selector.include?("..") || (selector.include?("[") && !selector.include?("]"))
+    end
+
+    def child_matches(children, segment)
+      case segment
+      when Selector::ALL_ITEMS
+        children if children.is_a?(Array)
+      when Selector::ALL_KEYS
+        children.values if children.is_a?(Hash)
+      when Integer
+        return nil unless children.is_a?(Array)
+
+        segment < children.length ? [children[segment]] : []
+      else
+        return nil unless children.is_a?(Hash)
+
+        children.key?(segment) ? [children[segment]] : []
       end
     end
 

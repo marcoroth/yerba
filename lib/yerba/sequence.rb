@@ -45,6 +45,9 @@ module Yerba
 
     def value_at(index)
       if connected?
+        child = current_children&.[](index) if index.is_a?(Integer) && !index.negative?
+        return child.value if child.is_a?(Scalar)
+
         new_path = "#{@selector}[#{index}]"
         document.value_at(new_path)
       else
@@ -91,6 +94,12 @@ module Yerba
 
     def each(&)
       return enum_for(:each) unless block_given?
+
+      if connected? && (tree = current_children)
+        tree.each { |child| yield child&.dup }
+
+        return self
+      end
 
       if connected?
         items = document.get_all("#{@selector}[]")
@@ -211,19 +220,9 @@ module Yerba
     end
 
     def length
-      if connected?
-        scalar_items = document.value_at("#{@selector}[]")
+      return @data.length unless connected?
 
-        if scalar_items.is_a?(Array) && !scalar_items.empty?
-          scalar_items.length
-        else
-          data = document.value_at(@selector)
-
-          data.is_a?(Array) ? data.length : 0
-        end
-      else
-        @data.length
-      end
+      current_children&.size || document.length_at(@selector)
     end
     alias size length
 

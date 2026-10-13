@@ -6,47 +6,79 @@ module Yerba
 
     include Node
 
-    def initialize: (?untyped array) -> untyped
+    extend Node::ClassMethods
 
-    def []: (untyped index) -> untyped
+    @sequence_indent: (Yerba::sequence_indent | String)?
 
-    def fetch: (untyped index) -> untyped
+    @collection_style: (Yerba::collection_style | String)?
 
+    @data: untyped
+
+    # : (?Array[untyped]? array) -> void
+    def initialize: (?Array[untyped]? array) -> void
+
+    # : (Integer index) -> untyped
+    def []: (Integer index) -> untyped
+
+    # : (Integer index) -> untyped
+    def fetch: (Integer index) -> untyped
+
+    # : (*untyped keys) -> untyped
     def dig: (*untyped keys) -> untyped
 
-    def value_at: (untyped index) -> untyped
+    # : (Integer index) -> untyped
+    def value_at: (Integer index) -> untyped
 
-    def <<: (untyped item) -> untyped
+    # : (untyped item) -> self
+    def <<: (untyped item) -> self
 
-    def concat: (untyped items) -> untyped
+    # : (Array[untyped] items) -> self
+    def concat: (Array[untyped] items) -> self
 
-    def each: () ?{ (?) -> untyped } -> untyped
+    # : () { (untyped) -> void } -> self
+    # : () -> Enumerator[untyped, self]
+    def each: () { (untyped) -> void } -> self
+            | () -> Enumerator[untyped, self]
 
-    def find_by: (?untyped selector, ?untyped value, **untyped criteria) -> untyped
+    # : (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> untyped
+    def find_by: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> untyped
 
-    def where: (?untyped selector, ?untyped value, **untyped criteria) -> untyped
+    # : (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> QueryResult
+    def where: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> QueryResult
 
-    def pluck: (*untyped fields) -> untyped
+    # : (*(String | Symbol) fields) -> Array[untyped]
+    def pluck: (*String | Symbol fields) -> Array[untyped]
 
-    def index_of: (?untyped selector, ?untyped value, **untyped criteria) -> untyped
+    # : (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> Integer?
+    def index_of: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> Integer?
 
-    def indices_of: (?untyped selector, ?untyped value, **untyped criteria) -> untyped
+    # : (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> Array[Integer]
+    def indices_of: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> Array[Integer]
 
-    def length: () -> untyped
+    # : () -> Integer
+    def length: () -> Integer
 
     alias size length
 
+    # : () -> untyped
     def first: () -> untyped
 
+    # : () -> untyped
     def last: () -> untyped
 
-    def remove: (untyped value) -> untyped
+    # : (untyped value) -> self
+    def remove: (untyped value) -> self
 
-    def delete_at: (untyped index) -> untyped
+    # : (Integer index) -> self
+    def delete_at: (Integer index) -> self
 
-    def delete_if: () -> untyped
+    # : () { (untyped) -> boolish } -> self
+    # : () -> Enumerator[untyped, self]
+    def delete_if: () { (untyped) -> boolish } -> self
+                 | () -> Enumerator[untyped, self]
 
-    def sort: (?by: untyped, ?case_sensitive: untyped) -> untyped
+    # : (?by: (String | Symbol)?, ?case_sensitive: bool) -> self
+    def sort: (?by: (String | Symbol)?, ?case_sensitive: bool) -> self
 
     # Deletes the entire sequence node from the YAML document.
     #
@@ -63,42 +95,59 @@ module Yerba
     #
     #   document["items"].delete
     #   document.to_s # => "{}\n"
-    def delete: () -> untyped
+    # : () -> Document?
+    def delete: () -> Document?
 
-    def value: () -> untyped
+    # : () -> Array[untyped]
+    def value: () -> Array[untyped]
 
-    def to_a: () -> untyped
+    # : () -> Array[untyped]
+    def to_a: () -> Array[untyped]
 
     alias to_ary to_a
 
-    def to_yaml: () -> untyped
+    # : () -> String
+    def to_yaml: () -> String
 
-    def to_s: () -> untyped
+    # : () -> String
+    def to_s: () -> String
 
-    def inspect: () -> untyped
+    # : () -> String
+    def inspect: () -> String
 
-    def collection_style: () -> untyped
+    # : () -> (Yerba::collection_style | String)?
+    def collection_style: () -> (Yerba::collection_style | String)?
 
-    def collection_style=: (untyped style) -> untyped
+    # : (Yerba::collection_style | String style) -> (Yerba::collection_style | String)
+    def collection_style=: (Yerba::collection_style | String style) -> (Yerba::collection_style | String)
 
-    def sequence_indent: () -> untyped
+    # : () -> (Yerba::sequence_indent | String)?
+    def sequence_indent: () -> (Yerba::sequence_indent | String)?
 
-    def sequence_indent=: (untyped style) -> untyped
+    # : (Yerba::sequence_indent | String style) -> (Yerba::sequence_indent | String)
+    def sequence_indent=: (Yerba::sequence_indent | String style) -> (Yerba::sequence_indent | String)
 
     private
 
-    def dig_into: (untyped hash, untyped path) -> untyped
+    # : (Hash[String, untyped] hash, String path) -> untyped
+    def dig_into: (Hash[String, untyped] hash, String path) -> untyped
 
-    def expand_nested_criteria: (untyped criteria) -> untyped
+    # : (Hash[untyped, untyped] criteria) -> Array[[untyped, untyped]]
+    def expand_nested_criteria: (Hash[untyped, untyped] criteria) -> Array[[ untyped, untyped ]]
 
-    def flatten_hash: (untyped prefix, untyped hash) -> untyped
+    # : (String prefix, Hash[untyped, untyped] hash) -> Hash[String, untyped]
+    def flatten_hash: (String prefix, Hash[untyped, untyped] hash) -> Hash[String, untyped]
 
-    def nested_indices_for: (untyped field, untyped expected) -> untyped
+    # : (String field, untyped expected) -> Array[Integer]
+    def nested_indices_for: (String field, untyped expected) -> Array[Integer]
 
-    def dig_values: (untyped hash, untyped path) -> untyped
+    # : (Hash[String, untyped] hash, String path) -> Array[untyped]
+    def dig_values: (Hash[String, untyped] hash, String path) -> Array[untyped]
 
-    def detect_quote_style: () -> untyped
+    # : () -> Yerba::quote_style?
+    def detect_quote_style: () -> Yerba::quote_style?
 
-    def items: () -> untyped
+    # : () -> Array[untyped]
+    def items: () -> Array[untyped]
   end
 end

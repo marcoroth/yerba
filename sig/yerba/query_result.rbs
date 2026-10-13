@@ -4,27 +4,41 @@ module Yerba
   class QueryResult
     include Enumerable[untyped]
 
-    def initialize: (untyped sequence, untyped indices) -> untyped
+    @sequence: Sequence
 
-    # : () ?{ (untyped) -> void } -> untyped
-    def each: () ?{ (untyped) -> void } -> untyped
+    @indices: Array[Integer]
 
-    def []: (untyped position) -> untyped
+    # : (Sequence sequence, Array[Integer] indices) -> void
+    def initialize: (Sequence sequence, Array[Integer] indices) -> void
 
+    # : () { (untyped) -> void } -> Array[Integer]
+    # : () -> Enumerator[untyped, Array[Integer]]
+    def each: () { (untyped) -> void } -> Array[Integer]
+            | () -> Enumerator[untyped, Array[Integer]]
+
+    # : (Integer position) -> untyped
+    def []: (Integer position) -> untyped
+
+    # : () -> untyped
     def first: () -> untyped
 
+    # : () -> untyped
     def last: () -> untyped
 
-    def length: () -> untyped
+    # : () -> Integer
+    def length: () -> Integer
 
     alias size length
 
     alias count length
 
-    def empty?: () -> untyped
+    # : () -> bool
+    def empty?: () -> bool
 
-    def indices: () -> untyped
+    # : () -> Array[Integer]
+    def indices: () -> Array[Integer]
 
-    def inspect: () -> untyped
+    # : () -> String
+    def inspect: () -> String
   end
 end

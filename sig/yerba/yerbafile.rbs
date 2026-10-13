@@ -2,20 +2,30 @@
 
 module Yerba
   class Yerbafile
-    attr_reader path: untyped
+    # Defined in the C extension.
+    def self.locate: (?String? directory) -> String?
 
-    def initialize: (untyped path) -> untyped
+    attr_reader path: String
 
-    def self.find: (?untyped directory) -> untyped
+    # : (String path) -> void
+    def initialize: (String path) -> void
 
-    def self.find!: (?untyped directory) -> untyped
+    # : (?String directory) -> Yerbafile?
+    def self.find: (?String directory) -> Yerbafile?
 
-    def self.resolve: (?untyped yerbafile) -> untyped
+    # : (?String directory) -> Yerbafile
+    def self.find!: (?String directory) -> Yerbafile
 
-    def self.apply!: (untyped document, ?untyped yerbafile) -> untyped
+    # : (?(Yerbafile | String | true)? yerbafile) -> Yerbafile
+    def self.resolve: (?(Yerbafile | String | true)? yerbafile) -> Yerbafile
 
-    def apply: (untyped document) -> untyped
+    # : (Document document, ?(Yerbafile | String | true)? yerbafile) -> Document
+    def self.apply!: (Document document, ?(Yerbafile | String | true)? yerbafile) -> Document
 
-    def inspect: () -> untyped
+    # : (Document document) -> Document
+    def apply: (Document document) -> Document
+
+    # : () -> String
+    def inspect: () -> String
   end
 end

@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
 target :lib do
-  signature "sig"
+  signature "sig", "sig-private"
 
-  check "lib/yerba/selector.rb"
+  check "lib"
 
   library "json"
+  library "fileutils"
+  library "did_you_mean"
 end

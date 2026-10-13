@@ -1,6 +1,39 @@
 # Generated from lib/yerba.rb with RBS::Inline
 
 module Yerba
+  # A plain Ruby value, as returned by Document#value_at, Document#values, Document#to_h, ...
+  type scalar_value = String | Integer | Float | bool | nil
+
+  type value = scalar_value | Array[value] | Hash[String, value]
+
+  # A node of a document, as returned by Document#[]
+  type node = Scalar | Map | Sequence
+
+  # Returned by Document#get_quote_style and Scalar#quote_style
+  type quote_style = :plain | :single | :double | :literal | :literal_clip | :literal_keep | :folded | :folded_clip | :folded_keep
+
+  # Returned by Document#get_collection_style, Map#collection_style and Sequence#collection_style
+  type collection_style = :block | :flow
+
+  # Returned by Document#get_sequence_indent and Sequence#sequence_indent
+  type sequence_indent = :compact | :indented
+
+  # Defined in the C extension (module function).
+  def self?.quote_scalar: (String value, ?(quote_style | String)? style) -> String
+
+  # Defined in the C extension.
+  class Error < StandardError
+  end
+
+  class PathNotFoundError < Error
+  end
+
+  class ParseError < Error
+  end
+
+  class PathValidationError < Error
+  end
+
   class UnsupportedPlatformError < StandardError
   end
 
@@ -16,21 +49,27 @@ module Yerba
   class StaleFileError < StandardError
   end
 
-  GEM_NAME: ::String
+  GEM_NAME: String
 
-  EXECUTABLE_NAME: ::String
+  EXECUTABLE_NAME: String
 
-  NATIVE_PLATFORMS: untyped
+  NATIVE_PLATFORMS: Hash[String, String]
 
-  def self.executable: (?exe_path: untyped) -> untyped
+  # : (?exe_path: String?) -> String
+  def self.executable: (?exe_path: String?) -> String
 
-  def self.compile_from_source: () -> untyped
+  # : () -> String?
+  def self.compile_from_source: () -> String?
 
-  def self.parse: (untyped content) -> untyped
+  # : (String content) -> Document
+  def self.parse: (String content) -> Document
 
-  def self.parse_file: (untyped path) -> untyped
+  # : (String path) -> Document
+  def self.parse_file: (String path) -> Document
 
-  def self.document: (untyped path) -> untyped
+  # : (String path) -> Document
+  def self.document: (String path) -> Document
 
-  def self.files: (untyped glob) -> untyped
+  # : (String glob) -> Collection
+  def self.files: (String glob) -> Collection
 end

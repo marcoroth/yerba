@@ -2,31 +2,52 @@
 
 module Yerba
   class Map
-    include Enumerable[untyped]
+    include Enumerable[[ untyped, untyped ]]
 
     include Node
 
-    def initialize: (?untyped hash, **untyped data) -> untyped
+    extend Node::ClassMethods
 
-    def []: (untyped key) -> untyped
+    @collection_style: (Yerba::collection_style | String)?
 
-    def []=: (untyped key, untyped value) -> untyped
+    @data: untyped
 
-    def set: (untyped key, untyped value, ?style: untyped) -> untyped
+    # : (?Hash[untyped, untyped]? hash, **untyped data) -> void
+    def initialize: (?Hash[untyped, untyped]? hash, **untyped data) -> void
 
-    def insert: (untyped key, untyped value, ?before: untyped, ?after: untyped, ?style: untyped) -> untyped
+    # : (String | Symbol key) -> untyped
+    def []: (String | Symbol key) -> untyped
 
-    def sort_keys: (untyped order) -> untyped
+    # : (String | Symbol key, untyped value) -> void
+    def []=: (String | Symbol key, untyped value) -> void
 
-    def keys: () -> untyped
+    # : (String | Symbol key, untyped value, ?style: Yerba::collection_style?) -> void
+    def set: (String | Symbol key, untyped value, ?style: Yerba::collection_style?) -> void
 
-    def each: () ?{ (?) -> untyped } -> untyped
+    # : (String | Symbol key, untyped value, ?before: String?, ?after: String?, ?style: Yerba::collection_style?) -> self
+    def insert: (String | Symbol key, untyped value, ?before: String?, ?after: String?, ?style: Yerba::collection_style?) -> self
 
-    def fetch: (untyped key) -> untyped
+    # : (String | Array[String] order) -> self
+    def sort_keys: (String | Array[String] order) -> self
 
+    # : () -> Array[untyped]
+    def keys: () -> Array[untyped]
+
+    # Yields each key and value.
+    #
+    # : () { (?) -> void } -> self
+    # : () -> Enumerator[[untyped, untyped], self]
+    def each: () { (?) -> void } -> self
+            | () -> Enumerator[[ untyped, untyped ], self]
+
+    # : (String | Symbol key) -> untyped
+    def fetch: (String | Symbol key) -> untyped
+
+    # : (*untyped keys) -> untyped
     def dig: (*untyped keys) -> untyped
 
-    def value_at: (untyped key) -> untyped
+    # : (String | Symbol key) -> untyped
+    def value_at: (String | Symbol key) -> untyped
 
     # Deletes a key from the map, or deletes the entire map node from the document.
     #
@@ -50,34 +71,45 @@ module Yerba
     #   # Delete the entire map node:
     #   document["database"].delete
     #   document.to_s # => "{}\n"
-    def delete: (?untyped key) -> untyped
+    # : (?(String | Symbol)? key) -> self
+    def delete: (?(String | Symbol)? key) -> self
 
-    def key?: (untyped key) -> untyped
+    # : (String | Symbol key) -> bool
+    def key?: (String | Symbol key) -> bool
 
     alias has_key? key?
 
     alias include? key?
 
-    def value: () -> untyped
+    # : () -> Hash[untyped, untyped]?
+    def value: () -> Hash[untyped, untyped]?
 
-    def to_h: () -> untyped
+    # : () -> Hash[untyped, untyped]
+    def to_h: () -> Hash[untyped, untyped]
 
     alias to_hash to_h
 
-    def to_s: () -> untyped
+    # : () -> String
+    def to_s: () -> String
 
-    def to_yaml: () -> untyped
+    # : () -> String
+    def to_yaml: () -> String
 
-    def inspect: () -> untyped
+    # : () -> String
+    def inspect: () -> String
 
-    def collection_style: () -> untyped
+    # : () -> (Yerba::collection_style | String)?
+    def collection_style: () -> (Yerba::collection_style | String)?
 
-    def collection_style=: (untyped style) -> untyped
+    # : (Yerba::collection_style | String style) -> (Yerba::collection_style | String)
+    def collection_style=: (Yerba::collection_style | String style) -> (Yerba::collection_style | String)
 
     private
 
-    def format_value: (untyped value) -> untyped
+    # : (untyped value) -> String
+    def format_value: (untyped value) -> String
 
-    def coerce_value: (untyped value, ?style: untyped) -> untyped
+    # : (untyped value, ?style: Yerba::collection_style?) -> untyped
+    def coerce_value: (untyped value, ?style: Yerba::collection_style?) -> untyped
   end
 end

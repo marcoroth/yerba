@@ -4,36 +4,56 @@ module Yerba
   class Scalar
     include Node
 
-    def initialize: (?untyped value, ?quote_style: untyped) -> untyped
+    extend Node::ClassMethods
 
-    def value: () -> untyped
+    @quote_style: (Yerba::quote_style | String)?
 
-    def quote_style: () -> untyped
+    @value: Yerba::scalar_value
 
-    def quote_style=: (untyped style) -> untyped
+    # : (?Yerba::scalar_value value, ?quote_style: (Yerba::quote_style | String)?) -> void
+    def initialize: (?Yerba::scalar_value value, ?quote_style: (Yerba::quote_style | String)?) -> void
 
-    def value=: (untyped new_value) -> untyped
+    # : () -> Yerba::scalar_value
+    def value: () -> Yerba::scalar_value
+
+    # : () -> (Yerba::quote_style | String)?
+    def quote_style: () -> (Yerba::quote_style | String)?
+
+    # : (Yerba::quote_style | String style) -> (Yerba::quote_style | String)
+    def quote_style=: (Yerba::quote_style | String style) -> (Yerba::quote_style | String)
+
+    # : (Yerba::scalar_value new_value) -> Yerba::scalar_value
+    def value=: (Yerba::scalar_value new_value) -> Yerba::scalar_value
 
     alias set value=
 
-    def to_s: () -> untyped
+    # : () -> String
+    def to_s: () -> String
 
-    def to_str: () -> untyped
+    # : () -> String
+    def to_str: () -> String
 
-    def to_i: () -> untyped
+    # : () -> Integer
+    def to_i: () -> Integer
 
-    def to_f: () -> untyped
+    # : () -> Float
+    def to_f: () -> Float
 
-    def ==: (untyped other) -> untyped
+    # : (untyped other) -> bool
+    def ==: (untyped other) -> bool
 
-    def to_yaml: () -> untyped
+    # : () -> String
+    def to_yaml: () -> String
 
-    def delete: () -> untyped
+    # : () -> Document?
+    def delete: () -> Document?
 
-    def inspect: () -> untyped
+    # : () -> String
+    def inspect: () -> String
 
     private
 
-    def init_from: (?value: untyped, ?quote_style: untyped, **untyped) -> untyped
+    # : (?value: Yerba::scalar_value, ?quote_style: (Yerba::quote_style | String)?, **untyped) -> void
+    def init_from: (?value: Yerba::scalar_value, ?quote_style: (Yerba::quote_style | String)?, **untyped) -> void
   end
 end

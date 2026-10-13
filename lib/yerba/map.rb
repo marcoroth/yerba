@@ -2,9 +2,16 @@
 
 module Yerba
   class Map
-    include Enumerable #[untyped]
+    include Enumerable #[[untyped, untyped]]
     include Node
 
+    # @rbs!
+    #   extend Node::ClassMethods
+
+    # @rbs @data: untyped
+    # @rbs @collection_style: (Yerba::collection_style | String)?
+
+    #: (?Hash[untyped, untyped]? hash, **untyped data) -> void
     def initialize(hash = nil, **data)
       init_node(nil, nil, nil, nil, nil, nil)
 
@@ -15,6 +22,7 @@ module Yerba
               end
     end
 
+    #: (String | Symbol key) -> untyped
     def [](key)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
@@ -24,10 +32,12 @@ module Yerba
       end
     end
 
+    #: (String | Symbol key, untyped value) -> void
     def []=(key, value)
       set(key, value)
     end
 
+    #: (String | Symbol key, untyped value, ?style: Yerba::collection_style?) -> void
     def set(key, value, style: nil)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
@@ -58,6 +68,7 @@ module Yerba
       end
     end
 
+    #: (String | Symbol key, untyped value, ?before: String?, ?after: String?, ?style: Yerba::collection_style?) -> self
     def insert(key, value, before: nil, after: nil, style: nil)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
@@ -73,18 +84,24 @@ module Yerba
       self
     end
 
+    #: (String | Array[String] order) -> self
     def sort_keys(order)
       document&.sort_keys(@selector, order)
 
       self
     end
 
+    #: () -> Array[untyped]
     def keys
       return @data.keys unless connected?
 
       document.keys_at(@selector)
     end
 
+    # Yields each key and value.
+    #
+    #: () { (?) -> void } -> self
+    #: () -> Enumerator[[untyped, untyped], self]
     def each(&)
       return enum_for(:each) unless block_given?
 
@@ -105,6 +122,7 @@ module Yerba
       self
     end
 
+    #: (String | Symbol key) -> untyped
     def fetch(key)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
@@ -114,14 +132,16 @@ module Yerba
       end
     end
 
+    #: (*untyped keys) -> untyped
     def dig(*keys)
       if connected?
-        keys.reduce(self) { |node, key| node.nil? ? nil : node[key] }
+        keys.reduce(self) { |node, key| node.nil? ? nil : node[key] } #$ untyped
       else
         @data.dig(*keys)
       end
     end
 
+    #: (String | Symbol key) -> untyped
     def value_at(key)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
@@ -153,6 +173,7 @@ module Yerba
     #   # Delete the entire map node:
     #   document["database"].delete
     #   document.to_s # => "{}\n"
+    #: (?(String | Symbol)? key) -> self
     def delete(key = nil)
       if key && connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
@@ -166,6 +187,7 @@ module Yerba
       self
     end
 
+    #: (String | Symbol key) -> bool
     def key?(key)
       if connected?
         new_path = @selector.empty? ? key.to_s : "#{@selector}.#{key}"
@@ -177,10 +199,12 @@ module Yerba
     alias has_key? key?
     alias include? key?
 
+    #: () -> Hash[untyped, untyped]?
     def value
       @data || nil
     end
 
+    #: () -> Hash[untyped, untyped]
     def to_h
       if connected?
         results = document.find(@selector)
@@ -191,10 +215,12 @@ module Yerba
     end
     alias to_hash to_h
 
+    #: () -> String
     def to_s
       source || to_yaml
     end
 
+    #: () -> String
     def to_yaml
       to_hash.map do |key, val|
         formatted = format_value(val)
@@ -202,6 +228,7 @@ module Yerba
       end.join("\n")
     end
 
+    #: () -> String
     def inspect
       if connected?
         results = document.find(@selector)
@@ -219,10 +246,12 @@ module Yerba
       end
     end
 
+    #: () -> (Yerba::collection_style | String)?
     def collection_style
       @collection_style || document&.get_collection_style(@selector)
     end
 
+    #: (Yerba::collection_style | String style) -> (Yerba::collection_style | String)
     def collection_style=(style)
       document&.set_collection_style(@selector, style)
 
@@ -231,6 +260,7 @@ module Yerba
 
     private
 
+    #: (untyped value) -> String
     def format_value(value)
       case value
       when Scalar then value.to_yaml
@@ -239,6 +269,7 @@ module Yerba
       end
     end
 
+    #: (untyped value, ?style: Yerba::collection_style?) -> untyped
     def coerce_value(value, style: nil)
       case value
       when Array, Hash

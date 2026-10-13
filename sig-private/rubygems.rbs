@@ -1,0 +1,9 @@
+# Signatures missing from RBS core, used for type checking only (not shipped with the gem).
+
+class Gem::Platform
+  def self.local: () -> Gem::Platform
+
+  def cpu: () -> String?
+
+  def os: () -> String
+end

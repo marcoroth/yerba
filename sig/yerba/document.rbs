@@ -2,70 +2,196 @@
 
 module Yerba
   class Document
-    ROOT_SELECTOR: ::String
+    # A schema validation error, as returned by Document#validate.
+    type schema_error = Hash[String, String | Integer | nil]
 
-    def self.cache: () -> untyped
+    def initialize: (?String? path) -> void
 
-    def self.clear_cache!: () -> untyped
+    def self.parse: (String content) -> Document
 
-    def self.from: (untyped object, ?path: untyped) -> untyped
+    def replace_content!: (String content) -> self
 
-    def selector: () -> untyped
+    # Returns an Array of nodes for wildcard selectors.
+    def []: (Integer index) -> Yerba::node?
+          | (String selector) -> (Yerba::node | Array[Yerba::node] | nil)
 
-    def root: () -> untyped
+    def node_at: (Integer index) -> Yerba::node?
+               | (String selector) -> (Yerba::node | Array[Yerba::node] | nil)
 
-    def root=: (untyped value) -> untyped
+    def value_at: (String selector) -> Yerba::value
 
-    def []=: (untyped key, untyped value) -> untyped
+    def values: () -> Yerba::value
 
-    def map?: () -> untyped
+    def get_all: (String selector) -> Array[Yerba::node]
 
-    def sequence?: () -> untyped
+    def location: (?String? selector) -> Location?
 
-    def to_h: () -> untyped
+    def locations: (String selector) -> Array[Location]
 
-    def to_a: () -> untyped
+    def selectors: () -> Array[String]
 
-    def to_yaml: () -> untyped
+    def keys_at: (String selector) -> Array[String]
 
-    def save_to!: (untyped path) -> untyped
+    def resolve_selectors: (String selector) -> Array[String]
 
-    def stale?: () -> untyped
+    def get_quote_style: (String selector) -> Yerba::quote_style?
 
-    def dig: (*untyped keys) -> untyped
+    def set_quote_style: (String selector, Yerba::quote_style | String style) -> self
 
-    def fetch: (untyped selector) -> untyped
+    def get_collection_style: (String selector) -> Yerba::collection_style?
 
-    def find_by: () -> untyped
+    def set_collection_style: (String selector, Yerba::collection_style | String style) -> self
 
-    def where: () -> untyped
+    def get_sequence_indent: (String selector) -> Yerba::sequence_indent?
 
-    def pluck: () -> untyped
+    def set_sequence_indent: (String selector, Yerba::sequence_indent | String style) -> self
 
-    def <<: (untyped item) -> untyped
+    def exists?: (String selector) -> bool
 
-    def concat: (untyped items) -> untyped
+    def valid_selector?: (String selector) -> bool
 
-    def save!: (?apply: untyped) -> untyped
+    def condition?: (String condition, ?path: String?) -> bool
 
-    def apply!: (?untyped yerbafile) -> untyped
+    def find: (String selector, ?condition: String?, ?select: String?) -> Array[Yerba::value]
 
-    def apply: (?untyped yerbafile) -> untyped
+    def set: (String selector, Yerba::scalar_value value, ?condition: String?, ?condition_path: String?, ?if_exists: boolish, ?if_missing: boolish, ?all: boolish, ?plain: boolish) -> self
 
-    def valid?: (untyped schema, ?selector: untyped) -> untyped
+    def insert: (String selector, Yerba::scalar_value value, ?before: String?, ?after: String?, ?at: Integer?, ?style: (Yerba::quote_style | String)?, ?plain: boolish) -> self
 
-    def validate: (untyped schema, ?selector: untyped) -> untyped
+    def insert_object: (String selector, Hash[untyped, untyped] object, ?before: String?, ?after: String?, ?at: Integer?) -> self
 
-    def validate_selector!: (untyped selector) -> untyped
+    def insert_objects: (String selector, Array[untyped] objects) -> self
+
+    def delete: (String selector, ?condition: String?, ?condition_path: String?) -> self
+
+    def remove: (String selector, String value) -> self
+
+    def remove_at: (String selector, Integer index) -> self
+
+    def rename: (String source, String destination) -> self
+
+    def sort: (?String? selector, ?by: (String | Symbol)?, ?order: (:asc | :desc | String | Array[String])?, ?case_sensitive: boolish) -> self
+
+    def sort_keys: (String selector, String | Array[String] order) -> self
+
+    def quote_style: (?path: String?, ?key_style: String?, ?value_style: String?) -> self
+
+    def blank_lines: (String selector, Integer count) -> self
+
+    def apply_yerbafile: (?String? yerbafile_path) -> self
+
+    def validate_schema: (String schema_json, ?String? selector) -> Array[schema_error]
+
+    def source: (String selector) -> String?
+
+    def to_s: () -> String
+
+    def write!: () -> self
+
+    def changed?: () -> bool
+
+    def path: () -> String?
+
+    @loaded_mtime: Time?
+
+    @path: String?
+
+    self.@cache: Hash[String, Document]?
+
+    ROOT_SELECTOR: String
+
+    # : () -> Hash[String, Document]
+    def self.cache: () -> Hash[String, Document]
+
+    # : () -> void
+    def self.clear_cache!: () -> void
+
+    # : (Array[untyped] | Hash[untyped, untyped] object, ?path: String?) -> Document
+    def self.from: (Array[untyped] | Hash[untyped, untyped] object, ?path: String?) -> Document
+
+    # : () -> String
+    def selector: () -> String
+
+    # : () -> Yerba::node
+    def root: () -> Yerba::node
+
+    # : (Array[untyped] | Hash[untyped, untyped] value) -> void
+    def root=: (Array[untyped] | Hash[untyped, untyped] value) -> void
+
+    # : (String | Symbol key, untyped value) -> void
+    def []=: (String | Symbol key, untyped value) -> void
+
+    # : () -> bool
+    def map?: () -> bool
+
+    # : () -> bool
+    def sequence?: () -> bool
+
+    # : () -> Yerba::value
+    def to_h: () -> Yerba::value
+
+    # : () -> Yerba::value
+    def to_a: () -> Yerba::value
+
+    # : () -> String
+    def to_yaml: () -> String
+
+    # : (String path) -> self
+    def save_to!: (String path) -> self
+
+    # : () -> bool
+    def stale?: () -> bool
+
+    # : (*(String | Integer) keys) -> untyped
+    def dig: (*String | Integer keys) -> untyped
+
+    # : (String selector) -> (Yerba::node | Array[Yerba::node] | nil)
+    def fetch: (String selector) -> (Yerba::node | Array[Yerba::node] | nil)
+
+    # : (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> untyped
+    def find_by: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> untyped
+
+    # : (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> QueryResult
+    def where: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> QueryResult
+
+    # : (*(String | Symbol) fields) -> Array[untyped]
+    def pluck: (*String | Symbol fields) -> Array[untyped]
+
+    # : (untyped item) -> Sequence
+    def <<: (untyped item) -> Sequence
+
+    # : (Array[untyped] items) -> Sequence
+    def concat: (Array[untyped] items) -> Sequence
+
+    # : (?apply: Yerbafile | String | true | false) -> self
+    def save!: (?apply: Yerbafile | String | true | false) -> self
+
+    # : (?(Yerbafile | String | true)? yerbafile) -> self
+    def apply!: (?(Yerbafile | String | true)? yerbafile) -> self
+
+    # : (?(Yerbafile | String | true)? yerbafile) -> self
+    def apply: (?(Yerbafile | String | true)? yerbafile) -> self
+
+    # : (String | Hash[untyped, untyped] schema, ?selector: String?) -> bool
+    def valid?: (String | Hash[untyped, untyped] schema, ?selector: String?) -> bool
+
+    # : (String | Hash[untyped, untyped] schema, ?selector: String?) -> Array[schema_error]
+    def validate: (String | Hash[untyped, untyped] schema, ?selector: String?) -> Array[schema_error]
+
+    # : (String selector) -> void
+    def validate_selector!: (String selector) -> void
 
     private
 
-    def empty_root?: () -> untyped
+    # : () -> bool
+    def empty_root?: () -> bool
 
-    def check_stale!: () -> untyped
+    # : () -> void
+    def check_stale!: () -> void
 
     public
 
-    def inspect: () -> untyped
+    # : () -> String
+    def inspect: () -> String
   end
 end

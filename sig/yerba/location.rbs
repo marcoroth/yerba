@@ -2,20 +2,20 @@
 
 module Yerba
   class Location < Data
-    attr_reader start_line(): untyped
+    attr_reader start_line(): Integer
 
-    attr_reader start_column(): untyped
+    attr_reader start_column(): Integer
 
-    attr_reader end_line(): untyped
+    attr_reader end_line(): Integer
 
-    attr_reader end_column(): untyped
+    attr_reader end_column(): Integer
 
-    attr_reader start_offset(): untyped
+    attr_reader start_offset(): Integer
 
-    attr_reader end_offset(): untyped
+    attr_reader end_offset(): Integer
 
-    def self.new: (untyped start_line, untyped start_column, untyped end_line, untyped end_column, untyped start_offset, untyped end_offset) -> instance
-                | (start_line: untyped, start_column: untyped, end_line: untyped, end_column: untyped, start_offset: untyped, end_offset: untyped) -> instance
+    def self.new: (Integer start_line, Integer start_column, Integer end_line, Integer end_column, Integer start_offset, Integer end_offset) -> instance
+                | (start_line: Integer, start_column: Integer, end_line: Integer, end_column: Integer, start_offset: Integer, end_offset: Integer) -> instance
 
     def self.members: () -> [ :start_line, :start_column, :end_line, :end_column, :start_offset, :end_offset ]
 

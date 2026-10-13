@@ -2,34 +2,59 @@
 
 module Yerba
   module Node
-    attr_reader selector: untyped
+    @line: Integer?
 
-    attr_reader location: untyped
+    @file_path: String?
 
-    attr_reader key: untyped
+    @key: Scalar?
 
-    def file_path: () -> untyped
+    @location: Location?
 
-    def line: () -> untyped
+    @document: Document?
 
+    attr_reader selector: String?
+
+    attr_reader location: Location?
+
+    attr_reader key: Scalar?
+
+    @selector: untyped
+
+    # : () -> String?
+    def file_path: () -> String?
+
+    # : () -> Integer?
+    def line: () -> Integer?
+
+    # The Document this node belongs to, or nil when disconnected (untyped, see above).
+    # : () -> untyped
     def document: () -> untyped
 
-    def connected?: () -> untyped
+    # : () -> bool
+    def connected?: () -> bool
 
-    def source: () -> untyped
+    # : () -> String?
+    def source: () -> String?
 
-    module ClassMethods
-      def from_document: (untyped document, untyped selector, ?untyped location, ?untyped key, **untyped attributes) -> untyped
+    # Extended into Scalar, Map and Sequence.
+    # @rbs module-self Class
+    module ClassMethods : Class
+      # : (Document? document, String? selector, ?Location? location, ?Scalar? key, **untyped attributes) -> Yerba::node
+      def from_document: (Document? document, String? selector, ?Location? location, ?Scalar? key, **untyped attributes) -> Yerba::node
 
-      def from: (selector: untyped, ?file_path: untyped, ?line: untyped, ?location: untyped, ?document: untyped, ?key: untyped, **untyped attributes) -> untyped
+      # : (selector: String?, ?file_path: String?, ?line: Integer?, ?location: Location | Hash[untyped, untyped] | nil, ?document: Document?, ?key: Scalar?, **untyped attributes) -> Yerba::node
+      def from: (selector: String?, ?file_path: String?, ?line: Integer?, ?location: Location | Hash[untyped, untyped] | nil, ?document: Document?, ?key: Scalar?, **untyped attributes) -> Yerba::node
 
-      def coerce_location: (untyped location) -> untyped
+      # : (Location | Hash[untyped, untyped] | nil location) -> Location?
+      def coerce_location: (Location | Hash[untyped, untyped] | nil location) -> Location?
     end
 
-    def self.included: (untyped base) -> untyped
+    # : (Module base) -> void
+    def self.included: (Module base) -> void
 
     private
 
-    def init_node: (untyped document, untyped selector, untyped location, untyped key, untyped file_path, untyped line) -> untyped
+    # : (Document? document, String? selector, Location? location, Scalar? key, String? file_path, Integer? line) -> void
+    def init_node: (Document? document, String? selector, Location? location, Scalar? key, String? file_path, Integer? line) -> void
   end
 end

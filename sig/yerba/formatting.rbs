@@ -2,14 +2,19 @@
 
 module Yerba
   module Formatting
-    def self.quote: (untyped value, untyped style) -> untyped
+    # : (untyped value, (Yerba::quote_style | String)? style) -> String
+    def self.quote: (untyped value, (Yerba::quote_style | String)? style) -> String
 
-    def self.to_yaml_value: (untyped value) -> untyped
+    # : (untyped value) -> String
+    def self.to_yaml_value: (untyped value) -> String
 
-    def self.to_block_yaml_value: (untyped value, ?untyped indent) -> untyped
+    # : (untyped value, ?Integer indent) -> String
+    def self.to_block_yaml_value: (untyped value, ?Integer indent) -> String
 
-    def self.to_scalar_value: (untyped value) -> untyped
+    # : (untyped value) -> String
+    def self.to_scalar_value: (untyped value) -> String
 
-    def self.to_yaml_document: (untyped value) -> untyped
+    # : (Array[untyped] | Hash[untyped, untyped] value) -> String
+    def self.to_yaml_document: (Array[untyped] | Hash[untyped, untyped] value) -> String
   end
 end

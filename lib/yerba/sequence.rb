@@ -2,15 +2,24 @@
 
 module Yerba
   class Sequence
-    include Enumerable
+    include Enumerable #[untyped]
     include Node
 
+    # @rbs!
+    #   extend Node::ClassMethods
+
+    # @rbs @data: untyped
+    # @rbs @collection_style: (Yerba::collection_style | String)?
+    # @rbs @sequence_indent: (Yerba::sequence_indent | String)?
+
+    #: (?Array[untyped]? array) -> void
     def initialize(array = nil)
       init_node(nil, nil, nil, nil, nil, nil)
 
       @data = array.is_a?(Array) ? array : []
     end
 
+    #: (Integer index) -> untyped
     def [](index)
       if connected?
         new_path = "#{@selector}[#{index}]"
@@ -20,6 +29,7 @@ module Yerba
       end
     end
 
+    #: (Integer index) -> untyped
     def fetch(index)
       if connected?
         new_path = "#{@selector}[#{index}]"
@@ -35,14 +45,16 @@ module Yerba
       end
     end
 
+    #: (*untyped keys) -> untyped
     def dig(*keys)
       if connected?
-        keys.reduce(self) { |node, key| node.nil? ? nil : node[key] }
+        keys.reduce(self) { |node, key| node.nil? ? nil : node[key] } #$ untyped
       else
         @data.dig(*keys)
       end
     end
 
+    #: (Integer index) -> untyped
     def value_at(index)
       if connected?
         new_path = "#{@selector}[#{index}]"
@@ -52,6 +64,7 @@ module Yerba
       end
     end
 
+    #: (untyped item) -> self
     def <<(item)
       if connected?
         case item
@@ -71,6 +84,7 @@ module Yerba
       self
     end
 
+    #: (Array[untyped] items) -> self
     def concat(items)
       if connected?
         hashes = items.map do |item|
@@ -89,6 +103,8 @@ module Yerba
       self
     end
 
+    #: () { (untyped) -> void } -> self
+    #: () -> Enumerator[untyped, self]
     def each(&)
       return enum_for(:each) unless block_given?
 
@@ -107,16 +123,19 @@ module Yerba
       self
     end
 
+    #: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> untyped
     def find_by(selector = nil, value = nil, **criteria)
       index = index_of(selector, value, **criteria)
 
       self[index] if index
     end
 
+    #: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> QueryResult
     def where(selector = nil, value = nil, **criteria)
       QueryResult.new(self, indices_of(selector, value, **criteria))
     end
 
+    #: (*(String | Symbol) fields) -> Array[untyped]
     def pluck(*fields)
       return [] unless connected?
 
@@ -132,7 +151,10 @@ module Yerba
       end
     end
 
+    #: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> Integer?
     def index_of(selector = nil, value = nil, **criteria)
+      # @type var criteria: Hash[untyped, untyped]
+
       if selector && value.nil? && criteria.empty?
         all_values = document&.value_at(@selector)
 
@@ -144,7 +166,7 @@ module Yerba
       criteria[selector] = value if selector && value
       pairs = expand_nested_criteria(criteria)
 
-      indices = nil
+      indices = nil #: Array[Integer]?
 
       pairs.each do |field, expected|
         field_string = field.to_s
@@ -170,7 +192,10 @@ module Yerba
       indices&.first
     end
 
+    #: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> Array[Integer]
     def indices_of(selector = nil, value = nil, **criteria)
+      # @type var criteria: Hash[untyped, untyped]
+
       if selector && value.nil? && criteria.empty?
         all_values = document&.value_at(@selector)
 
@@ -184,7 +209,7 @@ module Yerba
       criteria[selector] = value if selector && value
       pairs = expand_nested_criteria(criteria)
 
-      indices = nil
+      indices = nil #: Array[Integer]?
 
       pairs.each do |field, expected|
         field_string = field.to_s
@@ -210,6 +235,7 @@ module Yerba
       indices || []
     end
 
+    #: () -> Integer
     def length
       if connected?
         scalar_items = document.value_at("#{@selector}[]")
@@ -227,30 +253,36 @@ module Yerba
     end
     alias size length
 
+    #: () -> untyped
     def first
       self[0]
     end
 
+    #: () -> untyped
     def last
       self[length - 1] # rubocop:disable Style/NegativeArrayIndex
     end
 
+    #: (untyped value) -> self
     def remove(value)
       document&.remove(@selector, value.to_s)
 
       self
     end
 
+    #: (Integer index) -> self
     def delete_at(index)
       document&.remove_at(@selector, index)
 
       self
     end
 
+    #: () { (untyped) -> boolish } -> self
+    #: () -> Enumerator[untyped, self]
     def delete_if
       return enum_for(:delete_if) unless block_given?
 
-      indices_to_remove = []
+      indices_to_remove = [] #: Array[Integer]
 
       length.times do |index|
         indices_to_remove << index if yield self[index]
@@ -263,6 +295,7 @@ module Yerba
       self
     end
 
+    #: (?by: (String | Symbol)?, ?case_sensitive: bool) -> self
     def sort(by: nil, case_sensitive: false)
       document&.sort(@selector, by: by, case_sensitive: case_sensitive)
 
@@ -284,19 +317,23 @@ module Yerba
     #
     #   document["items"].delete
     #   document.to_s # => "{}\n"
+    #: () -> Document?
     def delete
       document&.delete(@selector)
     end
 
+    #: () -> Array[untyped]
     def value
       items
     end
 
+    #: () -> Array[untyped]
     def to_a
       @data || items
     end
     alias to_ary to_a
 
+    #: () -> String
     def to_yaml
       items.map do |item|
         case item
@@ -307,10 +344,12 @@ module Yerba
       end.join("\n")
     end
 
+    #: () -> String
     def to_s
       source || super
     end
 
+    #: () -> String
     def inspect
       list = items
       preview = list.first(5).map(&:inspect).join(", ")
@@ -323,20 +362,24 @@ module Yerba
       end
     end
 
+    #: () -> (Yerba::collection_style | String)?
     def collection_style
       @collection_style || document&.get_collection_style(@selector)
     end
 
+    #: (Yerba::collection_style | String style) -> (Yerba::collection_style | String)
     def collection_style=(style)
       document&.set_collection_style(@selector, style)
 
       @collection_style = style
     end
 
+    #: () -> (Yerba::sequence_indent | String)?
     def sequence_indent
       @sequence_indent || document&.get_sequence_indent(@selector)
     end
 
+    #: (Yerba::sequence_indent | String style) -> (Yerba::sequence_indent | String)
     def sequence_indent=(style)
       document&.set_sequence_indent(@selector, style)
 
@@ -345,14 +388,16 @@ module Yerba
 
     private
 
+    #: (Hash[String, untyped] hash, String path) -> untyped
     def dig_into(hash, path)
       keys = path.split(".")
 
-      keys.reduce(hash) { |current, key| current.is_a?(Hash) ? current[key] : nil }
+      keys.reduce(hash) { |current, key| current.is_a?(Hash) ? current[key] : nil } #$ untyped
     end
 
+    #: (Hash[untyped, untyped] criteria) -> Array[[untyped, untyped]]
     def expand_nested_criteria(criteria)
-      expanded = []
+      expanded = [] #: Array[[untyped, untyped]]
 
       criteria.each do |field, value|
         if value.is_a?(Hash)
@@ -371,8 +416,9 @@ module Yerba
       expanded
     end
 
+    #: (String prefix, Hash[untyped, untyped] hash) -> Hash[String, untyped]
     def flatten_hash(prefix, hash)
-      result = {}
+      result = {} #: Hash[String, untyped]
 
       hash.each do |key, value|
         path = "#{prefix}.#{key}"
@@ -387,6 +433,7 @@ module Yerba
       result
     end
 
+    #: (String field, untyped expected) -> Array[Integer]
     def nested_indices_for(field, expected)
       all_values = document&.value_at(@selector)
       return [] unless all_values.is_a?(Array)
@@ -399,12 +446,13 @@ module Yerba
       end
     end
 
+    #: (Hash[String, untyped] hash, String path) -> Array[untyped]
     def dig_values(hash, path)
       parts = path.split(".")
       current = [hash]
 
       parts.each do |part|
-        next_values = []
+        next_values = [] #: Array[untyped]
 
         current.each do |value|
           if part == "[]" && value.is_a?(Array)
@@ -424,10 +472,12 @@ module Yerba
       current
     end
 
+    #: () -> Yerba::quote_style?
     def detect_quote_style
       document.get_quote_style("#{@selector}[0]")
     end
 
+    #: () -> Array[untyped]
     def items
       if connected?
         result = document.value_at("#{@selector}[]")

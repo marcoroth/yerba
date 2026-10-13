@@ -1,0 +1,20 @@
+# Generated from lib/yerba/formatting.rb with RBS::Inline
+
+module Yerba
+  module Formatting
+    # : (untyped value, (Yerba::quote_style | String)? style) -> String
+    def self.quote: (untyped value, (Yerba::quote_style | String)? style) -> String
+
+    # : (untyped value) -> String
+    def self.to_yaml_value: (untyped value) -> String
+
+    # : (untyped value, ?Integer indent) -> String
+    def self.to_block_yaml_value: (untyped value, ?Integer indent) -> String
+
+    # : (untyped value) -> String
+    def self.to_scalar_value: (untyped value) -> String
+
+    # : (Array[untyped] | Hash[untyped, untyped] value) -> String
+    def self.to_yaml_document: (Array[untyped] | Hash[untyped, untyped] value) -> String
+  end
+end

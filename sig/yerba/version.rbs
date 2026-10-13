@@ -1,0 +1,5 @@
+# Generated from lib/yerba/version.rb with RBS::Inline
+
+module Yerba
+  VERSION: ::String
+end

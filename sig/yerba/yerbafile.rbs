@@ -1,0 +1,31 @@
+# Generated from lib/yerba/yerbafile.rb with RBS::Inline
+
+module Yerba
+  class Yerbafile
+    # Defined in the C extension.
+    def self.locate: (?String? directory) -> String?
+
+    attr_reader path: String
+
+    # : (String path) -> void
+    def initialize: (String path) -> void
+
+    # : (?String directory) -> Yerbafile?
+    def self.find: (?String directory) -> Yerbafile?
+
+    # : (?String directory) -> Yerbafile
+    def self.find!: (?String directory) -> Yerbafile
+
+    # : (?(Yerbafile | String | true)? yerbafile) -> Yerbafile
+    def self.resolve: (?(Yerbafile | String | true)? yerbafile) -> Yerbafile
+
+    # : (Document document, ?(Yerbafile | String | true)? yerbafile) -> Document
+    def self.apply!: (Document document, ?(Yerbafile | String | true)? yerbafile) -> Document
+
+    # : (Document document) -> Document
+    def apply: (Document document) -> Document
+
+    # : () -> String
+    def inspect: () -> String
+  end
+end

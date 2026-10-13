@@ -1,0 +1,60 @@
+# Generated from lib/yerba/node.rb with RBS::Inline
+
+module Yerba
+  module Node
+    @line: Integer?
+
+    @file_path: String?
+
+    @key: Scalar?
+
+    @location: Location?
+
+    @document: Document?
+
+    attr_reader selector: String?
+
+    attr_reader location: Location?
+
+    attr_reader key: Scalar?
+
+    @selector: untyped
+
+    # : () -> String?
+    def file_path: () -> String?
+
+    # : () -> Integer?
+    def line: () -> Integer?
+
+    # The Document this node belongs to, or nil when disconnected (untyped, see above).
+    # : () -> untyped
+    def document: () -> untyped
+
+    # : () -> bool
+    def connected?: () -> bool
+
+    # : () -> String?
+    def source: () -> String?
+
+    # Extended into Scalar, Map and Sequence.
+    # @rbs module-self Class
+    module ClassMethods : Class
+      # : (Document? document, String? selector, ?Location? location, ?Scalar? key, **untyped attributes) -> Yerba::node
+      def from_document: (Document? document, String? selector, ?Location? location, ?Scalar? key, **untyped attributes) -> Yerba::node
+
+      # : (selector: String?, ?file_path: String?, ?line: Integer?, ?location: Location | Hash[untyped, untyped] | nil, ?document: Document?, ?key: Scalar?, **untyped attributes) -> Yerba::node
+      def from: (selector: String?, ?file_path: String?, ?line: Integer?, ?location: Location | Hash[untyped, untyped] | nil, ?document: Document?, ?key: Scalar?, **untyped attributes) -> Yerba::node
+
+      # : (Location | Hash[untyped, untyped] | nil location) -> Location?
+      def coerce_location: (Location | Hash[untyped, untyped] | nil location) -> Location?
+    end
+
+    # : (Module base) -> void
+    def self.included: (Module base) -> void
+
+    private
+
+    # : (Document? document, String? selector, Location? location, Scalar? key, String? file_path, Integer? line) -> void
+    def init_node: (Document? document, String? selector, Location? location, Scalar? key, String? file_path, Integer? line) -> void
+  end
+end

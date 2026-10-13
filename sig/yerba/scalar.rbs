@@ -1,0 +1,59 @@
+# Generated from lib/yerba/scalar.rb with RBS::Inline
+
+module Yerba
+  class Scalar
+    include Node
+
+    extend Node::ClassMethods
+
+    @quote_style: (Yerba::quote_style | String)?
+
+    @value: Yerba::scalar_value
+
+    # : (?Yerba::scalar_value value, ?quote_style: (Yerba::quote_style | String)?) -> void
+    def initialize: (?Yerba::scalar_value value, ?quote_style: (Yerba::quote_style | String)?) -> void
+
+    # : () -> Yerba::scalar_value
+    def value: () -> Yerba::scalar_value
+
+    # : () -> (Yerba::quote_style | String)?
+    def quote_style: () -> (Yerba::quote_style | String)?
+
+    # : (Yerba::quote_style | String style) -> (Yerba::quote_style | String)
+    def quote_style=: (Yerba::quote_style | String style) -> (Yerba::quote_style | String)
+
+    # : (Yerba::scalar_value new_value) -> Yerba::scalar_value
+    def value=: (Yerba::scalar_value new_value) -> Yerba::scalar_value
+
+    alias set value=
+
+    # : () -> String
+    def to_s: () -> String
+
+    # : () -> String
+    def to_str: () -> String
+
+    # : () -> Integer
+    def to_i: () -> Integer
+
+    # : () -> Float
+    def to_f: () -> Float
+
+    # : (untyped other) -> bool
+    def ==: (untyped other) -> bool
+
+    # : () -> String
+    def to_yaml: () -> String
+
+    # : () -> Document?
+    def delete: () -> Document?
+
+    # : () -> String
+    def inspect: () -> String
+
+    private
+
+    # : (?value: Yerba::scalar_value, ?quote_style: (Yerba::quote_style | String)?, **untyped) -> void
+    def init_from: (?value: Yerba::scalar_value, ?quote_style: (Yerba::quote_style | String)?, **untyped) -> void
+  end
+end

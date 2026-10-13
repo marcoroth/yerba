@@ -2,10 +2,12 @@
 
 module Yerba
   module Formatting
+    #: (untyped value, (Yerba::quote_style | String)? style) -> String
     def self.quote(value, style)
       Yerba.quote_scalar(value.to_s, style)
     end
 
+    #: (untyped value) -> String
     def self.to_yaml_value(value)
       case value
       when Array
@@ -27,6 +29,7 @@ module Yerba
       end
     end
 
+    #: (untyped value, ?Integer indent) -> String
     def self.to_block_yaml_value(value, indent = 0)
       prefix = "  " * indent
 
@@ -62,6 +65,7 @@ module Yerba
       end
     end
 
+    #: (untyped value) -> String
     def self.to_scalar_value(value)
       case value
       when true then "true"
@@ -72,6 +76,7 @@ module Yerba
       end
     end
 
+    #: (Array[untyped] | Hash[untyped, untyped] value) -> String
     def self.to_yaml_document(value)
       case value
       when Array

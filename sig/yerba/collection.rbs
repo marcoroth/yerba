@@ -1,0 +1,39 @@
+# Generated from lib/yerba/collection.rb with RBS::Inline
+
+module Yerba
+  class Collection
+    include Enumerable[Document]
+
+    # Defined in the C extension.
+    def self.get: (String glob, String selector) -> Array[Yerba::node]
+
+    # Defined in the C extension. Each result carries the matching file in "__file".
+    def self.find: (String glob, String selector, ?condition: String?, ?select: String?) -> Array[Hash[String, Yerba::value]]
+
+    @glob: String
+
+    # : (String glob) -> void
+    def initialize: (String glob) -> void
+
+    # : () { (Document) -> void } -> void
+    def each: () { (Document) -> void } -> void
+
+    # : (String path) -> Array[Yerba::node]
+    def get: (String path) -> Array[Yerba::node]
+
+    # : (String path, ?condition: String?, ?select: String?) -> Array[Hash[String, Yerba::value]]
+    def find: (String path, ?condition: String?, ?select: String?) -> Array[Hash[String, Yerba::value]]
+
+    # : (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> untyped
+    def find_by: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> untyped
+
+    # : (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> Array[untyped]
+    def where: (?(String | Symbol)? selector, ?untyped value, **untyped criteria) -> Array[untyped]
+
+    # : (*(String | Symbol) fields) -> Array[untyped]
+    def pluck: (*String | Symbol fields) -> Array[untyped]
+
+    # : () { (Document) -> void } -> void
+    def apply!: () { (Document) -> void } -> void
+  end
+end

@@ -1,0 +1,115 @@
+# Generated from lib/yerba/map.rb with RBS::Inline
+
+module Yerba
+  class Map
+    include Enumerable[[ untyped, untyped ]]
+
+    include Node
+
+    extend Node::ClassMethods
+
+    @collection_style: (Yerba::collection_style | String)?
+
+    @data: untyped
+
+    # : (?Hash[untyped, untyped]? hash, **untyped data) -> void
+    def initialize: (?Hash[untyped, untyped]? hash, **untyped data) -> void
+
+    # : (String | Symbol key) -> untyped
+    def []: (String | Symbol key) -> untyped
+
+    # : (String | Symbol key, untyped value) -> void
+    def []=: (String | Symbol key, untyped value) -> void
+
+    # : (String | Symbol key, untyped value, ?style: Yerba::collection_style?) -> void
+    def set: (String | Symbol key, untyped value, ?style: Yerba::collection_style?) -> void
+
+    # : (String | Symbol key, untyped value, ?before: String?, ?after: String?, ?style: Yerba::collection_style?) -> self
+    def insert: (String | Symbol key, untyped value, ?before: String?, ?after: String?, ?style: Yerba::collection_style?) -> self
+
+    # : (String | Array[String] order) -> self
+    def sort_keys: (String | Array[String] order) -> self
+
+    # : () -> Array[untyped]
+    def keys: () -> Array[untyped]
+
+    # Yields each key and value.
+    #
+    # : () { (?) -> void } -> self
+    # : () -> Enumerator[[untyped, untyped], self]
+    def each: () { (?) -> void } -> self
+            | () -> Enumerator[[ untyped, untyped ], self]
+
+    # : (String | Symbol key) -> untyped
+    def fetch: (String | Symbol key) -> untyped
+
+    # : (*untyped keys) -> untyped
+    def dig: (*untyped keys) -> untyped
+
+    # : (String | Symbol key) -> untyped
+    def value_at: (String | Symbol key) -> untyped
+
+    # Deletes a key from the map, or deletes the entire map node from the document.
+    #
+    # When +key+ is given and the map is connected to a document, deletes that key
+    # from the map in the YAML document. When no +key+ is given and the map is
+    # connected, removes the entire map node at its selector path. When not connected
+    # to a document, delegates to the underlying Hash.
+    #
+    # Returns +self+.
+    #
+    #   # Delete a specific key from a connected map:
+    #   document = Yerba::Document.parse(<<~YAML)
+    #     database:
+    #       host: localhost
+    #       pool: 10
+    #   YAML
+    #
+    #   document["database"].delete("pool")
+    #   document.to_s # => "database:\n  host: localhost\n"
+    #
+    #   # Delete the entire map node:
+    #   document["database"].delete
+    #   document.to_s # => "{}\n"
+    # : (?(String | Symbol)? key) -> self
+    def delete: (?(String | Symbol)? key) -> self
+
+    # : (String | Symbol key) -> bool
+    def key?: (String | Symbol key) -> bool
+
+    alias has_key? key?
+
+    alias include? key?
+
+    # : () -> Hash[untyped, untyped]?
+    def value: () -> Hash[untyped, untyped]?
+
+    # : () -> Hash[untyped, untyped]
+    def to_h: () -> Hash[untyped, untyped]
+
+    alias to_hash to_h
+
+    # : () -> String
+    def to_s: () -> String
+
+    # : () -> String
+    def to_yaml: () -> String
+
+    # : () -> String
+    def inspect: () -> String
+
+    # : () -> (Yerba::collection_style | String)?
+    def collection_style: () -> (Yerba::collection_style | String)?
+
+    # : (Yerba::collection_style | String style) -> (Yerba::collection_style | String)
+    def collection_style=: (Yerba::collection_style | String style) -> (Yerba::collection_style | String)
+
+    private
+
+    # : (untyped value) -> String
+    def format_value: (untyped value) -> String
+
+    # : (untyped value, ?style: Yerba::collection_style?) -> untyped
+    def coerce_value: (untyped value, ?style: Yerba::collection_style?) -> untyped
+  end
+end

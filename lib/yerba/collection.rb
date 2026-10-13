@@ -2,12 +2,13 @@
 
 module Yerba
   class Collection
-    include Enumerable
+    include Enumerable #[Document]
 
     def initialize(glob)
       @glob = glob
     end
 
+    #: () { (Document) -> void } -> void
     def each
       Dir.glob(@glob).each { |path| yield Document.new(path) }
     end

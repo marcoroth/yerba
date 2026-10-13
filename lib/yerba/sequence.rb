@@ -2,7 +2,7 @@
 
 module Yerba
   class Sequence
-    include Enumerable
+    include Enumerable #[untyped]
     include Node
 
     def initialize(array = nil)

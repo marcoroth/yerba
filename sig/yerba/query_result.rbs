@@ -1,0 +1,30 @@
+# Generated from lib/yerba/query_result.rb with RBS::Inline
+
+module Yerba
+  class QueryResult
+    include Enumerable[untyped]
+
+    def initialize: (untyped sequence, untyped indices) -> untyped
+
+    # : () ?{ (untyped) -> void } -> untyped
+    def each: () ?{ (untyped) -> void } -> untyped
+
+    def []: (untyped position) -> untyped
+
+    def first: () -> untyped
+
+    def last: () -> untyped
+
+    def length: () -> untyped
+
+    alias size length
+
+    alias count length
+
+    def empty?: () -> untyped
+
+    def indices: () -> untyped
+
+    def inspect: () -> untyped
+  end
+end

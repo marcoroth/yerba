@@ -10,5 +10,7 @@ gem "parallel", "~> 1.28"
 gem "rake", "~> 13.4"
 gem "rake-compiler", "~> 1.3"
 gem "rake-compiler-dock", "~> 1.12"
+gem "rbs-inline", require: false
 gem "rb_sys", "~> 0.9.128"
 gem "rubocop", "~> 1.88"
+gem "steep", require: false

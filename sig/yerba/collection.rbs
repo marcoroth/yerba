@@ -1,0 +1,24 @@
+# Generated from lib/yerba/collection.rb with RBS::Inline
+
+module Yerba
+  class Collection
+    include Enumerable[Document]
+
+    def initialize: (untyped glob) -> untyped
+
+    # : () { (Document) -> void } -> void
+    def each: () { (Document) -> void } -> void
+
+    def get: (untyped path) -> untyped
+
+    def find: (untyped path, ?condition: untyped, ?select: untyped) -> untyped
+
+    def find_by: () -> untyped
+
+    def where: () -> untyped
+
+    def pluck: () -> untyped
+
+    def apply!: () -> untyped
+  end
+end

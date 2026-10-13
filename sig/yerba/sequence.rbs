@@ -1,0 +1,104 @@
+# Generated from lib/yerba/sequence.rb with RBS::Inline
+
+module Yerba
+  class Sequence
+    include Enumerable[untyped]
+
+    include Node
+
+    def initialize: (?untyped array) -> untyped
+
+    def []: (untyped index) -> untyped
+
+    def fetch: (untyped index) -> untyped
+
+    def dig: (*untyped keys) -> untyped
+
+    def value_at: (untyped index) -> untyped
+
+    def <<: (untyped item) -> untyped
+
+    def concat: (untyped items) -> untyped
+
+    def each: () ?{ (?) -> untyped } -> untyped
+
+    def find_by: (?untyped selector, ?untyped value, **untyped criteria) -> untyped
+
+    def where: (?untyped selector, ?untyped value, **untyped criteria) -> untyped
+
+    def pluck: (*untyped fields) -> untyped
+
+    def index_of: (?untyped selector, ?untyped value, **untyped criteria) -> untyped
+
+    def indices_of: (?untyped selector, ?untyped value, **untyped criteria) -> untyped
+
+    def length: () -> untyped
+
+    alias size length
+
+    def first: () -> untyped
+
+    def last: () -> untyped
+
+    def remove: (untyped value) -> untyped
+
+    def delete_at: (untyped index) -> untyped
+
+    def delete_if: () -> untyped
+
+    def sort: (?by: untyped, ?case_sensitive: untyped) -> untyped
+
+    # Deletes the entire sequence node from the YAML document.
+    #
+    # Removes the sequence at its selector path from the parent document.
+    # Has no effect if the sequence is not connected to a document.
+    #
+    # Returns the document, or +nil+ if the sequence is not connected to a document.
+    #
+    #   document = Yerba::Document.parse(<<~YAML)
+    #     items:
+    #       - name: Ruby
+    #       - name: Rust
+    #   YAML
+    #
+    #   document["items"].delete
+    #   document.to_s # => "{}\n"
+    def delete: () -> untyped
+
+    def value: () -> untyped
+
+    def to_a: () -> untyped
+
+    alias to_ary to_a
+
+    def to_yaml: () -> untyped
+
+    def to_s: () -> untyped
+
+    def inspect: () -> untyped
+
+    def collection_style: () -> untyped
+
+    def collection_style=: (untyped style) -> untyped
+
+    def sequence_indent: () -> untyped
+
+    def sequence_indent=: (untyped style) -> untyped
+
+    private
+
+    def dig_into: (untyped hash, untyped path) -> untyped
+
+    def expand_nested_criteria: (untyped criteria) -> untyped
+
+    def flatten_hash: (untyped prefix, untyped hash) -> untyped
+
+    def nested_indices_for: (untyped field, untyped expected) -> untyped
+
+    def dig_values: (untyped hash, untyped path) -> untyped
+
+    def detect_quote_style: () -> untyped
+
+    def items: () -> untyped
+  end
+end

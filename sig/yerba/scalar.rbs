@@ -1,0 +1,39 @@
+# Generated from lib/yerba/scalar.rb with RBS::Inline
+
+module Yerba
+  class Scalar
+    include Node
+
+    def initialize: (?untyped value, ?quote_style: untyped) -> untyped
+
+    def value: () -> untyped
+
+    def quote_style: () -> untyped
+
+    def quote_style=: (untyped style) -> untyped
+
+    def value=: (untyped new_value) -> untyped
+
+    alias set value=
+
+    def to_s: () -> untyped
+
+    def to_str: () -> untyped
+
+    def to_i: () -> untyped
+
+    def to_f: () -> untyped
+
+    def ==: (untyped other) -> untyped
+
+    def to_yaml: () -> untyped
+
+    def delete: () -> untyped
+
+    def inspect: () -> untyped
+
+    private
+
+    def init_from: (?value: untyped, ?quote_style: untyped, **untyped) -> untyped
+  end
+end

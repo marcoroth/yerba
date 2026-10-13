@@ -1,0 +1,21 @@
+# Generated from lib/yerba/yerbafile.rb with RBS::Inline
+
+module Yerba
+  class Yerbafile
+    attr_reader path: untyped
+
+    def initialize: (untyped path) -> untyped
+
+    def self.find: (?untyped directory) -> untyped
+
+    def self.find!: (?untyped directory) -> untyped
+
+    def self.resolve: (?untyped yerbafile) -> untyped
+
+    def self.apply!: (untyped document, ?untyped yerbafile) -> untyped
+
+    def apply: (untyped document) -> untyped
+
+    def inspect: () -> untyped
+  end
+end

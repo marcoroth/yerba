@@ -1,3 +1,36 @@
+# Generated from lib/yerba.rb with RBS::Inline
+
 module Yerba
-  VERSION: String
+  class UnsupportedPlatformError < StandardError
+  end
+
+  class ExecutableNotFoundError < StandardError
+  end
+
+  class CompilationError < StandardError
+  end
+
+  class SelectorNotFoundError < StandardError
+  end
+
+  class StaleFileError < StandardError
+  end
+
+  GEM_NAME: ::String
+
+  EXECUTABLE_NAME: ::String
+
+  NATIVE_PLATFORMS: untyped
+
+  def self.executable: (?exe_path: untyped) -> untyped
+
+  def self.compile_from_source: () -> untyped
+
+  def self.parse: (untyped content) -> untyped
+
+  def self.parse_file: (untyped path) -> untyped
+
+  def self.document: (untyped path) -> untyped
+
+  def self.files: (untyped glob) -> untyped
 end

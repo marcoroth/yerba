@@ -2,7 +2,7 @@
 
 module Yerba
   class Map
-    include Enumerable
+    include Enumerable #[untyped]
     include Node
 
     def initialize(hash = nil, **data)

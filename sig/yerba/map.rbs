@@ -1,0 +1,83 @@
+# Generated from lib/yerba/map.rb with RBS::Inline
+
+module Yerba
+  class Map
+    include Enumerable[untyped]
+
+    include Node
+
+    def initialize: (?untyped hash, **untyped data) -> untyped
+
+    def []: (untyped key) -> untyped
+
+    def []=: (untyped key, untyped value) -> untyped
+
+    def set: (untyped key, untyped value, ?style: untyped) -> untyped
+
+    def insert: (untyped key, untyped value, ?before: untyped, ?after: untyped, ?style: untyped) -> untyped
+
+    def sort_keys: (untyped order) -> untyped
+
+    def keys: () -> untyped
+
+    def each: () ?{ (?) -> untyped } -> untyped
+
+    def fetch: (untyped key) -> untyped
+
+    def dig: (*untyped keys) -> untyped
+
+    def value_at: (untyped key) -> untyped
+
+    # Deletes a key from the map, or deletes the entire map node from the document.
+    #
+    # When +key+ is given and the map is connected to a document, deletes that key
+    # from the map in the YAML document. When no +key+ is given and the map is
+    # connected, removes the entire map node at its selector path. When not connected
+    # to a document, delegates to the underlying Hash.
+    #
+    # Returns +self+.
+    #
+    #   # Delete a specific key from a connected map:
+    #   document = Yerba::Document.parse(<<~YAML)
+    #     database:
+    #       host: localhost
+    #       pool: 10
+    #   YAML
+    #
+    #   document["database"].delete("pool")
+    #   document.to_s # => "database:\n  host: localhost\n"
+    #
+    #   # Delete the entire map node:
+    #   document["database"].delete
+    #   document.to_s # => "{}\n"
+    def delete: (?untyped key) -> untyped
+
+    def key?: (untyped key) -> untyped
+
+    alias has_key? key?
+
+    alias include? key?
+
+    def value: () -> untyped
+
+    def to_h: () -> untyped
+
+    alias to_hash to_h
+
+    def to_s: () -> untyped
+
+    def to_yaml: () -> untyped
+
+    def inspect: () -> untyped
+
+    def collection_style: () -> untyped
+
+    def collection_style=: (untyped style) -> untyped
+
+    private
+
+    def format_value: (untyped value) -> untyped
+
+    def coerce_value: (untyped value, ?style: untyped) -> untyped
+  end
+end

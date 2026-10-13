@@ -1,0 +1,35 @@
+# Generated from lib/yerba/node.rb with RBS::Inline
+
+module Yerba
+  module Node
+    attr_reader selector: untyped
+
+    attr_reader location: untyped
+
+    attr_reader key: untyped
+
+    def file_path: () -> untyped
+
+    def line: () -> untyped
+
+    def document: () -> untyped
+
+    def connected?: () -> untyped
+
+    def source: () -> untyped
+
+    module ClassMethods
+      def from_document: (untyped document, untyped selector, ?untyped location, ?untyped key, **untyped attributes) -> untyped
+
+      def from: (selector: untyped, ?file_path: untyped, ?line: untyped, ?location: untyped, ?document: untyped, ?key: untyped, **untyped attributes) -> untyped
+
+      def coerce_location: (untyped location) -> untyped
+    end
+
+    def self.included: (untyped base) -> untyped
+
+    private
+
+    def init_node: (untyped document, untyped selector, untyped location, untyped key, untyped file_path, untyped line) -> untyped
+  end
+end

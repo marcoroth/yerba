@@ -2,13 +2,14 @@
 
 module Yerba
   class QueryResult
-    include Enumerable
+    include Enumerable #[untyped]
 
     def initialize(sequence, indices)
       @sequence = sequence
       @indices = indices
     end
 
+    #: () ?{ (untyped) -> void } -> untyped
     def each
       return enum_for(:each) unless block_given?
 

@@ -1,0 +1,71 @@
+# Generated from lib/yerba/document.rb with RBS::Inline
+
+module Yerba
+  class Document
+    ROOT_SELECTOR: ::String
+
+    def self.cache: () -> untyped
+
+    def self.clear_cache!: () -> untyped
+
+    def self.from: (untyped object, ?path: untyped) -> untyped
+
+    def selector: () -> untyped
+
+    def root: () -> untyped
+
+    def root=: (untyped value) -> untyped
+
+    def []=: (untyped key, untyped value) -> untyped
+
+    def map?: () -> untyped
+
+    def sequence?: () -> untyped
+
+    def to_h: () -> untyped
+
+    def to_a: () -> untyped
+
+    def to_yaml: () -> untyped
+
+    def save_to!: (untyped path) -> untyped
+
+    def stale?: () -> untyped
+
+    def dig: (*untyped keys) -> untyped
+
+    def fetch: (untyped selector) -> untyped
+
+    def find_by: () -> untyped
+
+    def where: () -> untyped
+
+    def pluck: () -> untyped
+
+    def <<: (untyped item) -> untyped
+
+    def concat: (untyped items) -> untyped
+
+    def save!: (?apply: untyped) -> untyped
+
+    def apply!: (?untyped yerbafile) -> untyped
+
+    def apply: (?untyped yerbafile) -> untyped
+
+    def valid?: (untyped schema, ?selector: untyped) -> untyped
+
+    def validate: (untyped schema, ?selector: untyped) -> untyped
+
+    def validate_selector!: (untyped selector) -> untyped
+
+    private
+
+    def empty_root?: () -> untyped
+
+    def check_stale!: () -> untyped
+
+    public
+
+    def inspect: () -> untyped
+  end
+end

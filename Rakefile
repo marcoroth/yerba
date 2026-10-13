@@ -115,7 +115,28 @@ Rake::TestTask.new(:test) do |t|
   t.test_files = FileList["test/**/*_test.rb"]
 end
 
+begin
+  require "rubocop/rake_task"
+
+  RuboCop::RakeTask.new
+rescue LoadError => e
+  desc "RuboCop task not available (rubocop not installed)"
+  task :rubocop do
+    abort "rubocop is required: #{e.message}\n\nRun: bundle install"
+  end
+end
+
+desc "Generate RBS signatures from the inline annotations"
+task :rbs do
+  sh "bundle exec rbs-inline --opt-out --output=sig/ lib/"
+end
+
+desc "Type check with Steep"
+task :steep do
+  sh "bundle exec steep check"
+end
+
 task test: :compile
-task default: [:test]
+task default: [:test, :rubocop, :steep]
 
 Dir["rakelib/**/*.rake"].each { |f| load f }

@@ -55,3 +55,13 @@ cargo test --test delete_test
 # Single test function
 cargo test --test delete_test test_delete_only_sequence_item_replaces_with_empty_sequence
 ```
+### Type Signatures
+
+RBS signatures in `sig/` are generated from inline [rbs-inline](https://github.com/soutaro/rbs-inline) annotations (`#:` comments) in `lib/`. After changing a method signature, regenerate them and type check with Steep:
+
+```bash
+bundle exec rake rbs
+bundle exec rake steep
+```
+
+CI fails when `sig/` is out of date with the annotations. Steep currently checks the files listed in the `Steepfile`; add files there as they get annotated.

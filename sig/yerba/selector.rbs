@@ -1,0 +1,95 @@
+# Generated from lib/yerba/selector.rb with RBS::Inline
+
+module Yerba
+  # A parsed selector, split into its segments.
+  #
+  #   Yerba::Selector.parse("[3].talks[1]").segments  # => [3, "talks", 1]
+  #   Yerba::Selector.parse("[].speakers[]").segments # => [:all_items, "speakers", :all_items]
+  #   Yerba::Selector.parse("database.*").segments    # => ["database", :all_keys]
+  #   Yerba::Selector.parse(".title").relative?       # => true
+  #
+  # Keys are Strings, indexes Integers, `[]` is `:all_items` and `*` is `:all_keys`.
+  class Selector
+    type segment = String | Integer | :all_items | :all_keys
+
+    def self.native_parse: (String) -> Hash[String, untyped]
+
+    def self.native_build: (String, bool) -> String
+
+    ALL_KEYS: :all_keys
+
+    ALL_ITEMS: :all_items
+
+    @source: String?
+
+    @relative: bool
+
+    attr_reader segments: Array[segment]
+
+    # : (Selector | String) -> Selector
+    def self.parse: (Selector | String) -> Selector
+
+    # Builds a selector from segments: Strings (keys), Integers (indexes), `:all_items` or `:all_keys`.
+    #
+    #   Yerba::Selector.build([3, "talks", 1]).to_s # => "[3].talks[1]"
+    #
+    # : (Array[segment], ?relative: bool) -> Selector
+    def self.build: (Array[segment], ?relative: bool) -> Selector
+
+    # : () -> void
+    def self.clear_cache!: () -> void
+
+    # : () -> Hash[String, Selector]
+    def self.cache: () -> Hash[String, Selector]
+
+    # : (String | Integer | Hash[String, String]) -> segment
+    def self.decode: (String | Integer | Hash[String, String]) -> segment
+
+    # : (Array[segment], ?relative: bool, ?source: String?) -> void
+    def initialize: (Array[segment], ?relative: bool, ?source: String?) -> void
+
+    # : () -> bool
+    def relative?: () -> bool
+
+    # : () -> bool
+    def absolute?: () -> bool
+
+    # : () -> bool
+    def empty?: () -> bool
+
+    # : () -> bool
+    def wildcard?: () -> bool
+
+    # "[3].talks[1]" => "[3].talks"
+    # : () -> Selector
+    def parent: () -> Selector
+
+    # Selector.parse("[3]").join("talks", 1) => "[3].talks[1]"
+    # : (*segment) -> Selector
+    def join: (*segment) -> Selector
+
+    # : (untyped) -> untyped
+    def dig: (untyped) -> untyped
+
+    # : () -> String
+    def to_s: () -> String
+
+    alias to_str to_s
+
+    # : (untyped) -> bool
+    def ==: (untyped) -> bool
+
+    alias eql? ==
+
+    # : () -> Integer
+    def hash: () -> Integer
+
+    # : () -> String
+    def inspect: () -> String
+
+    private
+
+    # : () -> Array[String | Integer | Hash[Symbol, String]]
+    def encoded_segments: () -> Array[String | Integer | Hash[Symbol, String]]
+  end
+end

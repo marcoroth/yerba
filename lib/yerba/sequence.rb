@@ -76,15 +76,15 @@ module Yerba
 
     def concat(items)
       if connected?
-        hashes = items.map do |item|
+        values = items.map do |item|
           case item
           when Map then item.to_hash
-          when Hash then item
-          else { value: item.to_s }
+          when Scalar then item.value
+          else item
           end
         end
 
-        document.insert_objects(@selector, hashes)
+        document.insert_objects(@selector, values)
       else
         @data.concat(items)
       end

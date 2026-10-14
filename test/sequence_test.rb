@@ -1325,4 +1325,42 @@ class SequenceTest < Minitest::Spec
 
     assert_nil document["tags"].value_at(99)
   end
+
+  test "concat appends scalars as plain items" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+    YAML
+
+    items = ["yaml", "yes", 1]
+    document["tags"].concat(items)
+
+    assert_equal "tags:\n  - ruby\n  - yaml\n  - \"yes\"\n  - 1\n", document.to_s
+  end
+
+  test "concat appends maps, hashes and scalar nodes" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - name: a
+      other: b
+    YAML
+
+    items = [{ name: "b" }, document["other"]]
+    document["items"].concat(items)
+
+    assert_equal [{ "name" => "a" }, { "name" => "b" }, "b"], document.value_at("items")
+  end
+
+  test "an invalid index selects nothing instead of the sequence" do
+    document = Yerba::Document.parse(<<~YAML)
+      tags:
+        - ruby
+        - rails
+    YAML
+
+    assert_nil document.value_at("tags[abc]")
+    assert_nil document.value_at("tags[0")
+    refute document.exists?("tags[abc]")
+    assert_raises(Yerba::Error) { document.set("tags[abc]", "x") }
+  end
 end

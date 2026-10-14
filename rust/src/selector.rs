@@ -234,6 +234,8 @@ fn parse_segments(input: &str) -> Vec<SelectorSegment> {
           segments.push(SelectorSegment::AllItems);
         } else if let Some(index) = parse_index(inner) {
           segments.push(index);
+        } else {
+          segments.push(SelectorSegment::Key(rest[..=close].to_string()));
         }
 
         rest = &rest[close + 1..];
@@ -242,6 +244,8 @@ fn parse_segments(input: &str) -> Vec<SelectorSegment> {
           rest = &rest[1..];
         }
       } else {
+        segments.push(SelectorSegment::Key(rest.to_string()));
+
         break;
       }
     } else {

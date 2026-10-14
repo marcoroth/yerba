@@ -722,7 +722,18 @@ static VALUE document_set(int argc, VALUE *argv, VALUE self) {
     VALUE v_if_missing = rb_hash_aref(opts, ID2SYM(rb_intern("if_missing")));
 
     if (RTEST(v_if_exists) && !yerba_document_exists(document, StringValueCStr(path))) return self;
-    if (RTEST(v_if_missing) && yerba_document_exists(document, StringValueCStr(path))) return self;
+
+    if (RTEST(v_if_missing)) {
+      if (yerba_document_exists(document, StringValueCStr(path))) return self;
+
+      VALUE insert_opts = rb_hash_new();
+      rb_hash_aset(insert_opts, ID2SYM(rb_intern("plain")), rb_hash_aref(opts, ID2SYM(rb_intern("plain"))));
+
+      VALUE insert_argv[3] = { path, value, insert_opts };
+      rb_funcallv_kw(self, rb_intern("insert"), 3, insert_argv, RB_PASS_KEYWORDS);
+
+      return self;
+    }
   }
 
   char number_buffer[64];

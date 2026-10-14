@@ -599,3 +599,31 @@ fn test_set_all_plain_writes_literals_over_quoted_values() {
 
   assert_eq!(document.to_string(), "items:\n  - a: null\n  - a: null\n");
 }
+
+#[test]
+fn test_set_key_without_value() {
+  let mut document = parse(indoc! {"
+    name: Alice
+    nickname:
+    alias: # todo
+  "});
+
+  document.set("nickname", "Ally").unwrap();
+  document.set("alias", "a: b").unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+    name: Alice
+    nickname: Ally
+    alias: "a: b" # todo
+  "#}
+  );
+}
+
+#[test]
+fn test_set_missing_key_still_fails() {
+  let mut document = parse("name: Alice\n");
+
+  assert!(document.set("nickname", "Ally").is_err());
+}

@@ -23,6 +23,7 @@ module Yerba
       when true then "true"
       when false then "false"
       when nil then "null"
+      when String then Yerba.quote_scalar(value, "flow")
       else value.to_s
       end
     end

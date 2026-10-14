@@ -325,11 +325,178 @@ pub fn is_inline_scalar_safe(value: &str) -> bool {
 }
 
 pub fn needs_quoting(value: &str) -> bool {
-  is_yaml_non_string(value) || !is_plain_safe(value)
+  is_yaml_non_string(value) || resolves_to_non_string_in_psych(value) || !is_plain_safe(value)
 }
 
 pub fn needs_quoting_in_flow(value: &str) -> bool {
-  is_yaml_non_string(value) || !is_plain_safe_in_flow(value)
+  is_yaml_non_string(value) || resolves_to_non_string_in_psych(value) || !is_plain_safe_in_flow(value)
+}
+
+pub fn resolves_to_non_string_in_psych(value: &str) -> bool {
+  let lower = value.to_ascii_lowercase();
+
+  if matches!(
+    lower.as_str(),
+    "yes" | "true" | "on" | "no" | "false" | "off" | "null" | "~" | ".inf" | "+.inf" | "-.inf" | ".nan"
+  ) {
+    return true;
+  }
+
+  if value.len() > 1 && value.starts_with(':') {
+    return true;
+  }
+
+  is_psych_date_or_time(value) || is_psych_sexagesimal(value) || is_psych_float(value) || is_psych_integer(value)
+}
+
+fn take_digits(bytes: &[u8], mut position: usize, min: usize, max: usize) -> Option<usize> {
+  let start = position;
+
+  while position < bytes.len() && position - start < max && bytes[position].is_ascii_digit() {
+    position += 1;
+  }
+
+  (position - start >= min).then_some(position)
+}
+
+fn skip_sign(bytes: &[u8]) -> usize {
+  usize::from(matches!(bytes.first(), Some(b'+') | Some(b'-')))
+}
+
+fn is_psych_date_or_time(value: &str) -> bool {
+  let bytes = value.as_bytes();
+  let start = usize::from(bytes.first() == Some(&b'-'));
+
+  let Some(position) = take_digits(bytes, start, 4, 4) else { return false };
+  if bytes.get(position) != Some(&b'-') {
+    return false;
+  }
+
+  let Some(position) = take_digits(bytes, position + 1, 1, 2) else {
+    return false;
+  };
+  if bytes.get(position) != Some(&b'-') {
+    return false;
+  }
+
+  let Some(position) = take_digits(bytes, position + 1, 1, 2) else {
+    return false;
+  };
+
+  match bytes.get(position) {
+    None => true,
+    Some(byte) => matches!(byte, b'T' | b't') || byte.is_ascii_whitespace(),
+  }
+}
+
+fn is_psych_sexagesimal(value: &str) -> bool {
+  let bytes = value.as_bytes();
+  let mut position = skip_sign(bytes);
+
+  if !bytes.get(position).is_some_and(u8::is_ascii_digit) {
+    return false;
+  }
+
+  while bytes.get(position).is_some_and(|byte| byte.is_ascii_digit() || *byte == b'_') {
+    position += 1;
+  }
+
+  let mut groups = 0;
+
+  while bytes.get(position) == Some(&b':') && groups < 2 {
+    let Some(next) = take_digits(bytes, position + 1, 1, 2) else { return false };
+
+    if next - position == 3 && bytes[position + 1] > b'5' {
+      return false;
+    }
+
+    position = next;
+    groups += 1;
+  }
+
+  if groups == 0 {
+    return false;
+  }
+
+  if bytes.get(position) == Some(&b'.') {
+    position += 1;
+
+    while bytes.get(position).is_some_and(|byte| byte.is_ascii_digit() || *byte == b'_') {
+      position += 1;
+    }
+  }
+
+  position == bytes.len()
+}
+
+fn is_psych_float(value: &str) -> bool {
+  let bytes = value.as_bytes();
+  let mut position = skip_sign(bytes);
+  let mut digits = 0;
+
+  if bytes.get(position).is_some_and(u8::is_ascii_digit) {
+    while bytes.get(position).is_some_and(|byte| byte.is_ascii_digit() || *byte == b'_' || *byte == b',') {
+      digits += usize::from(bytes[position].is_ascii_digit());
+      position += 1;
+    }
+  }
+
+  if bytes.get(position) != Some(&b'.') {
+    return false;
+  }
+
+  position += 1;
+
+  while bytes.get(position).is_some_and(u8::is_ascii_digit) {
+    digits += 1;
+    position += 1;
+  }
+
+  if matches!(bytes.get(position), Some(b'e') | Some(b'E')) {
+    if !matches!(bytes.get(position + 1), Some(b'+') | Some(b'-')) {
+      return false;
+    }
+
+    let Some(next) = take_digits(bytes, position + 2, 1, usize::MAX) else {
+      return false;
+    };
+    position = next;
+  }
+
+  digits > 0 && position == bytes.len()
+}
+
+fn is_psych_integer(value: &str) -> bool {
+  let bytes = value.as_bytes();
+  let rest = &bytes[skip_sign(bytes)..];
+
+  let prefixed = |digits: &[u8], valid: fn(&u8) -> bool| {
+    let digits: Vec<&u8> = digits.iter().skip_while(|byte| matches!(byte, b'_' | b',')).collect();
+
+    digits.first().is_some_and(|byte| valid(byte)) && digits.iter().all(|byte| valid(byte) || matches!(byte, b'_' | b','))
+  };
+
+  match rest {
+    [] => false,
+    [b'0'] => true,
+    [b'0', b'b', digits @ ..] => prefixed(digits, |byte| matches!(byte, b'0' | b'1')),
+    [b'0', b'x', digits @ ..] => prefixed(digits, u8::is_ascii_hexdigit),
+    [b'0', digits @ ..] => prefixed(digits, |byte| matches!(byte, b'0'..=b'7')),
+    [first, tail @ ..] if (b'1'..=b'9').contains(first) => {
+      let mut tail = tail.iter().peekable();
+
+      while let Some(byte) = tail.next() {
+        match byte {
+          b'0'..=b'9' => {}
+          b'_' | b',' if tail.peek().is_some_and(|next| next.is_ascii_digit()) => {}
+          _ => return false,
+        }
+      }
+
+      true
+    }
+    _ => false,
+  }
 }
 
 pub fn quote_scalar(value: &str) -> String {
@@ -344,6 +511,8 @@ pub fn quote_scalar_styled(value: &str, style: Option<&str>) -> String {
   match style {
     Some("double") => format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR),
     Some("single") if is_single_quotable(value) => format_scalar_value(value, SyntaxKind::SINGLE_QUOTED_SCALAR),
+    Some("flow") if needs_quoting_in_flow(value) => format_scalar_value(value, SyntaxKind::DOUBLE_QUOTED_SCALAR),
+    Some("flow") => value.to_string(),
 
     _ => quote_scalar(value),
   }

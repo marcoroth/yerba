@@ -411,3 +411,36 @@ fn test_set_upgrades_a_single_quoted_field_that_cannot_hold_the_value() {
 
   assert_eq!(document.to_string(), "note: \"line one\\nline two\"\n");
 }
+
+#[test]
+fn test_needs_quoting_for_forms_psych_loads_as_non_strings() {
+  for value in [
+    "12:30:00",
+    "1:30",
+    "-1:30:15.5",
+    "0755",
+    "0b1010",
+    "1_000",
+    "1,000",
+    "1_000.5",
+    ".5",
+    "1.",
+    "2025-01-01",
+    "2025-1-1",
+    "2025-01-01 10:00:00",
+    "2025-01-01T10:00:00Z",
+    ":symbol",
+    "tRuE",
+    "YeS",
+    "nUlL",
+    ".Inf",
+  ] {
+    assert!(needs_quoting(value), "{value} should need quoting");
+  }
+
+  for value in ["plain", "1.2.3", "v1.0", "ratio 1:2", "a-b-c", "y", "n", "1:60", "12:3:45:00"] {
+    assert!(!needs_quoting(value), "{value} should not need quoting");
+  }
+
+  assert_eq!(quote_scalar("12:30:00"), "\"12:30:00\"");
+}

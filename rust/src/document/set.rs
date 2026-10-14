@@ -1,7 +1,7 @@
 use super::*;
 
 fn is_plain_writable(value: &str) -> bool {
-  crate::syntax::is_plain_safe(value) && !crate::syntax::is_yaml_non_string(value)
+  crate::syntax::is_plain_safe(value) && !crate::syntax::is_yaml_non_string(value) && !crate::syntax::resolves_to_non_string_in_psych(value)
 }
 
 fn scalar_replacement_text(value: &str, kind: SyntaxKind) -> String {
@@ -205,7 +205,10 @@ impl Document {
   }
 
   fn set_with(&mut self, dot_path: &str, value: &str, plain: bool) -> Result<(), YerbaError> {
-    let current_node = self.navigate(dot_path)?;
+    let current_node = match self.navigate(dot_path) {
+      Ok(node) => node,
+      Err(error) => return self.set_valueless_entry(dot_path, value, plain).unwrap_or(Err(error)),
+    };
 
     if let Some(block_scalar) = current_node.descendants().find(|node| node.kind() == SyntaxKind::BLOCK_SCALAR) {
       if plain {
@@ -234,6 +237,18 @@ impl Document {
     let new_text = scalar_replacement_text(value, scalar_token.kind());
 
     self.replace_token(&scalar_token, &new_text)
+  }
+
+  fn set_valueless_entry(&mut self, dot_path: &str, value: &str, plain: bool) -> Option<Result<(), YerbaError>> {
+    let entry = self.find_entry(dot_path)?;
+    let colon = entry.children_with_tokens().find(|element| element.kind() == SyntaxKind::COLON)?;
+    let text = if plain {
+      value.to_string()
+    } else {
+      scalar_replacement_text(value, SyntaxKind::PLAIN_SCALAR)
+    };
+
+    Some(self.apply_edit(TextRange::empty(colon.text_range().end()), &format!(" {}", text)))
   }
 
   fn block_scalar_replacement(source: &str, block_scalar: &SyntaxNode, value: &str) -> String {

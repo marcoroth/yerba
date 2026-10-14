@@ -2505,4 +2505,16 @@ class DocumentTest < Minitest::Spec
     assert_equal "Alice", document.source("name")
     assert_equal "30", document.source("age")
   end
+
+  test "set writes a value for a key without one" do
+    document = Yerba::Document.parse(<<~YAML)
+      name: Alice
+      nickname:
+    YAML
+
+    document.set("nickname", "Ally")
+    document.root["name"] = "Alicia"
+
+    assert_equal "name: Alicia\nnickname: Ally\n", document.to_s
+  end
 end

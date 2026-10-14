@@ -415,7 +415,7 @@ impl Document {
     self.find_entry(dot_path).is_some()
   }
 
-  fn find_entry(&self, dot_path: &str) -> Option<SyntaxNode> {
+  pub(crate) fn find_entry(&self, dot_path: &str) -> Option<SyntaxNode> {
     let (parent_path, last_key) = match dot_path.rsplit_once('.') {
       Some((parent, key)) => (parent, key),
       None => ("", dot_path),

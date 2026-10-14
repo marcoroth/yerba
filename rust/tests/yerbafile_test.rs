@@ -86,7 +86,7 @@ fn test_load_parses_yerbafile() {
       - files: "**/*.yml"
         pipeline:
           - sort_keys:
-              path: "[]"
+              selector: "[]"
               order:
                 - name
                 - slug
@@ -110,7 +110,7 @@ fn test_apply_to_document_reorders_keys() {
       - files: "**/*.yml"
         pipeline:
           - sort_keys:
-              path: "[]"
+              selector: "[]"
               order:
                 - name
                 - slug
@@ -151,7 +151,7 @@ fn test_apply_to_document_skips_non_matching_rules() {
       - files: "data/videos/**/*.yml"
         pipeline:
           - sort_keys:
-              path: "[]"
+              selector: "[]"
               order:
                 - title
                 - id
@@ -192,7 +192,7 @@ fn test_apply_to_document_applies_all_matching_rules() {
               key_style: plain
               value_style: double
           - sort_keys:
-              path: "[]"
+              selector: "[]"
               order:
                 - name
                 - slug
@@ -269,7 +269,7 @@ fn test_global_pipeline_runs_before_rule_pipeline() {
       - files: "**/*.yml"
         pipeline:
           - quote_style:
-              path: "name"
+              selector: "name"
               value_style: plain
   "#},
   )
@@ -589,7 +589,7 @@ fn test_apply_collection_style_flow_to_block() {
       - files: "**/*.yml"
         pipeline:
           - collection_style:
-              path: "tags"
+              selector: "tags"
               style: block
   "#},
   )
@@ -625,7 +625,7 @@ fn test_apply_collection_style_block_to_flow() {
       - files: "**/*.yml"
         pipeline:
           - collection_style:
-              path: "tags"
+              selector: "tags"
               style: flow
   "#},
   )
@@ -661,7 +661,7 @@ fn test_apply_collection_style_with_wildcard_path() {
       - files: "**/*.yml"
         pipeline:
           - collection_style:
-              path: "[].tags"
+              selector: "[].tags"
               style: block
   "#},
   )
@@ -1017,7 +1017,7 @@ fn test_schema_with_path_validates_each_item() {
         pipeline:
           - schema:
               file: "schema.json"
-              path: "[]"
+              selector: "[]"
   "#},
   )
   .unwrap();
@@ -1070,7 +1070,7 @@ fn test_schema_validation_with_path_selector() {
         pipeline:
           - schema:
               file: "schema.json"
-              path: "tiers[]"
+              selector: "tiers[]"
   "#},
   )
   .unwrap();
@@ -1116,7 +1116,7 @@ fn test_schema_validation_with_path_selector_fails_on_invalid() {
         pipeline:
           - schema:
               file: "schema.json"
-              path: "tiers[]"
+              selector: "tiers[]"
   "#},
   )
   .unwrap();
@@ -1162,7 +1162,7 @@ fn test_schema_validation_empty_array_passes_with_path() {
         pipeline:
           - schema:
               file: "schema.json"
-              path: "[]"
+              selector: "[]"
   "#},
   )
   .unwrap();
@@ -1291,7 +1291,7 @@ fn test_delete_with_wildcard_and_condition() {
       - files: "**/*.yml"
         pipeline:
           - delete:
-              path: "[].website"
+              selector: "[].website"
               condition: '.website == ""'
   "#},
   )
@@ -1339,7 +1339,7 @@ fn test_delete_with_wildcard_without_condition() {
       - files: "**/*.yml"
         pipeline:
           - delete:
-              path: "[].website"
+              selector: "[].website"
   "#},
   )
   .unwrap();
@@ -1378,7 +1378,7 @@ fn test_delete_with_wildcard_no_matches() {
       - files: "**/*.yml"
         pipeline:
           - delete:
-              path: "[].website"
+              selector: "[].website"
               condition: '.website == ""'
   "#},
   )
@@ -1419,7 +1419,7 @@ fn test_apply_to_document_with_absolute_file_path() {
       - files: "data/speakers.yml"
         pipeline:
           - sort_keys:
-              path: "[]"
+              selector: "[]"
               order:
                 - name
                 - github
@@ -1688,7 +1688,7 @@ fn test_load_rejects_an_unparseable_condition() {
       - files: "**/*.yml"
         pipeline:
           - delete:
-              path: "[].website"
+              selector: "[].website"
               condition: '.website = ""'
   "#},
   )
@@ -1709,7 +1709,7 @@ fn test_load_rejects_a_condition_without_an_operator() {
       - files: "**/*.yml"
         pipeline:
           - set:
-              path: "name"
+              selector: "name"
               value: "x"
               condition: 'nonsense'
   "#},
@@ -1728,7 +1728,7 @@ fn test_load_rejects_a_malformed_condition_in_the_global_pipeline() {
     files: "**/*.yml"
     pipeline:
       - remove:
-          path: "tags"
+          selector: "tags"
           value: "old"
           condition: '.tags = old'
   "#},
@@ -1748,7 +1748,7 @@ fn test_load_accepts_valid_conditions() {
       - files: "**/*.yml"
         pipeline:
           - delete:
-              path: "[].website"
+              selector: "[].website"
               condition: '.website == ""'
           - rename:
               from: "old"
@@ -1771,7 +1771,7 @@ fn test_apply_refuses_an_absolute_condition_under_a_parent_instead_of_deleting_e
       - files: "**/*.yml"
         pipeline:
           - delete:
-              path: "[].website"
+              selector: "[].website"
               condition: 'website == ""'
   "#},
   )
@@ -1803,7 +1803,7 @@ fn test_insert_step_quotes_a_value_that_would_change_the_structure() {
       - files: "**/*.yml"
         pipeline:
           - insert:
-              path: "[0].raw_title"
+              selector: "[0].raw_title"
               value: "Conf 2018: A Talk"
   "#},
   )
@@ -1828,7 +1828,7 @@ fn test_insert_step_with_plain_writes_a_literal() {
       - files: "**/*.yml"
         pipeline:
           - insert:
-              path: "[0].published"
+              selector: "[0].published"
               value: "true"
               plain: true
   "#},
@@ -2006,7 +2006,7 @@ fn test_escapes_step_scopes_by_path() {
       - files: "**/*.yml"
         pipeline:
           - escapes:
-              path: "[].title"
+              selector: "[].title"
   "#},
   )
   .unwrap();
@@ -2074,4 +2074,33 @@ fn test_sort_step_sorts_by_space_separated_fields() {
 
   assert!(changed);
   assert_eq!(document.get_all("[].id"), vec!["first", "second", "late"]);
+}
+
+#[test]
+fn test_path_is_accepted_as_an_alias_for_selector() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        path: "[]"
+        pipeline:
+          - sort_keys:
+              path: ""
+              order:
+                - name
+                - slug
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  assert_eq!(yerbafile.rules[0].selector.as_deref(), Some("[]"));
+
+  let mut document = yerba::Document::parse("- slug: alice\n  name: Alice\n").unwrap();
+
+  assert!(yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap());
+  assert_eq!(document.to_string(), "- name: Alice\n  slug: alice\n");
 }

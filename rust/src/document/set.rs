@@ -112,23 +112,23 @@ fn replacement_text(span: &ValueSpan, value: &str) -> String {
 }
 
 impl Document {
-  pub fn set(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    self.set_with(dot_path, value, false)
+  pub fn set(&mut self, selector: &str, value: &str) -> Result<(), YerbaError> {
+    self.set_with(selector, value, false)
   }
 
-  pub fn set_all(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    self.set_all_with(dot_path, value, false)
+  pub fn set_all(&mut self, selector: &str, value: &str) -> Result<(), YerbaError> {
+    self.set_all_with(selector, value, false)
   }
 
-  pub fn set_all_plain(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    self.set_all_with(dot_path, value, true)
+  pub fn set_all_plain(&mut self, selector: &str, value: &str) -> Result<(), YerbaError> {
+    self.set_all_with(selector, value, true)
   }
 
-  fn set_all_with(&mut self, dot_path: &str, value: &str, plain: bool) -> Result<(), YerbaError> {
-    let nodes = self.navigate_all_compact(dot_path);
+  fn set_all_with(&mut self, selector: &str, value: &str, plain: bool) -> Result<(), YerbaError> {
+    let nodes = self.navigate_all_compact(selector);
 
     if nodes.is_empty() {
-      return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+      return Err(YerbaError::SelectorNotFound(selector.to_string()));
     }
 
     let source = self.source_text();
@@ -137,13 +137,21 @@ impl Document {
     self.apply_edits(edits)
   }
 
-  pub fn set_where(&mut self, container_path: &str, relative_path: &str, value: &str, condition: &str, all: bool, plain: bool) -> Result<usize, YerbaError> {
+  pub fn set_where(
+    &mut self,
+    container_selector: &str,
+    relative_selector: &str,
+    value: &str,
+    condition: &str,
+    all: bool,
+    plain: bool,
+  ) -> Result<usize, YerbaError> {
     validate_item_condition(condition)?;
 
-    let items = self.navigate_all_compact(container_path);
+    let items = self.navigate_all_compact(container_selector);
 
     if items.is_empty() {
-      return Err(YerbaError::SelectorNotFound(container_path.to_string()));
+      return Err(YerbaError::SelectorNotFound(container_selector.to_string()));
     }
 
     let source = self.source_text();
@@ -154,7 +162,7 @@ impl Document {
         continue;
       }
 
-      targets.extend(navigate_from_node(item, relative_path));
+      targets.extend(navigate_from_node(item, relative_selector));
     }
 
     if targets.is_empty() {
@@ -162,10 +170,10 @@ impl Document {
     }
 
     if !all && targets.len() > 1 {
-      let selector = if container_path.is_empty() {
-        relative_path.to_string()
+      let selector = if container_selector.is_empty() {
+        relative_selector.to_string()
       } else {
-        format!("{}.{}", container_path, relative_path)
+        format!("{}.{}", container_selector, relative_selector)
       };
 
       return Err(YerbaError::AmbiguousSelector(selector, targets.len()));
@@ -179,9 +187,9 @@ impl Document {
     Ok(count)
   }
 
-  pub fn set_scalar_style(&mut self, dot_path: &str, style: &QuoteStyle) -> Result<(), YerbaError> {
-    let current_node = self.navigate(dot_path)?;
-    let scalar_token = find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+  pub fn set_scalar_style(&mut self, selector: &str, style: &QuoteStyle) -> Result<(), YerbaError> {
+    let current_node = self.navigate(selector)?;
+    let scalar_token = find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
     let current_kind = scalar_token.kind();
     let target_kind = style.to_syntax_kind();
@@ -200,14 +208,14 @@ impl Document {
     self.replace_token(&scalar_token, &new_text)
   }
 
-  pub fn set_plain(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    self.set_with(dot_path, value, true)
+  pub fn set_plain(&mut self, selector: &str, value: &str) -> Result<(), YerbaError> {
+    self.set_with(selector, value, true)
   }
 
-  fn set_with(&mut self, dot_path: &str, value: &str, plain: bool) -> Result<(), YerbaError> {
-    let current_node = match self.navigate(dot_path) {
+  fn set_with(&mut self, selector: &str, value: &str, plain: bool) -> Result<(), YerbaError> {
+    let current_node = match self.navigate(selector) {
       Ok(node) => node,
-      Err(error) => return self.set_valueless_entry(dot_path, value, plain).unwrap_or(Err(error)),
+      Err(error) => return self.set_valueless_entry(selector, value, plain).unwrap_or(Err(error)),
     };
 
     if let Some(block_scalar) = current_node.descendants().find(|node| node.kind() == SyntaxKind::BLOCK_SCALAR) {
@@ -222,13 +230,13 @@ impl Document {
     }
 
     if holds_collection(&current_node) {
-      let span = value_span(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+      let span = value_span(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
       let replacement = if plain { value.to_string() } else { crate::syntax::quote_scalar(value) };
 
       return self.apply_edit(span.range, &replacement_text(&span, &replacement));
     }
 
-    let scalar_token = find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let scalar_token = find_scalar_token(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
     if plain {
       return self.replace_token(&scalar_token, value);
@@ -239,8 +247,8 @@ impl Document {
     self.replace_token(&scalar_token, &new_text)
   }
 
-  fn set_valueless_entry(&mut self, dot_path: &str, value: &str, plain: bool) -> Option<Result<(), YerbaError>> {
-    let entry = self.find_entry(dot_path)?;
+  fn set_valueless_entry(&mut self, selector: &str, value: &str, plain: bool) -> Option<Result<(), YerbaError>> {
+    let entry = self.find_entry(selector)?;
     let colon = entry.children_with_tokens().find(|element| element.kind() == SyntaxKind::COLON)?;
     let text = if plain {
       value.to_string()

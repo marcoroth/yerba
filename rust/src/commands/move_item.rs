@@ -45,7 +45,7 @@ impl Args {
       self.before,
       self.after,
       self.to,
-      |document, path, reference| document.resolve_sequence_index(path, reference),
+      |document, selector, reference| document.resolve_sequence_index(selector, reference),
     );
 
     let result = document.move_item(&self.selector, from_index, to_index);

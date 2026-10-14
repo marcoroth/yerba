@@ -25,12 +25,12 @@ pub fn run() {
     #
     #       # Override quote style for a specific selector
     #       - quote_style:
-    #           path: "[].speakers"
+    #           selector: "[].speakers"
     #           value_style: plain
     #
     #       # Sort keys in a predefined order (aborts on unknown keys)
     #       - sort_keys:
-    #           path: "[]"
+    #           selector: "[]"
     #           order:
     #             - id
     #             - title
@@ -38,7 +38,7 @@ pub fn run() {
     #
     #       # Sort items in a sequence by field(s)
     #       - sort:
-    #           path: ""
+    #           selector: ""
     #           by: name
     #           # case_sensitive: false
     #
@@ -54,19 +54,19 @@ pub fn run() {
     #
     #       # Set a value (with optional condition)
     #       - set:
-    #           path: "status"
+    #           selector: "status"
     #           value: "published"
     #           # condition: ".draft == true"
     #
     #       # Insert a new key or sequence item
     #       - insert:
-    #           path: "tags"
+    #           selector: "tags"
     #           value: "yaml"
     #           # condition: ".tags not_contains yaml"
     #
     #       # Delete a key (with optional condition)
     #       - delete:
-    #           path: "deprecated_field"
+    #           selector: "deprecated_field"
     #           # condition: ".deprecated_field == true"
     #
     #       # Rename a key
@@ -76,12 +76,12 @@ pub fn run() {
     #
     #       # Remove an item from a sequence
     #       - remove:
-    #           path: "tags"
+    #           selector: "tags"
     #           value: "obsolete"
     #
     #       # Get a value and store it as a variable
     #       - get:
-    #           path: "[].name"
+    #           selector: "[].name"
     #           as: "names"
     #           # file: "other_file.yml"
   "#};

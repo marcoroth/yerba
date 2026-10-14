@@ -16,7 +16,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
 
 #[derive(clap::Args)]
 #[command(
-  about = "Rename a key, or move it to another map (the destination is a full selector path)",
+  about = "Rename a key, or move it to another map (the destination is a full selector)",
   arg_required_else_help = true,
   after_help = EXAMPLES.as_str()
 )]

@@ -44,6 +44,7 @@ class ConditionTest < Minitest::Spec
         port: 5432
     YAML
 
+    assert document.condition?('.host == "localhost"', selector: "database")
     assert document.condition?('.host == "localhost"', path: "database")
   end
 

@@ -1,70 +1,72 @@
 use super::*;
 
 impl Document {
-  pub fn rename(&mut self, source_path: &str, destination_path: &str) -> Result<(), YerbaError> {
-    Self::validate_path(source_path)?;
-    Self::validate_path(destination_path)?;
+  pub fn rename(&mut self, source_selector: &str, destination_selector: &str) -> Result<(), YerbaError> {
+    Self::validate_selector(source_selector)?;
+    Self::validate_selector(destination_selector)?;
 
-    let source_parent = source_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
-    let destination_parent = destination_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
-    let destination_key = destination_path.rsplit_once('.').map(|(_, key)| key).unwrap_or(destination_path);
+    let source_parent = source_selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+    let destination_parent = destination_selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+    let destination_key = destination_selector.rsplit_once('.').map(|(_, key)| key).unwrap_or(destination_selector);
 
     if source_parent == destination_parent {
-      let (parent_path, source_key) = source_path.rsplit_once('.').unwrap_or(("", source_path));
+      let (parent_selector, source_key) = source_selector.rsplit_once('.').unwrap_or(("", source_selector));
 
-      let parent_node = self.navigate(parent_path)?;
-      let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
+      let parent_node = self.navigate(parent_selector)?;
+      let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(source_selector.to_string()))?;
 
-      let entry = find_entry_by_key(&map, source_key).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
-      let key_node = entry.key().ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
-      let key_token = find_scalar_token(key_node.syntax()).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
+      let entry = find_entry_by_key(&map, source_key).ok_or_else(|| YerbaError::SelectorNotFound(source_selector.to_string()))?;
+      let key_node = entry.key().ok_or_else(|| YerbaError::SelectorNotFound(source_selector.to_string()))?;
+      let key_token = find_scalar_token(key_node.syntax()).ok_or_else(|| YerbaError::SelectorNotFound(source_selector.to_string()))?;
       let new_text = format_scalar_value(destination_key, key_token.kind());
 
       self.replace_token(&key_token, &new_text)
     } else {
-      let value = self.get(source_path).ok_or_else(|| YerbaError::SelectorNotFound(source_path.to_string()))?;
+      let value = self
+        .get(source_selector)
+        .ok_or_else(|| YerbaError::SelectorNotFound(source_selector.to_string()))?;
 
-      self.delete(source_path)?;
-      self.insert_into(destination_path, &value, InsertPosition::Last)
+      self.delete(source_selector)?;
+      self.insert_into(destination_selector, &value, InsertPosition::Last)
     }
   }
 
-  pub fn delete(&mut self, dot_path: &str) -> Result<(), YerbaError> {
-    Self::validate_path(dot_path)?;
-    self.refuse_flow_target(dot_path)?;
+  pub fn delete(&mut self, selector: &str) -> Result<(), YerbaError> {
+    Self::validate_selector(selector)?;
+    self.refuse_flow_target(selector)?;
 
-    let selector = crate::selector::Selector::parse(dot_path);
-    let segments = selector.segments();
-    let last_segment = segments.last().ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
-    let parent_path = selector.parent_path();
+    let parsed = crate::selector::Selector::parse(selector);
+    let segments = parsed.segments();
+    let last_segment = segments.last().ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
+    let parent_selector = parsed.parent_selector();
 
     match last_segment {
       crate::selector::SelectorSegment::Key(last_key) => {
-        let has_wildcard = selector.has_wildcard();
-        let has_brackets = selector.has_brackets();
+        let has_wildcard = parsed.has_wildcard();
+        let has_brackets = parsed.has_brackets();
 
-        if parent_path.is_empty() && (!has_wildcard || !has_brackets) {
-          let parent_node = self.navigate(&parent_path)?;
-          let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+        if parent_selector.is_empty() && (!has_wildcard || !has_brackets) {
+          let parent_node = self.navigate(&parent_selector)?;
+          let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
-          let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+          let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
           return self.remove_map_entry(&entry);
         }
 
-        let parent_nodes = self.navigate_all_compact(&parent_path);
+        let parent_nodes = self.navigate_all_compact(&parent_selector);
 
         if parent_nodes.is_empty() {
           if has_wildcard {
             return Ok(());
           }
 
-          return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+          return Err(YerbaError::SelectorNotFound(selector.to_string()));
         }
 
         if parent_nodes.len() == 1 && (!has_wildcard || !has_brackets) {
-          let map = find_block_map(&parent_nodes[0]).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
-          let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+          let map = find_block_map(&parent_nodes[0]).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
+          let entry = find_entry_by_key(&map, last_key).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
           if map.entries().count() == 1 {
             return self.collapse_to_empty_flow_map(&parent_nodes[0]);
@@ -88,31 +90,31 @@ impl Document {
         self.apply_edits(edits)
       }
 
-      crate::selector::SelectorSegment::Index(index) => self.remove_at(&parent_path, *index),
+      crate::selector::SelectorSegment::Index(index) => self.remove_at(&parent_selector, *index),
       crate::selector::SelectorSegment::IndexFromEnd(_) => {
-        let parent_node = self.navigate(&parent_path)?;
+        let parent_node = self.navigate(&parent_selector)?;
         let length = find_block_sequence(&parent_node)
           .map(|sequence| sequence.entries().count())
           .or_else(|| find_flow_sequence(&parent_node).map(|sequence| flow_sequence_entries(&sequence).len()))
-          .ok_or_else(|| YerbaError::NotASequence(parent_path.clone()))?;
+          .ok_or_else(|| YerbaError::NotASequence(parent_selector.clone()))?;
         let index = last_segment
           .sequence_index(length)
-          .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
-        self.remove_at(&parent_path, index)
+        self.remove_at(&parent_selector, index)
       }
-      crate::selector::SelectorSegment::AllItems | crate::selector::SelectorSegment::AllKeys => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
+      crate::selector::SelectorSegment::AllItems | crate::selector::SelectorSegment::AllKeys => Err(YerbaError::SelectorNotFound(selector.to_string())),
     }
   }
 
-  pub fn remove(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    let current_node = self.navigate(dot_path)?;
+  pub fn remove(&mut self, selector: &str, value: &str) -> Result<(), YerbaError> {
+    let current_node = self.navigate(selector)?;
 
     if find_flow_sequence(&current_node).is_some() {
-      return Err(YerbaError::FlowCollectionNotWritable(dot_path.to_string()));
+      return Err(YerbaError::FlowCollectionNotWritable(selector.to_string()));
     }
 
-    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(selector.to_string()))?;
 
     let target_entry = sequence
       .entries()
@@ -123,7 +125,7 @@ impl Document {
           .map(|text| text == value)
           .unwrap_or(false)
       })
-      .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", dot_path, value)))?;
+      .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", selector, value)))?;
 
     if sequence.entries().count() == 1 {
       return self.collapse_to_empty_flow_sequence(&current_node);
@@ -132,12 +134,12 @@ impl Document {
     self.remove_node(target_entry.syntax())
   }
 
-  pub fn remove_at(&mut self, dot_path: &str, index: usize) -> Result<(), YerbaError> {
-    Self::validate_path(dot_path)?;
+  pub fn remove_at(&mut self, selector: &str, index: usize) -> Result<(), YerbaError> {
+    Self::validate_selector(selector)?;
 
-    let current_node = self.navigate(dot_path)?;
+    let current_node = self.navigate(selector)?;
 
-    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(selector.to_string()))?;
 
     let entries: Vec<_> = sequence.entries().collect();
 

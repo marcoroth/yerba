@@ -47,12 +47,12 @@ pub fn validate_item_condition(condition: &str) -> Result<(), YerbaError> {
 }
 
 impl Document {
-  pub fn filter(&self, dot_path: &str, condition: &str) -> Result<Vec<yaml_serde::Value>, YerbaError> {
+  pub fn filter(&self, selector: &str, condition: &str) -> Result<Vec<yaml_serde::Value>, YerbaError> {
     validate_item_condition(condition)?;
 
     Ok(
       self
-        .navigate_all_compact(dot_path)
+        .navigate_all_compact(selector)
         .iter()
         .filter(|node| self.evaluate_condition_on_node(node, condition))
         .map(node_to_yaml_value)
@@ -60,14 +60,14 @@ impl Document {
     )
   }
 
-  pub fn filter_with_selectors(&self, dot_path: &str, condition: &str) -> Result<Vec<(yaml_serde::Value, String, usize)>, YerbaError> {
+  pub fn filter_with_selectors(&self, selector: &str, condition: &str) -> Result<Vec<(yaml_serde::Value, String, usize)>, YerbaError> {
     validate_item_condition(condition)?;
 
     let source = self.source_text();
 
     Ok(
       self
-        .navigate_all_compact(dot_path)
+        .navigate_all_compact(selector)
         .iter()
         .filter(|node| self.evaluate_condition_on_node(node, condition))
         .map(|node| {
@@ -88,13 +88,13 @@ impl Document {
       None => return false,
     };
 
-    let path = crate::selector::Selector::parse(&left);
+    let parsed = crate::selector::Selector::parse(&left);
 
-    if !path.is_relative() {
+    if !parsed.is_relative() {
       return false;
     }
 
-    let target_nodes = navigate_from_node(node, &path.to_selector_string());
+    let target_nodes = navigate_from_node(node, &parsed.to_selector_string());
     let values: Vec<String> = target_nodes.iter().filter_map(extract_scalar_text).collect();
 
     match operator {
@@ -138,8 +138,8 @@ impl Document {
     }
   }
 
-  pub fn evaluate_condition(&self, parent_path: &str, condition: &str) -> Result<bool, YerbaError> {
-    if parent_path.is_empty() {
+  pub fn evaluate_condition(&self, parent_selector: &str, condition: &str) -> Result<bool, YerbaError> {
+    if parent_selector.is_empty() {
       validate_condition(condition)?;
     } else {
       validate_item_condition(condition)?;
@@ -152,55 +152,55 @@ impl Document {
       None => return Ok(false),
     };
 
-    let path = crate::selector::Selector::parse(&left);
-    let path_string = path.to_selector_string();
+    let parsed = crate::selector::Selector::parse(&left);
+    let selector_string = parsed.to_selector_string();
 
-    let full_path = if parent_path.is_empty() {
-      path_string
+    let full_selector = if parent_selector.is_empty() {
+      selector_string
     } else {
-      format!("{}.{}", parent_path, path_string)
+      format!("{}.{}", parent_selector, selector_string)
     };
 
-    let has_brackets = crate::selector::Selector::parse(&full_path).has_brackets();
+    let has_brackets = crate::selector::Selector::parse(&full_selector).has_brackets();
 
     let result = match operator {
       "==" => {
         if has_brackets {
-          self.get_all(&full_path).iter().any(|value| value == &right)
+          self.get_all(&full_selector).iter().any(|value| value == &right)
         } else {
-          self.get(&full_path).unwrap_or_default() == right
+          self.get(&full_selector).unwrap_or_default() == right
         }
       }
       "!=" => {
         if has_brackets {
-          self.get_all(&full_path).iter().all(|value| value != &right)
+          self.get_all(&full_selector).iter().all(|value| value != &right)
         } else {
-          self.get(&full_path).unwrap_or_default() != right
+          self.get(&full_selector).unwrap_or_default() != right
         }
       }
       "contains" => {
         if has_brackets {
-          self.get_all(&full_path).iter().any(|value| value == &right || value.contains(&right))
+          self.get_all(&full_selector).iter().any(|value| value == &right || value.contains(&right))
         } else {
-          let items = self.get_sequence_values(&full_path);
+          let items = self.get_sequence_values(&full_selector);
 
           if !items.is_empty() {
             items.iter().any(|item| item == &right)
           } else {
-            self.get(&full_path).map(|value| value.contains(&right)).unwrap_or(false)
+            self.get(&full_selector).map(|value| value.contains(&right)).unwrap_or(false)
           }
         }
       }
       "not_contains" => {
         if has_brackets {
-          self.get_all(&full_path).iter().all(|value| value != &right && !value.contains(&right))
+          self.get_all(&full_selector).iter().all(|value| value != &right && !value.contains(&right))
         } else {
-          let items = self.get_sequence_values(&full_path);
+          let items = self.get_sequence_values(&full_selector);
 
           if !items.is_empty() {
             !items.iter().any(|item| item == &right)
           } else {
-            self.get(&full_path).map(|value| !value.contains(&right)).unwrap_or(true)
+            self.get(&full_selector).map(|value| !value.contains(&right)).unwrap_or(true)
           }
         }
       }

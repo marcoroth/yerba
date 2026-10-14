@@ -53,29 +53,29 @@ use crate::syntax::{
 
 #[derive(Debug, Clone)]
 pub struct SortField {
-  pub path: String,
+  pub selector: String,
   pub ascending: bool,
 }
 
 impl SortField {
-  pub fn asc(path: &str) -> Self {
+  pub fn asc(selector: &str) -> Self {
     SortField {
-      path: path.to_string(),
+      selector: selector.to_string(),
       ascending: true,
     }
   }
 
-  pub fn desc(path: &str) -> Self {
+  pub fn desc(selector: &str) -> Self {
     SortField {
-      path: path.to_string(),
+      selector: selector.to_string(),
       ascending: false,
     }
   }
 
   pub fn parse(input: &str) -> Self {
-    if let Some((path, direction)) = input.rsplit_once(':') {
+    if let Some((selector, direction)) = input.rsplit_once(':') {
       match direction {
-        "desc" | "descending" => SortField::desc(path),
+        "desc" | "descending" => SortField::desc(selector),
         _ => SortField::asc(input),
       }
     } else {
@@ -237,49 +237,49 @@ impl Document {
     Ok(())
   }
 
-  pub fn source(&self, dot_path: &str) -> Result<String, YerbaError> {
-    let node = self.navigate(dot_path)?;
+  pub fn source(&self, selector: &str) -> Result<String, YerbaError> {
+    let node = self.navigate(selector)?;
     Ok(node.text().to_string())
   }
 
-  pub fn navigate(&self, dot_path: &str) -> Result<SyntaxNode, YerbaError> {
-    Self::validate_path(dot_path)?;
+  pub fn navigate(&self, selector: &str) -> Result<SyntaxNode, YerbaError> {
+    Self::validate_selector(selector)?;
 
-    if dot_path.is_empty() {
-      let root = Root::cast(self.root.clone()).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    if selector.is_empty() {
+      let root = Root::cast(self.root.clone()).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
-      let document = root.documents().next().ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+      let document = root.documents().next().ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
       return Ok(document.syntax().clone());
     }
 
-    let nodes = self.navigate_all_compact(dot_path);
+    let nodes = self.navigate_all_compact(selector);
 
     match nodes.len() {
-      0 => Err(YerbaError::SelectorNotFound(dot_path.to_string())),
+      0 => Err(YerbaError::SelectorNotFound(selector.to_string())),
       1 => Ok(nodes.into_iter().next().unwrap()),
-      _ => Err(YerbaError::AmbiguousSelector(dot_path.to_string(), nodes.len())),
+      _ => Err(YerbaError::AmbiguousSelector(selector.to_string(), nodes.len())),
     }
   }
 
-  pub fn navigate_all_compact(&self, dot_path: &str) -> Vec<SyntaxNode> {
-    self.navigate_all(dot_path).into_iter().flatten().collect()
+  pub fn navigate_all_compact(&self, selector: &str) -> Vec<SyntaxNode> {
+    self.navigate_all(selector).into_iter().flatten().collect()
   }
 
-  pub(crate) fn refuse_flow_target(&self, dot_path: &str) -> Result<(), YerbaError> {
-    if self.navigate_all_compact(dot_path).iter().any(in_flow_collection) {
-      return Err(YerbaError::FlowCollectionNotWritable(dot_path.to_string()));
+  pub(crate) fn refuse_flow_target(&self, selector: &str) -> Result<(), YerbaError> {
+    if self.navigate_all_compact(selector).iter().any(in_flow_collection) {
+      return Err(YerbaError::FlowCollectionNotWritable(selector.to_string()));
     }
 
     Ok(())
   }
 
-  pub fn navigate_all(&self, dot_path: &str) -> Vec<Option<SyntaxNode>> {
-    if Document::validate_path(dot_path).is_err() {
+  pub fn navigate_all(&self, selector: &str) -> Vec<Option<SyntaxNode>> {
+    if Document::validate_selector(selector).is_err() {
       return Vec::new();
     }
 
-    let parsed = crate::selector::Selector::parse(dot_path);
+    let parsed = crate::selector::Selector::parse(selector);
 
     let root = match Root::cast(self.root.clone()) {
       Some(root) => root,
@@ -355,21 +355,21 @@ impl Document {
     current_nodes
   }
 
-  pub fn validate_path(dot_path: &str) -> Result<(), YerbaError> {
-    if dot_path.ends_with('.') {
-      return Err(YerbaError::ParseError(format!("invalid path: trailing dot in '{}'", dot_path)));
+  pub fn validate_selector(selector: &str) -> Result<(), YerbaError> {
+    if selector.ends_with('.') {
+      return Err(YerbaError::ParseError(format!("invalid selector: trailing dot in '{}'", selector)));
     }
 
-    if dot_path.contains("..") {
-      return Err(YerbaError::ParseError(format!("invalid path: double dot in '{}'", dot_path)));
+    if selector.contains("..") {
+      return Err(YerbaError::ParseError(format!("invalid selector: double dot in '{}'", selector)));
     }
 
-    if dot_path.starts_with('.') {
-      return Err(YerbaError::ParseError(format!("invalid path: leading dot in '{}'", dot_path)));
+    if selector.starts_with('.') {
+      return Err(YerbaError::ParseError(format!("invalid selector: leading dot in '{}'", selector)));
     }
 
-    if dot_path.contains('[') && !dot_path.contains(']') {
-      return Err(YerbaError::ParseError(format!("invalid path: unclosed bracket in '{}'", dot_path)));
+    if selector.contains('[') && !selector.contains(']') {
+      return Err(YerbaError::ParseError(format!("invalid selector: unclosed bracket in '{}'", selector)));
     }
 
     Ok(())
@@ -839,8 +839,8 @@ fn resolve_segment(node: &SyntaxNode, segment: &crate::selector::SelectorSegment
   }
 }
 
-pub(crate) fn navigate_from_node(node: &SyntaxNode, path: &str) -> Vec<SyntaxNode> {
-  let parsed = crate::selector::Selector::parse(path);
+pub(crate) fn navigate_from_node(node: &SyntaxNode, selector: &str) -> Vec<SyntaxNode> {
+  let parsed = crate::selector::Selector::parse(selector);
 
   navigate_remaining(node, parsed.segments())
 }

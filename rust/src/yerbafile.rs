@@ -21,7 +21,8 @@ pub struct Yerbafile {
 pub struct Rule {
   pub files: String,
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
   pub pipeline: Vec<PipelineStep>,
 }
 
@@ -48,7 +49,8 @@ pub enum PipelineStep {
 #[derive(Debug, Clone, Deserialize)]
 pub struct SortConfig {
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
   #[serde(default)]
   pub by: Option<String>,
   #[serde(default)]
@@ -58,7 +60,8 @@ pub struct SortConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct BlankLinesConfig {
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
   pub count: usize,
   #[serde(default)]
   pub before: Vec<String>,
@@ -81,7 +84,8 @@ pub struct DirectivesConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct UniqueConfig {
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
   #[serde(default = "default_dot")]
   pub by: String,
   #[serde(default)]
@@ -98,7 +102,8 @@ fn default_dot() -> String {
 pub struct SchemaConfig {
   pub file: String,
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
   #[serde(default)]
   pub items: bool,
 }
@@ -112,7 +117,8 @@ pub struct FinalNewlineConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct EscapesConfig {
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
 }
 
 fn default_one() -> usize {
@@ -129,7 +135,8 @@ pub struct RenameConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RemoveConfig {
-  pub path: String,
+  #[serde(alias = "path")]
+  pub selector: String,
   pub value: String,
   #[serde(default)]
   pub condition: Option<String>,
@@ -231,7 +238,8 @@ impl<'de> Deserialize<'de> for PipelineStep {
 #[derive(Debug, Clone, Deserialize)]
 pub struct SortKeysConfig {
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
   pub order: Vec<String>,
 }
 
@@ -241,26 +249,30 @@ pub struct QuoteStyleConfig {
   pub key_style: String,
   pub value_style: String,
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CollectionStyleConfig {
   pub style: String,
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SequenceIndentConfig {
   pub style: String,
   #[serde(default)]
-  pub path: Option<String>,
+  #[serde(alias = "path")]
+  pub selector: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SetConfig {
-  pub path: String,
+  #[serde(alias = "path")]
+  pub selector: String,
   pub value: String,
   #[serde(default)]
   pub condition: Option<String>,
@@ -270,7 +282,8 @@ pub struct SetConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct InsertConfig {
-  pub path: String,
+  #[serde(alias = "path")]
+  pub selector: String,
   pub value: String,
   #[serde(default)]
   pub condition: Option<String>,
@@ -280,7 +293,8 @@ pub struct InsertConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeleteConfig {
-  pub path: String,
+  #[serde(alias = "path")]
+  pub selector: String,
   #[serde(default)]
   pub condition: Option<String>,
 }
@@ -359,7 +373,7 @@ impl Yerbafile {
     }
   }
 
-  pub fn sort_order_for(&self, file_path: &str, dot_path: &str) -> Option<Vec<String>> {
+  pub fn sort_order_for(&self, file_path: &str, selector: &str) -> Option<Vec<String>> {
     for rule in &self.rules {
       let sort_keys_config = rule.pipeline.iter().find_map(|step| match step {
         PipelineStep::SortKeys(config) => Some(config),
@@ -367,10 +381,10 @@ impl Yerbafile {
       });
 
       if let Some(config) = sort_keys_config {
-        let full_path = resolve_step_path(rule.path.as_deref(), config.path.as_deref());
-        let normalized = full_path.trim_end_matches("[]").trim_end_matches('.');
+        let full_selector = resolve_step_selector(rule.selector.as_deref(), config.selector.as_deref());
+        let normalized = full_selector.trim_end_matches("[]").trim_end_matches('.');
 
-        if normalized != dot_path && !normalized.is_empty() && !dot_path.is_empty() {
+        if normalized != selector && !normalized.is_empty() && !selector.is_empty() {
           continue;
         }
 
@@ -472,10 +486,10 @@ impl Yerbafile {
       }
     }
 
-    let base_path = rule.path.as_deref();
+    let base_selector = rule.selector.as_deref();
 
     for step in &rule.pipeline {
-      if let Err(error) = execute_step(&mut document, step, base_path, file, self) {
+      if let Err(error) = execute_step(&mut document, step, base_selector, file, self) {
         return RuleResult {
           file: file.to_string(),
           changed: false,
@@ -635,10 +649,10 @@ impl Yerbafile {
         }
       }
 
-      let base_path = rule.path.as_deref();
+      let base_selector = rule.selector.as_deref();
 
       for step in &rule.pipeline {
-        execute_step(document, step, base_path, file_path, self)?;
+        execute_step(document, step, base_selector, file_path, self)?;
       }
     }
 
@@ -652,7 +666,7 @@ fn control_character_error(source: &str) -> Option<YerbaError> {
   (!found.is_empty()).then_some(YerbaError::ControlCharacters(found))
 }
 
-fn execute_pipeline(document: &mut Document, steps: &[PipelineStep], base_path: Option<&str>, file: &str, yerbafile: &Yerbafile) -> Result<(), YerbaError> {
+fn execute_pipeline(document: &mut Document, steps: &[PipelineStep], base_selector: Option<&str>, file: &str, yerbafile: &Yerbafile) -> Result<(), YerbaError> {
   use crate::document::style::StyleEnforcement;
 
   let mut enforcement = StyleEnforcement {
@@ -667,17 +681,17 @@ fn execute_pipeline(document: &mut Document, steps: &[PipelineStep], base_path: 
 
   for step in steps {
     match step {
-      PipelineStep::CollectionStyle(config) if config.path.is_none() && base_path.is_none() => {
+      PipelineStep::CollectionStyle(config) if config.selector.is_none() && base_selector.is_none() => {
         enforcement.collection_style = Some(config.style.clone());
         has_enforcement = true;
       }
 
-      PipelineStep::SequenceIndent(config) if config.path.is_none() && base_path.is_none() => {
+      PipelineStep::SequenceIndent(config) if config.selector.is_none() && base_selector.is_none() => {
         enforcement.sequence_indent = Some(config.style.clone());
         has_enforcement = true;
       }
 
-      PipelineStep::QuoteStyle(config) if config.path.is_none() && base_path.is_none() => {
+      PipelineStep::QuoteStyle(config) if config.selector.is_none() && base_selector.is_none() => {
         let key_style = config.key_style.parse::<crate::KeyStyle>().ok();
         let value_style = config.value_style.parse::<QuoteStyle>().ok();
 
@@ -695,23 +709,23 @@ fn execute_pipeline(document: &mut Document, steps: &[PipelineStep], base_path: 
   }
 
   for step in remaining_steps {
-    execute_step(document, step, base_path, file, yerbafile)?;
+    execute_step(document, step, base_selector, file, yerbafile)?;
   }
 
   Ok(())
 }
 
-fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<&str>, _file: &str, yerbafile: &Yerbafile) -> Result<(), YerbaError> {
+fn execute_step(document: &mut Document, step: &PipelineStep, base_selector: Option<&str>, _file: &str, yerbafile: &Yerbafile) -> Result<(), YerbaError> {
   match step {
     PipelineStep::QuoteStyle(config) => {
-      let dot_path = config.path.as_deref();
+      let selector = config.selector.as_deref();
 
       let key_style = config.key_style.parse::<crate::KeyStyle>().map_err(YerbaError::ParseError)?;
 
       let value_style = config.value_style.parse::<QuoteStyle>().map_err(YerbaError::ParseError)?;
 
-      document.enforce_key_style(&key_style, dot_path)?;
-      let warnings = document.enforce_quotes_at(&value_style, dot_path)?;
+      document.enforce_key_style(&key_style, selector)?;
+      let warnings = document.enforce_quotes_at(&value_style, selector)?;
 
       for warning in &warnings {
         eprintln!("  warning: {}", warning);
@@ -721,52 +735,52 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     }
 
     PipelineStep::CollectionStyle(config) => {
-      let dot_path = resolve_step_path(base_path, config.path.as_deref());
-      let path = if dot_path.is_empty() { None } else { Some(dot_path.as_str()) };
+      let selector = resolve_step_selector(base_selector, config.selector.as_deref());
+      let path = if selector.is_empty() { None } else { Some(selector.as_str()) };
 
       document.enforce_collection_style(&config.style, path)
     }
 
     PipelineStep::SequenceIndent(config) => {
-      let dot_path = resolve_step_path(base_path, config.path.as_deref());
-      let path = if dot_path.is_empty() { None } else { Some(dot_path.as_str()) };
+      let selector = resolve_step_selector(base_selector, config.selector.as_deref());
+      let path = if selector.is_empty() { None } else { Some(selector.as_str()) };
 
       document.enforce_sequence_indent(&config.style, path)
     }
 
     PipelineStep::SortKeys(config) => {
-      let full_path = resolve_step_path(base_path, config.path.as_deref());
+      let full_selector = resolve_step_selector(base_selector, config.selector.as_deref());
       let key_order: Vec<&str> = config.order.iter().map(|key| key.as_str()).collect();
 
-      document.validate_sort_keys(&full_path, &key_order)?;
-      document.sort_keys(&full_path, &key_order)
+      document.validate_sort_keys(&full_selector, &key_order)?;
+      document.sort_keys(&full_selector, &key_order)
     }
 
     PipelineStep::Set(config) => {
-      let full_path = resolve_step_path(base_path, Some(&config.path));
+      let full_selector = resolve_step_selector(base_selector, Some(&config.selector));
 
       if let Some(condition) = &config.condition {
-        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+        let parent_selector = full_selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, condition)? {
+        if !document.evaluate_condition(parent_selector, condition)? {
           return Ok(());
         }
       }
 
       if config.plain {
-        document.set_plain(&full_path, &config.value)
+        document.set_plain(&full_selector, &config.value)
       } else {
-        document.set(&full_path, &config.value)
+        document.set(&full_selector, &config.value)
       }
     }
 
     PipelineStep::Insert(config) => {
-      let full_path = resolve_step_path(base_path, Some(&config.path));
+      let full_selector = resolve_step_selector(base_selector, Some(&config.selector));
 
       if let Some(condition) = &config.condition {
-        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+        let parent_selector = full_selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, condition)? {
+        if !document.evaluate_condition(parent_selector, condition)? {
           return Ok(());
         }
       }
@@ -777,20 +791,20 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         crate::syntax::quote_scalar(&config.value)
       };
 
-      document.insert_into(&full_path, &value, crate::InsertPosition::Last)
+      document.insert_into(&full_selector, &value, crate::InsertPosition::Last)
     }
 
     PipelineStep::Delete(config) => {
-      let full_path = resolve_step_path(base_path, Some(&config.path));
+      let full_selector = resolve_step_selector(base_selector, Some(&config.selector));
 
-      if full_path.contains("[]") {
-        let concrete_selectors = document.resolve_selectors(&full_path);
+      if full_selector.contains("[]") {
+        let concrete_selectors = document.resolve_selectors(&full_selector);
 
         for selector in concrete_selectors.into_iter().rev() {
           if let Some(condition) = &config.condition {
-            let parent_path = selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+            let parent_selector = selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-            if !document.evaluate_condition(parent_path, condition)? {
+            if !document.evaluate_condition(parent_selector, condition)? {
               continue;
             }
           }
@@ -801,47 +815,47 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         Ok(())
       } else {
         if let Some(condition) = &config.condition {
-          let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+          let parent_selector = full_selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-          if !document.evaluate_condition(parent_path, condition)? {
+          if !document.evaluate_condition(parent_selector, condition)? {
             return Ok(());
           }
         }
 
-        document.delete(&full_path)
+        document.delete(&full_selector)
       }
     }
 
     PipelineStep::Rename(config) => {
-      let full_path = resolve_step_path(base_path, Some(&config.from));
+      let full_selector = resolve_step_selector(base_selector, Some(&config.from));
 
       if let Some(condition) = &config.condition {
-        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+        let parent_selector = full_selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, condition)? {
+        if !document.evaluate_condition(parent_selector, condition)? {
           return Ok(());
         }
       }
 
-      document.rename(&full_path, &config.to)
+      document.rename(&full_selector, &config.to)
     }
 
     PipelineStep::Remove(config) => {
-      let full_path = resolve_step_path(base_path, Some(&config.path));
+      let full_selector = resolve_step_selector(base_selector, Some(&config.selector));
 
       if let Some(condition) = &config.condition {
-        let parent_path = full_path.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+        let parent_selector = full_selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
-        if !document.evaluate_condition(parent_path, condition)? {
+        if !document.evaluate_condition(parent_selector, condition)? {
           return Ok(());
         }
       }
 
-      document.remove(&full_path, &config.value)
+      document.remove(&full_selector, &config.value)
     }
 
     PipelineStep::BlankLines(config) => {
-      let full_path = resolve_step_path(base_path, config.path.as_deref());
+      let full_selector = resolve_step_selector(base_selector, config.selector.as_deref());
 
       let options = crate::BlankLineOptions {
         before: config.before.clone(),
@@ -849,14 +863,14 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         skip_empty: config.skip_empty,
       };
 
-      document.enforce_blank_lines_with(&full_path, config.count, &options)
+      document.enforce_blank_lines_with(&full_selector, config.count, &options)
     }
 
     PipelineStep::Sort(config) => {
-      let full_path = resolve_step_path(base_path, config.path.as_deref());
+      let full_selector = resolve_step_selector(base_selector, config.selector.as_deref());
       let sort_fields = config.by.as_deref().map(crate::SortField::parse_list).unwrap_or_default();
 
-      document.sort_items(&full_path, &sort_fields, config.case_sensitive)
+      document.sort_items(&full_selector, &sort_fields, config.case_sensitive)
     }
 
     PipelineStep::Directives(config) => {
@@ -891,7 +905,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     PipelineStep::Schema(config) => {
       let schema_path = yerbafile.resolve_path(&config.file);
       let schema = crate::schema::load_schema(&schema_path)?;
-      let selector = resolve_step_path(base_path, config.path.as_deref());
+      let selector = resolve_step_selector(base_selector, config.selector.as_deref());
       let errors = document.validate_schema(&schema, config.items, if selector.is_empty() { None } else { Some(&selector) });
 
       if errors.is_empty() {
@@ -902,8 +916,8 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     }
 
     PipelineStep::Unique(config) => {
-      let full_path = resolve_step_path(base_path, config.path.as_deref());
-      let duplicates = document.unique_with_options(&full_path, &config.by, config.remove, config.allow_blank_duplicates)?;
+      let full_selector = resolve_step_selector(base_selector, config.selector.as_deref());
+      let duplicates = document.unique_with_options(&full_selector, &config.by, config.remove, config.allow_blank_duplicates)?;
 
       if !duplicates.is_empty() && !config.remove {
         return Err(YerbaError::DuplicateValues(duplicates));
@@ -915,17 +929,17 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
     PipelineStep::FinalNewline(config) => document.enforce_final_newline(config.count),
 
     PipelineStep::Escapes(config) => {
-      let full_path = resolve_step_path(base_path, config.path.as_deref());
-      let scope = if full_path.is_empty() { None } else { Some(full_path.as_str()) };
+      let full_selector = resolve_step_selector(base_selector, config.selector.as_deref());
+      let scope = if full_selector.is_empty() { None } else { Some(full_selector.as_str()) };
 
       document.decode_escapes(scope).map(|_| ())
     }
   }
 }
 
-fn resolve_step_path(base_path: Option<&str>, step_path: Option<&str>) -> String {
-  let base = base_path.unwrap_or("");
-  let step = step_path.unwrap_or("");
+fn resolve_step_selector(base_selector: Option<&str>, step_selector: Option<&str>) -> String {
+  let base = base_selector.unwrap_or("");
+  let step = step_selector.unwrap_or("");
 
   match (base.is_empty(), step.is_empty()) {
     (true, true) => String::new(),

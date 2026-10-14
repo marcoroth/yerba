@@ -204,7 +204,7 @@ impl Selector {
     result
   }
 
-  pub fn parent_path(&self) -> String {
+  pub fn parent_selector(&self) -> String {
     let segments = self.segments();
 
     if segments.len() <= 1 {

@@ -36,16 +36,16 @@ pub struct Args {
 
 impl Args {
   pub fn run(self) {
-    let (parent_path, key) = self.selector.rsplit_once('.').unwrap_or(("", &self.selector));
+    let (parent_selector, key) = self.selector.rsplit_once('.').unwrap_or(("", &self.selector));
 
     let mut document = parse_file(&self.file);
 
     let before_key = self.before.map(|target| {
       let (target_parent, target_key) = target.rsplit_once('.').unwrap_or(("", &target));
 
-      if target_parent != parent_path {
+      if target_parent != parent_selector {
         eprintln!(
-          "{} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
+          "{} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different map.",
           ui::failure("Error:"),
           self.selector,
           target
@@ -60,9 +60,9 @@ impl Args {
     let after_key = self.after.map(|target| {
       let (target_parent, target_key) = target.rsplit_once('.').unwrap_or(("", &target));
 
-      if target_parent != parent_path {
+      if target_parent != parent_selector {
         eprintln!(
-          "{} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different path.",
+          "{} cannot move key across different maps ({} \u{2192} {})\n\n  Use 'yerba rename' to relocate keys to a different map.",
           ui::failure("Error:"),
           self.selector,
           target
@@ -76,15 +76,15 @@ impl Args {
 
     let (from_index, to_index) = resolve_move_indexes(
       &document,
-      parent_path,
+      parent_selector,
       key,
       before_key,
       after_key,
       self.to,
-      |document, parent_path, reference| document.resolve_key_index(parent_path, reference),
+      |document, parent_selector, reference| document.resolve_key_index(parent_selector, reference),
     );
 
-    let result = document.move_key(parent_path, from_index, to_index);
+    let result = document.move_key(parent_selector, from_index, to_index);
     run_op(&self.file, &document, result);
     output(&self.file, &document, self.dry_run);
   }

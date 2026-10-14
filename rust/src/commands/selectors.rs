@@ -25,7 +25,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
 )]
 pub struct Args {
   file: String,
-  /// Show selectors starting from this path
+  /// Show selectors starting from this selector
   selector: Option<String>,
   /// Sort selectors alphabetically (default: document order)
   #[arg(long)]

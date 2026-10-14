@@ -17,7 +17,7 @@ static HELP: LazyLock<String> = LazyLock::new(|| {
   commands::colorize_help(indoc! {r#"
     Selectors:
       key                  A single key          "database.host"
-      key.nested           Nested key path       "database.settings.pool"
+      key.nested           Nested keys           "database.settings.pool"
       []                   All items in array    "[].title"
       [N]                  Item at index         "[0].title"
       [-N]                 Item from the end     "[-1].title"

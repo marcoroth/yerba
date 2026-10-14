@@ -1,15 +1,15 @@
 use super::*;
 
 impl Document {
-  pub fn append(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    self.insert_into(dot_path, value, InsertPosition::Last)
+  pub fn append(&mut self, selector: &str, value: &str) -> Result<(), YerbaError> {
+    self.insert_into(selector, value, InsertPosition::Last)
   }
 
-  pub fn detect_sequence_quote_style(&self, dot_path: &str) -> QuoteStyle {
-    let try_paths = if dot_path.is_empty() {
+  pub fn detect_sequence_quote_style(&self, selector: &str) -> QuoteStyle {
+    let try_paths = if selector.is_empty() {
       vec!["[]".to_string(), "[0]".to_string()]
     } else {
-      vec![format!("{}[]", dot_path), format!("{}[0]", dot_path)]
+      vec![format!("{}[]", selector), format!("{}[0]", selector)]
     };
 
     for try_path in &try_paths {
@@ -22,16 +22,16 @@ impl Document {
       }
     }
 
-    if let Some(yaml_serde::Value::Sequence(sequence)) = self.get_value(dot_path).as_ref() {
+    if let Some(yaml_serde::Value::Sequence(sequence)) = self.get_value(selector).as_ref() {
       if let Some(yaml_serde::Value::Mapping(map)) = sequence.first() {
         if let Some((yaml_serde::Value::String(key_name), _)) = map.iter().next() {
-          let deep_path = if dot_path.is_empty() {
+          let deep_selector = if selector.is_empty() {
             format!("[].{}", key_name)
           } else {
-            format!("{}[].{}", dot_path, key_name)
+            format!("{}[].{}", selector, key_name)
           };
 
-          for scalar in self.get_all_typed(&deep_path) {
+          for scalar in self.get_all_typed(&deep_selector) {
             if scalar.kind == SyntaxKind::DOUBLE_QUOTED_SCALAR {
               return QuoteStyle::Double;
             } else if scalar.kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
@@ -45,27 +45,27 @@ impl Document {
     QuoteStyle::Plain
   }
 
-  pub fn insert_object(&mut self, dot_path: &str, json_value: &serde_json::Value, position: InsertPosition) -> Result<(), YerbaError> {
-    let quote_style = self.detect_sequence_quote_style(dot_path);
+  pub fn insert_object(&mut self, selector: &str, json_value: &serde_json::Value, position: InsertPosition) -> Result<(), YerbaError> {
+    let quote_style = self.detect_sequence_quote_style(selector);
     let yaml_text = crate::yaml_writer::json_to_yaml_text(json_value, &quote_style, 0);
 
-    self.insert_into(dot_path, &yaml_text, position)
+    self.insert_into(selector, &yaml_text, position)
   }
 
-  pub fn insert_objects(&mut self, dot_path: &str, json_values: &[serde_json::Value]) -> Result<(), YerbaError> {
+  pub fn insert_objects(&mut self, selector: &str, json_values: &[serde_json::Value]) -> Result<(), YerbaError> {
     if json_values.is_empty() {
       return Ok(());
     }
 
-    let quote_style = self.detect_sequence_quote_style(dot_path);
-    let current_node = self.navigate(dot_path)?;
+    let quote_style = self.detect_sequence_quote_style(selector);
+    let current_node = self.navigate(selector)?;
 
-    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(selector.to_string()))?;
 
     let entries: Vec<_> = sequence.entries().collect();
 
     if entries.is_empty() {
-      return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+      return Err(YerbaError::SelectorNotFound(selector.to_string()));
     }
 
     let indent = entries
@@ -88,60 +88,60 @@ impl Document {
     self.insert_after_node(last_entry.syntax(), &new_text)
   }
 
-  pub fn insert_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
-    self.insert_with(dot_path, value, position, false)
+  pub fn insert_into(&mut self, selector: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
+    self.insert_with(selector, value, position, false)
   }
 
-  pub fn insert_fragment_into(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
-    self.insert_with(dot_path, value, position, true)
+  pub fn insert_fragment_into(&mut self, selector: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
+    self.insert_with(selector, value, position, true)
   }
 
-  fn insert_with(&mut self, dot_path: &str, value: &str, position: InsertPosition, fragment: bool) -> Result<(), YerbaError> {
-    Self::validate_path(dot_path)?;
-    self.refuse_flow_target(dot_path)?;
+  fn insert_with(&mut self, selector: &str, value: &str, position: InsertPosition, fragment: bool) -> Result<(), YerbaError> {
+    Self::validate_selector(selector)?;
+    self.refuse_flow_target(selector)?;
 
-    if let Some((parent_path, _)) = dot_path.rsplit_once('.') {
-      if let Ok(parent) = self.navigate(parent_path) {
+    if let Some((parent_selector, _)) = selector.rsplit_once('.') {
+      if let Ok(parent) = self.navigate(parent_selector) {
         let occupied_flow = find_flow_map(&parent).map(|map| !flow_map_entries(&map).is_empty()).unwrap_or(false)
           || find_flow_sequence(&parent)
             .map(|sequence| !flow_sequence_entries(&sequence).is_empty())
             .unwrap_or(false);
 
         if occupied_flow {
-          return Err(YerbaError::FlowCollectionNotWritable(dot_path.to_string()));
+          return Err(YerbaError::FlowCollectionNotWritable(selector.to_string()));
         }
       }
     }
 
-    if crate::selector::Selector::parse(dot_path)
+    if crate::selector::Selector::parse(selector)
       .segments()
       .iter()
       .any(|segment| matches!(segment, crate::selector::SelectorSegment::AllKeys))
     {
-      return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+      return Err(YerbaError::SelectorNotFound(selector.to_string()));
     }
 
-    if let Ok(current_node) = self.navigate(dot_path) {
+    if let Ok(current_node) = self.navigate(selector) {
       if find_block_sequence(&current_node).is_some()
-        || matches!(self.get_value(dot_path).as_ref(), Some(yaml_serde::Value::Sequence(sequence)) if sequence.is_empty())
+        || matches!(self.get_value(selector).as_ref(), Some(yaml_serde::Value::Sequence(sequence)) if sequence.is_empty())
       {
-        return self.insert_sequence_item(dot_path, value, position);
+        return self.insert_sequence_item(selector, value, position);
       }
     }
 
-    let selector = crate::selector::Selector::parse(dot_path);
-    let has_wildcard = selector.has_wildcard() || selector.has_brackets();
-    let (parent_path, key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
+    let parsed = crate::selector::Selector::parse(selector);
+    let has_wildcard = parsed.has_wildcard() || parsed.has_brackets();
+    let (parent_selector, key) = selector.rsplit_once('.').unwrap_or(("", selector));
 
     if has_wildcard {
-      let count = self.navigate_all_compact(parent_path).len();
+      let count = self.navigate_all_compact(parent_selector).len();
 
       if count == 0 {
         return Ok(());
       }
 
       for i in (0..count).rev() {
-        let nodes = self.navigate_all_compact(parent_path);
+        let nodes = self.navigate_all_compact(parent_selector);
 
         let node = match nodes.get(i) {
           Some(node) => node.clone(),
@@ -156,10 +156,10 @@ impl Document {
               .any(|descendant| descendant.kind() == SyntaxKind::FLOW_MAP && !descendant.descendants().any(|child| child.kind() == SyntaxKind::FLOW_MAP_ENTRY));
 
             if has_empty_flow_map {
-              let selectors = self.resolve_selectors(parent_path);
+              let selectors = self.resolve_selectors(parent_selector);
 
-              if let Some(selector) = selectors.get(i) {
-                self.replace_empty_inline_map(selector, key, value)?;
+              if let Some(item_selector) = selectors.get(i) {
+                self.replace_empty_inline_map(item_selector, key, value)?;
                 continue;
               }
             }
@@ -226,24 +226,24 @@ impl Document {
       return Ok(());
     }
 
-    self.insert_map_key(parent_path, key, value, position, fragment)
+    self.insert_map_key(parent_selector, key, value, position, fragment)
   }
 
-  fn insert_sequence_item(&mut self, dot_path: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
-    let current_node = self.navigate(dot_path)?;
+  fn insert_sequence_item(&mut self, selector: &str, value: &str, position: InsertPosition) -> Result<(), YerbaError> {
+    let current_node = self.navigate(selector)?;
 
     let Some(sequence) = find_block_sequence(&current_node) else {
-      if matches!(self.get_value(dot_path).as_ref(), Some(yaml_serde::Value::Sequence(sequence)) if sequence.is_empty()) {
-        return self.replace_empty_inline_sequence(dot_path, value);
+      if matches!(self.get_value(selector).as_ref(), Some(yaml_serde::Value::Sequence(sequence)) if sequence.is_empty()) {
+        return self.replace_empty_inline_sequence(selector, value);
       }
 
-      return Err(YerbaError::NotASequence(dot_path.to_string()));
+      return Err(YerbaError::NotASequence(selector.to_string()));
     };
 
     let entries: Vec<_> = sequence.entries().collect();
 
     if entries.is_empty() {
-      return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+      return Err(YerbaError::SelectorNotFound(selector.to_string()));
     }
 
     let indent = entries
@@ -288,7 +288,7 @@ impl Document {
               .map(|text| text == target_value)
               .unwrap_or(false)
           })
-          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", dot_path, target_value)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", selector, target_value)))?;
 
         let target_range = target_entry.syntax().text_range();
         let replacement = format!("{}\n{}", new_item, indent);
@@ -307,7 +307,7 @@ impl Document {
               .map(|text| text == target_value)
               .unwrap_or(false)
           })
-          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", dot_path, target_value)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", selector, target_value)))?;
 
         let new_text = format!("\n{}{}", indent, new_item);
 
@@ -318,7 +318,7 @@ impl Document {
         let target_entry = entries
           .iter()
           .find(|entry| self.evaluate_condition_on_node(entry.syntax(), &condition))
-          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} condition '{}'", dot_path, condition)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} condition '{}'", selector, condition)))?;
 
         let target_range = target_entry.syntax().text_range();
         let replacement = format!("{}\n{}", new_item, indent);
@@ -331,7 +331,7 @@ impl Document {
         let target_entry = entries
           .iter()
           .find(|entry| self.evaluate_condition_on_node(entry.syntax(), &condition))
-          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} condition '{}'", dot_path, condition)))?;
+          .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} condition '{}'", selector, condition)))?;
 
         let new_text = format!("\n{}{}", indent, new_item);
 
@@ -347,8 +347,8 @@ impl Document {
     }
   }
 
-  fn insert_map_key(&mut self, dot_path: &str, key: &str, value: &str, position: InsertPosition, fragment: bool) -> Result<(), YerbaError> {
-    let current_node = self.navigate(dot_path)?;
+  fn insert_map_key(&mut self, selector: &str, key: &str, value: &str, position: InsertPosition, fragment: bool) -> Result<(), YerbaError> {
+    let current_node = self.navigate(selector)?;
 
     let map = match find_block_map(&current_node) {
       Some(map) => map,
@@ -359,11 +359,11 @@ impl Document {
           let is_empty = !flow_map_node.descendants().any(|descendant| descendant.kind() == SyntaxKind::FLOW_MAP_ENTRY);
 
           if is_empty {
-            return self.replace_empty_inline_map(dot_path, key, value);
+            return self.replace_empty_inline_map(selector, key, value);
           }
         }
 
-        return Err(YerbaError::SelectorNotFound(dot_path.to_string()));
+        return Err(YerbaError::SelectorNotFound(selector.to_string()));
       }
     };
 
@@ -377,7 +377,7 @@ impl Document {
     }
 
     if find_entry_by_key(&map, key).is_some() {
-      return Err(YerbaError::ParseError(format!("key '{}' already exists at '{}'", key, dot_path)));
+      return Err(YerbaError::ParseError(format!("key '{}' already exists at '{}'", key, selector)));
     }
 
     let indent = entries
@@ -413,7 +413,7 @@ impl Document {
       }
 
       InsertPosition::Before(target_key) => {
-        let target_entry = find_entry_by_key(&map, &target_key).ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", dot_path, target_key)))?;
+        let target_entry = find_entry_by_key(&map, &target_key).ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", selector, target_key)))?;
 
         let target_range = target_entry.syntax().text_range();
         let replacement = format!("{}\n{}", new_entry_text, indent);
@@ -423,14 +423,14 @@ impl Document {
       }
 
       InsertPosition::After(target_key) => {
-        let target_entry = find_entry_by_key(&map, &target_key).ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", dot_path, target_key)))?;
+        let target_entry = find_entry_by_key(&map, &target_key).ok_or_else(|| YerbaError::SelectorNotFound(format!("{}.{}", selector, target_key)))?;
 
         let new_text = format!("\n{}{}", indent, new_entry_text);
 
         self.insert_after_node(target_entry.syntax(), &new_text)
       }
 
-      InsertPosition::BeforeCondition(_) | InsertPosition::AfterCondition(_) => self.insert_map_key(dot_path, key, value, InsertPosition::Last, fragment),
+      InsertPosition::BeforeCondition(_) | InsertPosition::AfterCondition(_) => self.insert_map_key(selector, key, value, InsertPosition::Last, fragment),
 
       InsertPosition::FromSortOrder(order) => {
         let new_key_position = order.iter().position(|ordered_key| ordered_key == key);
@@ -455,19 +455,19 @@ impl Document {
           None => InsertPosition::Last,
         };
 
-        self.insert_map_key(dot_path, key, value, resolved, fragment)
+        self.insert_map_key(selector, key, value, resolved, fragment)
       }
     }
   }
 
-  fn replace_empty_inline_map(&mut self, dot_path: &str, key: &str, value: &str) -> Result<(), YerbaError> {
-    let current_node = self.navigate(dot_path)?;
+  fn replace_empty_inline_map(&mut self, selector: &str, key: &str, value: &str) -> Result<(), YerbaError> {
+    let current_node = self.navigate(selector)?;
 
-    if dot_path.is_empty() {
+    if selector.is_empty() {
       let flow_map = current_node
         .descendants()
         .find(|descendant| descendant.kind() == SyntaxKind::FLOW_MAP)
-        .ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+        .ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
       let range = flow_map.text_range();
 
@@ -482,12 +482,12 @@ impl Document {
       return self.apply_edit(adjusted_range, &replacement);
     }
 
-    let (parent_path, map_key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
-    let parent_node = self.navigate(parent_path)?;
+    let (parent_selector, map_key) = selector.rsplit_once('.').unwrap_or(("", selector));
+    let parent_node = self.navigate(parent_selector)?;
 
-    let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
-    let entry = find_entry_by_key(&map, map_key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let entry = find_entry_by_key(&map, map_key).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
     let entry_indent = preceding_whitespace_indent(entry.syntax());
     let child_indent = format!("{}  ", entry_indent);
     let new_entry_text = format!("{}{}: {}", child_indent, key, value);
@@ -505,13 +505,13 @@ impl Document {
     self.apply_edit(range, &replacement)
   }
 
-  fn replace_empty_inline_sequence(&mut self, dot_path: &str, value: &str) -> Result<(), YerbaError> {
-    if dot_path.is_empty() {
-      let current_node = self.navigate(dot_path)?;
+  fn replace_empty_inline_sequence(&mut self, selector: &str, value: &str) -> Result<(), YerbaError> {
+    if selector.is_empty() {
+      let current_node = self.navigate(selector)?;
       let flow_sequence = current_node
         .descendants()
         .find(|descendant| descendant.kind() == SyntaxKind::FLOW_SEQ)
-        .ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+        .ok_or_else(|| YerbaError::NotASequence(selector.to_string()))?;
 
       let new_item = Self::format_sequence_item(value, "");
       let range = flow_sequence.text_range();
@@ -528,15 +528,15 @@ impl Document {
       return self.apply_edit(adjusted_range, &replacement);
     }
 
-    let (parent_path, key) = dot_path.rsplit_once('.').unwrap_or(("", dot_path));
-    let parent_node = self.navigate(parent_path)?;
+    let (parent_selector, key) = selector.rsplit_once('.').unwrap_or(("", selector));
+    let parent_node = self.navigate(parent_selector)?;
 
-    let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let map = find_block_map(&parent_node).ok_or_else(|| YerbaError::NotASequence(selector.to_string()))?;
 
-    let entry = find_entry_by_key(&map, key).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let entry = find_entry_by_key(&map, key).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
     let item_indent = format!("{}  ", preceding_whitespace_indent(entry.syntax()));
     let new_item = Self::format_sequence_item(value, &item_indent);
-    let current_node = self.navigate(dot_path)?;
+    let current_node = self.navigate(selector)?;
     let inline_comment = self.trailing_inline_comment(&current_node);
 
     let mut range = current_node.text_range();

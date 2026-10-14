@@ -309,14 +309,14 @@ fn format_duration(elapsed: std::time::Duration) -> String {
 
 pub(crate) fn resolve_move_indexes(
   document: &yerba::Document,
-  path: &str,
+  selector: &str,
   item: &str,
   before: Option<String>,
   after: Option<String>,
   to: Option<usize>,
   resolve: impl Fn(&yerba::Document, &str, &str) -> Result<usize, yerba::YerbaError>,
 ) -> (usize, usize) {
-  let from_index = resolve(document, path, item).unwrap_or_else(|error| {
+  let from_index = resolve(document, selector, item).unwrap_or_else(|error| {
     eprintln!("{} {}", ui::failure("Error:"), error);
     process::exit(1);
   });
@@ -324,7 +324,7 @@ pub(crate) fn resolve_move_indexes(
   let to_index = if let Some(index) = to {
     index
   } else if let Some(target) = &before {
-    let target_index = resolve(document, path, target).unwrap_or_else(|error| {
+    let target_index = resolve(document, selector, target).unwrap_or_else(|error| {
       eprintln!("{} {}", ui::failure("Error:"), error);
       process::exit(1);
     });
@@ -335,7 +335,7 @@ pub(crate) fn resolve_move_indexes(
       target_index
     }
   } else if let Some(target) = &after {
-    let target_index = resolve(document, path, target).unwrap_or_else(|error| {
+    let target_index = resolve(document, selector, target).unwrap_or_else(|error| {
       eprintln!("{} {}", ui::failure("Error:"), error);
       process::exit(1);
     });
@@ -417,7 +417,7 @@ pub(crate) fn run_op_with_hint(display_file: &str, document: &yerba::Document, r
   }
 }
 
-pub(crate) fn show_similar_selectors(file: &str, document: &yerba::Document, invalid_path: &str) {
+pub(crate) fn show_similar_selectors(file: &str, document: &yerba::Document, invalid_selector: &str) {
   use yerba::didyoumean::didyoumean_ranked;
 
   let selectors = document.selectors();
@@ -426,7 +426,7 @@ pub(crate) fn show_similar_selectors(file: &str, document: &yerba::Document, inv
     return;
   }
 
-  let query = invalid_path.split_whitespace().next().unwrap_or(invalid_path);
+  let query = invalid_selector.split_whitespace().next().unwrap_or(invalid_selector);
   let threshold = query.len() / 2 + 3;
   let close = didyoumean_ranked(query, &selectors, threshold);
 
@@ -470,11 +470,11 @@ pub(crate) fn output(file: &str, document: &yerba::Document, dry_run: bool) {
 }
 
 pub(crate) fn default_insert_position(file: &str, selector: &str) -> yerba::InsertPosition {
-  let parent_path = selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+  let parent_selector = selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
   yerba::Yerbafile::find()
     .and_then(|yerbafile_path| yerba::Yerbafile::load(&yerbafile_path).ok())
-    .and_then(|yerbafile| yerbafile.sort_order_for(file, parent_path))
+    .and_then(|yerbafile| yerbafile.sort_order_for(file, parent_selector))
     .map(yerba::InsertPosition::FromSortOrder)
     .unwrap_or(yerba::InsertPosition::Last)
 }

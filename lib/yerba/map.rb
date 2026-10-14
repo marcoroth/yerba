@@ -145,7 +145,7 @@ module Yerba
     #
     # When +key+ is given and the map is connected to a document, deletes that key
     # from the map in the YAML document. When no +key+ is given and the map is
-    # connected, removes the entire map node at its selector path. When not connected
+    # connected, removes the entire map node at its selector. When not connected
     # to a document, delegates to the underlying Hash.
     #
     # Returns +self+.

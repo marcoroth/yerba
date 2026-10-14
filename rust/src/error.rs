@@ -27,13 +27,13 @@ impl std::fmt::Display for YerbaError {
       YerbaError::ParseError(msg) => write!(f, "parse error: {}", msg),
       YerbaError::IoError(err) => write!(f, "io error: {}", err),
       YerbaError::SelectorNotFound(selector) => write!(f, "selector not found: {}", selector),
-      YerbaError::NotASequence(path) => write!(f, "not a sequence: {}", path),
+      YerbaError::NotASequence(selector) => write!(f, "not a sequence: {}", selector),
 
-      YerbaError::FlowCollectionNotWritable(path) => {
+      YerbaError::FlowCollectionNotWritable(selector) => {
         write!(
           f,
           "cannot write to \"{}\": flow collections are not writable yet. Convert it to block style first, with `collection_style` or `yerba collection-style`",
-          path
+          selector
         )
       }
 

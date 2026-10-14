@@ -45,9 +45,9 @@ pub struct Args {
 impl Args {
   pub fn run(self) {
     let selector = yerba::Selector::parse(&self.selector);
-    let condition_path = self.condition.as_deref().map(yerba::Selector::parse);
+    let condition_selector = self.condition.as_deref().map(yerba::Selector::parse);
     let select_fields: Option<Vec<&str>> = self.select.as_deref().map(|fields| fields.split(',').collect());
-    let (search_path, extract_field) = self.resolve_search_scope(&selector, condition_path.as_ref());
+    let (search_selector, extract_field) = self.resolve_search_scope(&selector, condition_selector.as_ref());
 
     let normalized_condition = self.condition.as_ref().map(|condition| {
       if !condition.starts_with('.') {
@@ -73,7 +73,7 @@ impl Args {
       }
     }
 
-    let search_path_string = search_path.to_selector_string();
+    let search_selector_string = search_selector.to_selector_string();
     let mut all_results: Vec<serde_json::Value> = Vec::new();
     let files = resolve_files(&self.file);
     let is_glob = files.len() > 1;
@@ -97,10 +97,10 @@ impl Args {
 
         for field in fields {
           let field_trimmed = field.trim().trim_start_matches('.');
-          let full_selector = if search_path_string.is_empty() {
+          let full_selector = if search_selector_string.is_empty() {
             field_trimmed.to_string()
           } else {
-            format!("{}.{}", search_path_string, field_trimmed)
+            format!("{}.{}", search_selector_string, field_trimmed)
           };
 
           if !document.exists(&full_selector) {
@@ -122,24 +122,24 @@ impl Args {
 
       let (values, selectors, lines): (Vec<yaml_serde::Value>, Vec<String>, Vec<usize>) = if select_fields.is_some() {
         if let Some(condition) = &normalized_condition {
-          let triples = document.filter_with_selectors(&search_path_string, condition).unwrap_or_default();
+          let triples = document.filter_with_selectors(&search_selector_string, condition).unwrap_or_default();
           let (values, rest): (Vec<_>, Vec<_>) = triples.into_iter().map(|(v, s, l)| (v, (s, l))).unzip();
           let (selectors, lines): (Vec<_>, Vec<_>) = rest.into_iter().unzip();
 
           (values, selectors, lines)
         } else {
-          let located = document.get_all_located(&search_path_string);
+          let located = document.get_all_located(&search_selector_string);
           let selectors = located.iter().map(|n| n.selector.clone()).collect();
           let lines = located.iter().map(|n| n.line).collect();
-          let values = document.get_values(&search_path_string);
+          let values = document.get_values(&search_selector_string);
           let values: Vec<_> = values.into_iter().filter(|v| !v.is_null()).collect();
 
           (values, selectors, lines)
         }
       } else if let Some(condition) = &normalized_condition {
-        (document.filter(&search_path_string, condition).unwrap_or_default(), Vec::new(), Vec::new())
+        (document.filter(&search_selector_string, condition).unwrap_or_default(), Vec::new(), Vec::new())
       } else {
-        (document.get_values(&search_path_string), Vec::new(), Vec::new())
+        (document.get_values(&search_selector_string), Vec::new(), Vec::new())
       };
 
       for (index, value) in values.iter().enumerate() {
@@ -216,8 +216,8 @@ impl Args {
     }
   }
 
-  fn resolve_search_scope(&self, selector: &yerba::Selector, condition_path: Option<&yerba::Selector>) -> (yerba::Selector, Option<yerba::Selector>) {
-    if let Some(condition) = condition_path {
+  fn resolve_search_scope(&self, selector: &yerba::Selector, condition_selector: Option<&yerba::Selector>) -> (yerba::Selector, Option<yerba::Selector>) {
+    if let Some(condition) = condition_selector {
       if condition.is_relative() {
         let (container, field) = selector.split_at_last_bracket();
 

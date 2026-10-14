@@ -10,7 +10,7 @@ module Yerba
   #   Yerba::Selector.parse("database.*").segments    # => ["database", :all_keys]
   #   Yerba::Selector.parse(".title").relative?       # => true
   #
-  # Keys are Strings, indexes Integers, `[]` is `:all_items` and `*` is `:all_keys`.
+  # Keys are Strings, indexes Integers (negative from the end), `[]` is `:all_items` and `*` is `:all_keys`.
   #
   class Selector
     ALL_KEYS = :all_keys

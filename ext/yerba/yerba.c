@@ -294,9 +294,24 @@ static VALUE document_bracket(VALUE self, VALUE path) {
     return array;
   }
 
-  YerbaGetResult result = yerba_document_get(document, selector);
+  VALUE concrete_path = path;
 
-  return node_from_get_result(result, self, path);
+  if (strstr(selector, "[-") != NULL) {
+    char *json = yerba_document_resolve_selectors(document, selector);
+
+    if (json) {
+      VALUE json_string = make_utf8_string(json);
+      yerba_string_free(json);
+
+      VALUE resolved = rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+
+      if (RARRAY_LEN(resolved) > 0) concrete_path = rb_ary_entry(resolved, 0);
+    }
+  }
+
+  YerbaGetResult result = yerba_document_get(document, StringValueCStr(path));
+
+  return node_from_get_result(result, self, concrete_path);
 }
 
 /* document.exists?(path) */

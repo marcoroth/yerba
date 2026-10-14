@@ -65,8 +65,14 @@ class SelectorTest < Minitest::Spec
     assert_equal "", Yerba::Selector.build([]).to_s
   end
 
+  test "parses and builds indexes from the end as negative Integers" do
+    assert_equal ["tags", -1], Yerba::Selector.parse("tags[-1]").segments
+    assert_equal [-2, "talks", -1], Yerba::Selector.parse("[-2].talks[-1]").segments
+    assert_equal "tags[-1]", Yerba::Selector.build(["tags", -1]).to_s
+  end
+
   test "round-trips through parse and build" do
-    ["[3].talks[1]", "database.host", "[].speakers[].name", "database.*", "[0]", "[]"].each do |string|
+    ["[3].talks[1]", "database.host", "[].speakers[].name", "database.*", "[0]", "[]", "tags[-1]", "[-2].talks[-1]"].each do |string|
       assert_equal string, Yerba::Selector.build(Yerba::Selector.parse(string).segments).to_s
     end
   end
@@ -89,7 +95,7 @@ class SelectorTest < Minitest::Spec
             title: Lightning Two
     YAML
 
-    ["[0]", "[0].talks", "[0].talks[1]", "[0].talks[1].title", "[0].id"].each do |string|
+    ["[0]", "[0].talks", "[0].talks[1]", "[0].talks[1].title", "[0].id", "[-1].talks[-1].title", "[0].talks[-2].id"].each do |string|
       assert_equal document.value_at(string), Yerba::Selector.parse(string).dig(document.values), string
     end
   end
@@ -98,6 +104,7 @@ class SelectorTest < Minitest::Spec
     values = Yerba.parse("- id: a\n").values
 
     assert_nil Yerba::Selector.parse("[5].talks[0]").dig(values)
+    assert_nil Yerba::Selector.parse("[-2]").dig(values)
     assert_nil Yerba::Selector.parse("[0].id.nested").dig(values)
     assert_nil Yerba::Selector.parse("[0][1]").dig(values)
   end

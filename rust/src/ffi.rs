@@ -362,7 +362,7 @@ pub unsafe extern "C" fn yerba_selector_has_wildcard(path: *const c_char) -> boo
 
 /// Parses a selector into JSON: `{"relative": bool, "segments": [...]}`.
 ///
-/// Keys are encoded as strings, indexes as integers, `[]` as `{"all": "items"}` and `*` as `{"all": "keys"}`.
+/// Keys are encoded as strings, indexes as integers (negative from the end), `[]` as `{"all": "items"}` and `*` as `{"all": "keys"}`.
 #[no_mangle]
 pub unsafe extern "C" fn yerba_selector_parse(path: *const c_char) -> *mut c_char {
   use crate::selector::{Selector, SelectorSegment};
@@ -376,6 +376,7 @@ pub unsafe extern "C" fn yerba_selector_parse(path: *const c_char) -> *mut c_cha
     .map(|segment| match segment {
       SelectorSegment::Key(key) => serde_json::json!(key),
       SelectorSegment::Index(index) => serde_json::json!(index),
+      SelectorSegment::IndexFromEnd(offset) => serde_json::json!(-(*offset.min(&(i64::MAX as usize)) as i64)),
       SelectorSegment::AllItems => serde_json::json!({ "all": "items" }),
       SelectorSegment::AllKeys => serde_json::json!({ "all": "keys" }),
     })
@@ -398,7 +399,10 @@ pub unsafe extern "C" fn yerba_selector_build(segments_json: *const c_char, rela
     .iter()
     .filter_map(|value| match value {
       serde_json::Value::String(key) => Some(SelectorSegment::Key(key.clone())),
-      serde_json::Value::Number(number) => number.as_u64().map(|index| SelectorSegment::Index(index as usize)),
+      serde_json::Value::Number(number) => match number.as_i64() {
+        Some(index) if index < 0 => Some(SelectorSegment::IndexFromEnd(index.unsigned_abs() as usize)),
+        _ => number.as_u64().map(|index| SelectorSegment::Index(index as usize)),
+      },
       serde_json::Value::Object(object) => match object.get("all").and_then(|all| all.as_str()) {
         Some("items") => Some(SelectorSegment::AllItems),
         Some("keys") => Some(SelectorSegment::AllKeys),

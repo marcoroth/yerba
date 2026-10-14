@@ -23,6 +23,17 @@ pub enum SelectorSegment {
   AllItems,
   AllKeys,
   Index(usize),
+  IndexFromEnd(usize),
+}
+
+impl SelectorSegment {
+  pub(crate) fn sequence_index(&self, length: usize) -> Option<usize> {
+    match self {
+      SelectorSegment::Index(index) => (*index < length).then_some(*index),
+      SelectorSegment::IndexFromEnd(offset) => (*offset <= length).then(|| length - offset),
+      _ => None,
+    }
+  }
 }
 
 impl Selector {
@@ -59,14 +70,17 @@ impl Selector {
   }
 
   pub fn ends_with_bracket(&self) -> bool {
-    matches!(self.segments().last(), Some(SelectorSegment::AllItems | SelectorSegment::Index(_)))
+    matches!(
+      self.segments().last(),
+      Some(SelectorSegment::AllItems | SelectorSegment::Index(_) | SelectorSegment::IndexFromEnd(_))
+    )
   }
 
   pub fn has_brackets(&self) -> bool {
     self
       .segments()
       .iter()
-      .any(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::Index(_)))
+      .any(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::Index(_) | SelectorSegment::IndexFromEnd(_)))
   }
 
   pub fn has_wildcard(&self) -> bool {
@@ -88,7 +102,7 @@ impl Selector {
 
     let last_bracket = segments
       .iter()
-      .rposition(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::Index(_)));
+      .rposition(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::Index(_) | SelectorSegment::IndexFromEnd(_)));
 
     match last_bracket {
       Some(position) => {
@@ -110,7 +124,9 @@ impl Selector {
   pub fn split_at_first_bracket(&self) -> (Selector, Selector) {
     let segments = self.segments();
 
-    let first_bracket = segments.iter().position(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::Index(_)));
+    let first_bracket = segments
+      .iter()
+      .position(|s| matches!(s, SelectorSegment::AllItems | SelectorSegment::Index(_) | SelectorSegment::IndexFromEnd(_)));
 
     match first_bracket {
       Some(position) => {
@@ -178,6 +194,10 @@ impl Selector {
         SelectorSegment::Index(i) => {
           result.push_str(&format!("[{}]", i));
         }
+
+        SelectorSegment::IndexFromEnd(i) => {
+          result.push_str(&format!("[-{}]", i));
+        }
       }
     }
 
@@ -212,8 +232,8 @@ fn parse_segments(input: &str) -> Vec<SelectorSegment> {
 
         if inner.is_empty() {
           segments.push(SelectorSegment::AllItems);
-        } else if let Ok(index) = inner.parse::<usize>() {
-          segments.push(SelectorSegment::Index(index));
+        } else if let Some(index) = parse_index(inner) {
+          segments.push(index);
         }
 
         rest = &rest[close + 1..];
@@ -265,4 +285,21 @@ fn parse_segments(input: &str) -> Vec<SelectorSegment> {
   }
 
   segments
+}
+
+fn parse_index(input: &str) -> Option<SelectorSegment> {
+  if input.bytes().all(|byte| byte.is_ascii_digit()) {
+    return Some(SelectorSegment::Index(input.parse::<usize>().unwrap_or(usize::MAX)));
+  }
+
+  let digits = input.strip_prefix('-')?;
+
+  if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+    return None;
+  }
+
+  match digits.parse::<usize>().unwrap_or(usize::MAX) {
+    0 => Some(SelectorSegment::Index(0)),
+    offset => Some(SelectorSegment::IndexFromEnd(offset)),
+  }
 }

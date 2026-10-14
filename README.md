@@ -96,6 +96,7 @@ Selectors let you address any node in a YAML document:
 | `key.nested`      | Nested key path     | `"database.settings.pool"` |
 | `[]`              | All items in array  | `"[].title"`               |
 | `[N]`             | Item at index       | `"[0].title"`              |
+| `[-N]`            | Item from the end   | `"[-1].title"`             |
 | `*`               | All values in a map | `"database.*"`             |
 | `[].key[].nested` | Nested array access | `"[].speakers[].name"`     |
 
@@ -1172,7 +1173,7 @@ scalars.first.document.save!
 
 ### Parsing Selectors
 
-`Yerba::Selector` splits a selector into its segments, using the same parser as the rest of Yerba. Keys are Strings, indexes Integers, `[]` is `:all_items` and `*` is `:all_keys`:
+`Yerba::Selector` splits a selector into its segments, using the same parser as the rest of Yerba. Keys are Strings, indexes Integers (negative from the end), `[]` is `:all_items` and `*` is `:all_keys`:
 
 ```ruby
 selector = Yerba::Selector.parse("[3].talks[1]")
@@ -1183,6 +1184,7 @@ selector.join("speakers", 0).to_s  # => "[3].talks[1].speakers[0]"
 
 Yerba::Selector.parse("[].speakers[]").segments  # => [:all_items, "speakers", :all_items]
 Yerba::Selector.parse(".title").relative?        # => true
+Yerba::Selector.parse("tags[-1]").segments       # => ["tags", -1]
 
 Yerba::Selector.build([3, "talks", 1]).to_s      # => "[3].talks[1]"
 ```

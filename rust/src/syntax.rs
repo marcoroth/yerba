@@ -328,8 +328,7 @@ pub fn needs_quoting_in_flow(value: &str) -> bool {
   is_yaml_non_string(value) || resolves_to_non_string_in_psych(value) || !is_plain_safe_in_flow(value)
 }
 
-/// Psych loads dates, times and symbols as `Date`, `Time` and `Symbol`, which Yerba reads as strings,
-/// and raises on float-shaped values like `.e+5`, so those need quoting even though they read as strings.
+/// Psych loads these as `Date`, `Time` or `Symbol`, or raises (`.e+5`), so they need quotes although Yerba reads them as strings.
 pub fn resolves_to_non_string_in_psych(value: &str) -> bool {
   !matches!(resolve_plain_scalar(value), PlainScalar::String)
     || is_psych_float(value)
@@ -366,8 +365,6 @@ pub fn resolve_scalar(scalar: &ScalarValue) -> PlainScalar {
   resolve_plain_scalar(&scalar.text)
 }
 
-/// Resolves a plain scalar the way Psych's `ScalarScanner#tokenize` does (YAML 1.1 with Psych's
-/// extensions, legacy integers included), except that dates, times and symbols stay strings.
 pub fn resolve_plain_scalar(value: &str) -> PlainScalar {
   if value.is_empty() {
     return PlainScalar::Null;
@@ -493,7 +490,6 @@ fn sexagesimal_value(value: &str) -> PlainScalar {
   integer_or_float(integer_total, float_total)
 }
 
-/// The leading number Ruby's `String#to_i` (or `#to_f` with `fraction`) reads, without underscores.
 fn ruby_number_prefix(text: &str, fraction: bool) -> String {
   let bytes = text.as_bytes();
   let mut number = String::new();

@@ -88,5 +88,14 @@ module Document
     ensure
       file&.unlink
     end
+
+    test "values passes its JSON options as keywords" do
+      original = JSON.method(:parse)
+      JSON.define_singleton_method(:parse) { |source, **options| original.call(source, **options) }
+
+      assert_equal({ "a" => Float::INFINITY }, Yerba.parse("a: .inf\n").values)
+    ensure
+      JSON.define_singleton_method(:parse, original)
+    end
   end
 end

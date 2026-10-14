@@ -359,7 +359,9 @@ static VALUE document_get_value(VALUE self, VALUE path) {
   VALUE options = rb_hash_new();
   rb_hash_aset(options, ID2SYM(rb_intern("allow_nan")), Qtrue);
 
-  return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 2, json_string, options);
+  VALUE arguments[] = {json_string, options};
+
+  return rb_funcallv_kw(rb_path2class("JSON"), rb_intern("parse"), 2, arguments, RB_PASS_KEYWORDS);
 }
 
 /* document.values → the whole document as Ruby objects, cached until the document changes */

@@ -633,10 +633,10 @@ pub unsafe extern "C" fn yerba_document_insert(
     InsertPosition::At(at as usize)
   } else if !before.is_null() {
     let target = CStr::from_ptr(before).to_str().unwrap_or("");
-    InsertPosition::Before(target.to_string())
+    InsertPosition::before(target)
   } else if !after.is_null() {
     let target = CStr::from_ptr(after).to_str().unwrap_or("");
-    InsertPosition::After(target.to_string())
+    InsertPosition::after(target)
   } else {
     InsertPosition::Last
   };
@@ -675,10 +675,10 @@ pub unsafe extern "C" fn yerba_document_insert_object(
     InsertPosition::At(at as usize)
   } else if !before.is_null() {
     let target = CStr::from_ptr(before).to_str().unwrap_or("");
-    InsertPosition::Before(target.to_string())
+    InsertPosition::before(target)
   } else if !after.is_null() {
     let target = CStr::from_ptr(after).to_str().unwrap_or("");
-    InsertPosition::After(target.to_string())
+    InsertPosition::after(target)
   } else {
     InsertPosition::Last
   };

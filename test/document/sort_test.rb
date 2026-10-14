@@ -244,5 +244,75 @@ module Document
       assert_equal "Alice", document.value_at("items[0].name")
       assert_equal "Charlie", document.value_at("items[1].name")
     end
+
+    test "document.sort with an Array of fields sorts by each in turn" do
+      document = Yerba::Document.parse(<<~YAML)
+        - id: late
+          date: "2025-01-02"
+        - id: second
+          date: "2025-01-01"
+          start_time: "11:00"
+        - id: first
+          date: "2025-01-01"
+          start_time: "10:00"
+      YAML
+
+      document.sort(by: [:date, :start_time])
+
+      assert_equal ["first", "second", "late"], document.value_at("[].id")
+    end
+
+    test "document.sort with space separated fields sorts by each in turn" do
+      document = Yerba::Document.parse(<<~YAML)
+        - id: late
+          date: "2025-01-02"
+        - id: second
+          date: "2025-01-01"
+          start_time: "11:00"
+        - id: first
+          date: "2025-01-01"
+          start_time: "10:00"
+      YAML
+
+      document.sort(by: ".date .start_time")
+
+      assert_equal ["first", "second", "late"], document.value_at("[].id")
+    end
+
+    test "document.sort with a comma separated order String sorts in that order" do
+      document = Yerba::Document.parse(<<~YAML)
+        - id: a
+        - id: b
+        - id: c
+      YAML
+
+      document.sort(by: ".id", order: "c,a,b")
+
+      assert_equal ["c", "a", "b"], document.value_at("[].id")
+    end
+
+    test "document.sort with order: :asc sorts ascending" do
+      document = Yerba::Document.parse(<<~YAML)
+        - name: Charlie
+        - name: Alice
+      YAML
+
+      document.sort(by: "name", order: :asc)
+
+      assert_equal ["Alice", "Charlie"], document.value_at("[].name")
+    end
+
+    test "sequence.sort passes order through" do
+      document = Yerba::Document.parse(<<~YAML)
+        tags:
+          - go
+          - ruby
+          - rust
+      YAML
+
+      document["tags"].sort(order: ["rust", "go", "ruby"])
+
+      assert_equal ["rust", "go", "ruby"], document.value_at("tags")
+    end
   end
 end

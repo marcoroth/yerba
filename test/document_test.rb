@@ -344,6 +344,28 @@ class DocumentTest < Minitest::Spec
     assert_includes output, "2015"
   end
 
+  test "insert_object after a condition inserts after the matching item" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: a
+      - id: b
+    YAML
+
+    document.insert_object("", { id: "x" }, after: ".id == a")
+
+    assert_equal ["a", "x", "b"], document.value_at("[].id")
+  end
+
+  test "insert_object before a condition inserts before the matching item" do
+    document = Yerba::Document.parse(<<~YAML)
+      - id: a
+      - id: b
+    YAML
+
+    document.insert_object("", { id: "x" }, before: ".id == b")
+
+    assert_equal ["a", "x", "b"], document.value_at("[].id")
+  end
+
   test "delete removes a key" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice

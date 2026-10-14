@@ -2040,3 +2040,38 @@ fn test_escapes_step_is_a_no_op_when_nothing_is_escaped() {
 
   assert!(!changed);
 }
+
+#[test]
+fn test_sort_step_sorts_by_space_separated_fields() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/*.yml"
+        pipeline:
+          - sort:
+              by: ".date .start_time"
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  let mut document = yerba::Document::parse(indoc! {r#"
+    - id: late
+      date: "2025-01-02"
+    - id: second
+      date: "2025-01-01"
+      start_time: "11:00"
+    - id: first
+      date: "2025-01-01"
+      start_time: "10:00"
+  "#})
+  .unwrap();
+
+  let changed = yerbafile.apply_to_document(&mut document, "data/videos.yml").unwrap();
+
+  assert!(changed);
+  assert_eq!(document.get_all("[].id"), vec!["first", "second", "late"]);
+}

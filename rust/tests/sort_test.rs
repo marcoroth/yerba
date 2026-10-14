@@ -232,6 +232,36 @@ fn test_sort_field_parse_list() {
 }
 
 #[test]
+fn test_sort_field_parse_list_with_spaces() {
+  let fields = SortField::parse_list(".date .start_time:desc  .end_time");
+
+  assert_eq!(fields.len(), 3);
+  assert_eq!(fields[0].path, ".date");
+  assert_eq!(fields[1].path, ".start_time");
+  assert!(!fields[1].ascending);
+  assert_eq!(fields[2].path, ".end_time");
+}
+
+#[test]
+fn test_sort_field_parse_list_with_commas_and_spaces() {
+  let fields = SortField::parse_list(".date, .title");
+
+  assert_eq!(fields.len(), 2);
+  assert_eq!(fields[0].path, ".date");
+  assert_eq!(fields[1].path, ".title");
+}
+
+#[test]
+fn test_sort_field_parse_list_keeps_separators_inside_brackets_and_quotes() {
+  let fields = SortField::parse_list(r#".["first name"] .['a,b'] .title"#);
+
+  assert_eq!(fields.len(), 3);
+  assert_eq!(fields[0].path, r#".["first name"]"#);
+  assert_eq!(fields[1].path, ".['a,b']");
+  assert_eq!(fields[2].path, ".title");
+}
+
+#[test]
 fn test_sort_preserves_comments() {
   let mut document = parse(indoc! {"
     # tags

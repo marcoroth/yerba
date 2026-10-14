@@ -83,7 +83,35 @@ impl SortField {
   }
 
   pub fn parse_list(input: &str) -> Vec<Self> {
-    input.split(',').map(|field| SortField::parse(field.trim())).collect()
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut depth = 0usize;
+    let mut quote: Option<char> = None;
+
+    for character in input.chars() {
+      match (quote, character) {
+        (Some(open), _) if character == open => quote = None,
+        (Some(_), _) => {}
+        (None, '"' | '\'') => quote = Some(character),
+        (None, '[') => depth += 1,
+        (None, ']') => depth = depth.saturating_sub(1),
+        (None, ',') if depth == 0 => {
+          fields.push(std::mem::take(&mut current));
+          continue;
+        }
+        (None, _) if character.is_whitespace() && depth == 0 => {
+          fields.push(std::mem::take(&mut current));
+          continue;
+        }
+        _ => {}
+      }
+
+      current.push(character);
+    }
+
+    fields.push(current);
+
+    fields.iter().filter(|field| !field.is_empty()).map(|field| SortField::parse(field)).collect()
   }
 }
 
@@ -126,6 +154,28 @@ pub enum InsertPosition {
   BeforeCondition(String),
   AfterCondition(String),
   FromSortOrder(Vec<String>),
+}
+
+impl InsertPosition {
+  pub fn before(target: impl Into<String>) -> Self {
+    let target = target.into();
+
+    if target.starts_with('.') {
+      InsertPosition::BeforeCondition(target)
+    } else {
+      InsertPosition::Before(target)
+    }
+  }
+
+  pub fn after(target: impl Into<String>) -> Self {
+    let target = target.into();
+
+    if target.starts_with('.') {
+      InsertPosition::AfterCondition(target)
+    } else {
+      InsertPosition::After(target)
+    }
+  }
 }
 
 static NEXT_GENERATION: AtomicU64 = AtomicU64::new(1);

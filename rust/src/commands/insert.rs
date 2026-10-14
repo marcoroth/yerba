@@ -86,17 +86,9 @@ impl Args {
     let position = if let Some(index) = self.at {
       yerba::InsertPosition::At(index)
     } else if let Some(target) = self.before {
-      if target.starts_with('.') {
-        yerba::InsertPosition::BeforeCondition(target)
-      } else {
-        yerba::InsertPosition::Before(target)
-      }
+      yerba::InsertPosition::before(target)
     } else if let Some(target) = self.after {
-      if target.starts_with('.') {
-        yerba::InsertPosition::AfterCondition(target)
-      } else {
-        yerba::InsertPosition::After(target)
-      }
+      yerba::InsertPosition::after(target)
     } else {
       yerba::Yerbafile::find()
         .and_then(|yerbafile_path| yerba::Yerbafile::load(&yerbafile_path).ok())

@@ -853,27 +853,46 @@ static VALUE document_rename(VALUE self, VALUE source, VALUE destination) {
   return self;
 }
 
-/* document.sort(path = "", by: nil, order: nil, case_sensitive: false) */
+/* document.sort(path = "", by: nil, order: nil, case_sensitive: false)
+ *
+ * by:    a field, several fields separated by commas or spaces, or an Array of fields
+ * order: :asc, :desc, or an explicit order of values (Array or comma-separated String)
+ */
 static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
   VALUE path, opts;
   rb_scan_args(argc, argv, "01:", &path, &opts);
 
   if (NIL_P(path)) path = rb_str_new_cstr("");
 
-  const char *by = NULL;
+  VALUE by_value = Qnil;
+  VALUE order_csv = Qnil;
+  bool descending = false;
   bool case_sensitive = false;
-  VALUE v_order = Qnil;
 
   if (!NIL_P(opts)) {
     VALUE v_by = rb_hash_aref(opts, ID2SYM(rb_intern("by")));
-    v_order = rb_hash_aref(opts, ID2SYM(rb_intern("order")));
+    VALUE v_order = rb_hash_aref(opts, ID2SYM(rb_intern("order")));
     VALUE v_case_sensitive = rb_hash_aref(opts, ID2SYM(rb_intern("case_sensitive")));
 
-    if (SYMBOL_P(v_by)) {
-      VALUE by_string = rb_sym2str(v_by);
-      by = StringValueCStr(by_string);
+    if (RB_TYPE_P(v_by, T_ARRAY)) {
+      by_value = rb_ary_join(v_by, rb_str_new_cstr(","));
+    } else if (SYMBOL_P(v_by)) {
+      by_value = rb_sym2str(v_by);
     } else if (!NIL_P(v_by)) {
-      by = StringValueCStr(v_by);
+      by_value = rb_obj_as_string(v_by);
+    }
+
+    if (RB_TYPE_P(v_order, T_ARRAY)) {
+      order_csv = rb_ary_join(v_order, rb_str_new_cstr(","));
+    } else if (!NIL_P(v_order)) {
+      VALUE order_string = SYMBOL_P(v_order) ? rb_sym2str(v_order) : rb_obj_as_string(v_order);
+      const char *order = StringValueCStr(order_string);
+
+      if (strcmp(order, "desc") == 0 || strcmp(order, "descending") == 0) {
+        descending = true;
+      } else if (strcmp(order, "asc") != 0 && strcmp(order, "ascending") != 0) {
+        order_csv = order_string;
+      }
     }
 
     if (RTEST(v_case_sensitive)) {
@@ -883,55 +902,30 @@ static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
 
   struct Document *document = get_document(self);
   const char *path_string = StringValueCStr(path);
+  const char *by = NIL_P(by_value) ? NULL : StringValueCStr(by_value);
 
-  if (RB_TYPE_P(v_order, T_ARRAY)) {
-    VALUE order_csv = rb_ary_join(v_order, rb_str_new_cstr(","));
-    const char *order_string = StringValueCStr(order_csv);
-    const char *reorder_path = StringValueCStr(path);
-    const char *reorder_by;
-
-    if (by) {
-      VALUE reorder_by_value = rb_hash_aref(opts, ID2SYM(rb_intern("by")));
-
-      if (SYMBOL_P(reorder_by_value)) {
-        reorder_by_value = rb_sym2str(reorder_by_value);
-      }
-
-      reorder_by = StringValueCStr(reorder_by_value);
-    } else {
-      reorder_by = ".";
-    }
-
-    YerbaResult result = yerba_document_reorder(document, reorder_path, reorder_by, order_string);
+  if (!NIL_P(order_csv)) {
+    YerbaResult result = yerba_document_reorder(document, path_string, by ? by : ".", StringValueCStr(order_csv));
     check_result(result);
+
+    RB_GC_GUARD(by_value);
+    RB_GC_GUARD(order_csv);
 
     return self;
   }
 
-  const char *order = NULL;
-
-  if (SYMBOL_P(v_order)) {
-    VALUE order_string = rb_sym2str(v_order);
-    order = StringValueCStr(order_string);
-  } else if (!NIL_P(v_order)) {
-    order = StringValueCStr(v_order);
-  }
-
   VALUE by_with_order = Qnil;
 
-  if (order && strcmp(order, "desc") == 0) {
-    if (by) {
-      by_with_order = rb_sprintf("%s:desc", by);
-    } else {
-      by_with_order = rb_str_new_cstr(":desc");
-    }
-
+  if (descending) {
+    by_with_order = by ? rb_sprintf("%s:desc", by) : rb_str_new_cstr(":desc");
     by = StringValueCStr(by_with_order);
   }
 
   YerbaResult result = yerba_document_sort(document, path_string, by, case_sensitive);
-
   check_result(result);
+
+  RB_GC_GUARD(by_value);
+  RB_GC_GUARD(by_with_order);
 
   return self;
 }

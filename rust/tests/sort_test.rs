@@ -1,7 +1,7 @@
 mod support;
 use indoc::indoc;
 use support::parse;
-use yerba::SortField;
+use yerba::{SortField, SortMissing};
 
 #[test]
 fn test_sort_simple_array() {
@@ -551,6 +551,165 @@ fn test_sort_keeps_the_document_start_after_comments() {
         title: B
     "}
   );
+}
+
+#[test]
+fn test_sort_missing_values_sort_first_by_default() {
+  let mut document = parse(indoc! {r#"
+    - id: c
+      time: "11:00"
+    - id: film
+    - id: a
+      time: "09:00"
+    - id: b
+      time: "10:00"
+  "#});
+
+  document.sort_items_with("", &[SortField::asc("time")], false, None).unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["film", "a", "b", "c"]);
+}
+
+#[test]
+fn test_sort_missing_first_puts_items_without_a_value_first() {
+  let mut document = parse(indoc! {r#"
+    - id: c
+      time: "11:00"
+    - id: film
+    - id: a
+      time: "09:00"
+    - id: b
+      time: "10:00"
+  "#});
+
+  document
+    .sort_items_with("", &[SortField::asc("time")], false, Some(SortMissing::First))
+    .unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["film", "a", "b", "c"]);
+}
+
+#[test]
+fn test_sort_missing_last_puts_items_without_a_value_last() {
+  let mut document = parse(indoc! {r#"
+    - id: c
+      time: "11:00"
+    - id: film
+    - id: a
+      time: "09:00"
+    - id: b
+      time: "10:00"
+  "#});
+
+  document.sort_items_with("", &[SortField::asc("time")], false, Some(SortMissing::Last)).unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["a", "b", "c", "film"]);
+}
+
+#[test]
+fn test_sort_missing_keep_leaves_items_without_a_value_in_place() {
+  let mut document = parse(indoc! {r#"
+    - id: c
+      time: "11:00"
+    - id: film
+    - id: a
+      time: "09:00"
+    - id: b
+      time: "10:00"
+  "#});
+
+  document.sort_items_with("", &[SortField::asc("time")], false, Some(SortMissing::Keep)).unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["a", "film", "b", "c"]);
+}
+
+#[test]
+fn test_sort_missing_keep_treats_an_empty_value_as_missing() {
+  let mut document = parse(indoc! {r#"
+    - id: b
+      time: "10:00"
+    - id: film
+      time: ""
+    - id: a
+      time: "09:00"
+  "#});
+
+  document.sort_items_with("", &[SortField::asc("time")], false, Some(SortMissing::Keep)).unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["a", "film", "b"]);
+}
+
+#[test]
+fn test_sort_missing_last_compares_each_key_on_its_own() {
+  let mut document = parse(indoc! {r#"
+    - id: day-2-talk
+      date: "2024-09-12"
+      time: "11:00"
+    - id: day-1-podcast
+      date: "2024-09-11"
+    - id: day-1-talk
+      date: "2024-09-11"
+      time: "10:00"
+  "#});
+
+  document
+    .sort_items_with("", &SortField::parse_list(".date .time"), false, Some(SortMissing::Last))
+    .unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["day-1-talk", "day-1-podcast", "day-2-talk"]);
+}
+
+#[test]
+fn test_sort_missing_last_keeps_missing_values_last_when_descending() {
+  let mut document = parse(indoc! {r#"
+    - id: film
+    - id: a
+      time: "09:00"
+    - id: b
+      time: "10:00"
+  "#});
+
+  document
+    .sort_items_with("", &SortField::parse_list(".time:desc"), false, Some(SortMissing::Last))
+    .unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["b", "a", "film"]);
+}
+
+#[test]
+fn test_sort_missing_skip_leaves_the_sequence_when_a_value_is_missing() {
+  let mut document = parse(indoc! {r#"
+    - id: c
+      time: "11:00"
+    - id: film
+    - id: a
+      time: "09:00"
+  "#});
+
+  document.sort_items_with("", &[SortField::asc("time")], false, Some(SortMissing::Skip)).unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["c", "film", "a"]);
+}
+
+#[test]
+fn test_sort_missing_skip_sorts_when_every_value_is_present() {
+  let mut document = parse(indoc! {r#"
+    - id: c
+      time: "11:00"
+    - id: a
+      time: "09:00"
+  "#});
+
+  document.sort_items_with("", &[SortField::asc("time")], false, Some(SortMissing::Skip)).unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["a", "c"]);
+}
+
+#[test]
+fn test_sort_missing_parses_from_a_string() {
+  assert_eq!("keep".parse::<SortMissing>(), Ok(SortMissing::Keep));
+  assert_eq!("skip".parse::<SortMissing>(), Ok(SortMissing::Skip));
+  assert!("middle".parse::<SortMissing>().is_err());
 }
 
 #[test]

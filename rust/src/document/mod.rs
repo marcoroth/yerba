@@ -116,6 +116,29 @@ impl SortField {
   }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SortMissing {
+  First,
+  Last,
+  Keep,
+  Skip,
+}
+
+impl std::str::FromStr for SortMissing {
+  type Err = String;
+
+  fn from_str(input: &str) -> Result<Self, Self::Err> {
+    match input {
+      "first" => Ok(SortMissing::First),
+      "last" => Ok(SortMissing::Last),
+      "keep" => Ok(SortMissing::Keep),
+      "skip" => Ok(SortMissing::Skip),
+      _ => Err(format!("unknown missing: {} (expected first, last, keep or skip)", input)),
+    }
+  }
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NodeType {

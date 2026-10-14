@@ -811,7 +811,13 @@ pub unsafe extern "C" fn yerba_document_rename(document: *mut Document, source: 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yerba_document_sort(document: *mut Document, selector: *const c_char, by: *const c_char, case_sensitive: bool) -> YerbaResult {
+pub unsafe extern "C" fn yerba_document_sort(
+  document: *mut Document,
+  selector: *const c_char,
+  by: *const c_char,
+  case_sensitive: bool,
+  missing: *const c_char,
+) -> YerbaResult {
   let document = &mut *document;
   let selector_string = CStr::from_ptr(selector).to_str().unwrap_or("");
 
@@ -822,7 +828,16 @@ pub unsafe extern "C" fn yerba_document_sort(document: *mut Document, selector: 
     None => vec![],
   };
 
-  match document.sort_items(selector_string, &sort_fields, case_sensitive) {
+  let missing = if missing.is_null() {
+    None
+  } else {
+    match CStr::from_ptr(missing).to_str().unwrap_or("").parse::<crate::SortMissing>() {
+      Ok(missing) => Some(missing),
+      Err(error) => return YerbaResult::err(&error),
+    }
+  };
+
+  match document.sort_items_with(selector_string, &sort_fields, case_sensitive, missing) {
     Ok(()) => YerbaResult::ok(),
     Err(e) => YerbaResult::err(&e.to_string()),
   }

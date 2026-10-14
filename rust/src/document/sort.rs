@@ -225,8 +225,12 @@ impl Document {
   }
 
   pub fn sort_items(&mut self, selector: &str, sort_fields: &[SortField], case_sensitive: bool) -> Result<(), YerbaError> {
+    self.sort_items_with(selector, sort_fields, case_sensitive, None)
+  }
+
+  pub fn sort_items_with(&mut self, selector: &str, sort_fields: &[SortField], case_sensitive: bool, missing: Option<SortMissing>) -> Result<(), YerbaError> {
     if selector.contains("[].") {
-      return self.sort_each_items(selector, sort_fields, case_sensitive);
+      return self.sort_each_items(selector, sort_fields, case_sensitive, missing);
     }
 
     let current_node = self.navigate(selector)?;
@@ -236,13 +240,13 @@ impl Document {
       None => return Ok(()),
     };
 
-    match sort_sequence_edit(&sequence, sort_fields, case_sensitive) {
+    match sort_sequence_edit(&sequence, sort_fields, case_sensitive, missing) {
       Some(edit) => self.apply_edits(vec![edit]),
       None => Ok(()),
     }
   }
 
-  fn sort_each_items(&mut self, selector: &str, sort_fields: &[SortField], case_sensitive: bool) -> Result<(), YerbaError> {
+  fn sort_each_items(&mut self, selector: &str, sort_fields: &[SortField], case_sensitive: bool, missing: Option<SortMissing>) -> Result<(), YerbaError> {
     let (parent_selector, child_selector) = if let Some(last_bracket) = selector.rfind("[].") {
       (&selector[..last_bracket + 2], &selector[last_bracket + 3..])
     } else {
@@ -265,7 +269,7 @@ impl Document {
           None => continue,
         };
 
-        if let Some(edit) = sort_sequence_edit(&sequence, sort_fields, case_sensitive) {
+        if let Some(edit) = sort_sequence_edit(&sequence, sort_fields, case_sensitive, missing) {
           edits.push(edit);
         }
       }
@@ -398,7 +402,7 @@ fn sort_map_edit(map: &BlockMap, key_order: &[&str]) -> Option<(TextRange, Strin
   Some((range, rebuild_from_groups(&sorted_groups, &indent, false)))
 }
 
-fn sort_sequence_edit(sequence: &BlockSeq, sort_fields: &[SortField], case_sensitive: bool) -> Option<(TextRange, String)> {
+fn sort_sequence_edit(sequence: &BlockSeq, sort_fields: &[SortField], case_sensitive: bool, missing: Option<SortMissing>) -> Option<(TextRange, String)> {
   let entries: Vec<_> = sequence.entries().collect();
 
   if entries.len() <= 1 {
@@ -415,7 +419,30 @@ fn sort_sequence_edit(sequence: &BlockSeq, sort_fields: &[SortField], case_sensi
 
   let original_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
 
-  sortable.sort_by(|(values_a, _), (values_b, _)| compare_sort_values(values_a, values_b, sort_fields, case_sensitive));
+  let compare = |(values_a, _): &(Vec<String>, EntryGroup), (values_b, _): &(Vec<String>, EntryGroup)| {
+    compare_sort_values(values_a, values_b, sort_fields, case_sensitive, missing)
+  };
+
+  let is_absent = |(values, _): &(Vec<String>, EntryGroup)| values.iter().any(|value| value.is_empty());
+
+  match missing {
+    Some(SortMissing::Skip) if sortable.iter().any(is_absent) => return None,
+    Some(SortMissing::Keep) => {
+      let absent_positions: Vec<bool> = sortable.iter().map(is_absent).collect();
+      let (absent, mut present): (Vec<_>, Vec<_>) = sortable.into_iter().partition(is_absent);
+
+      present.sort_by(compare);
+
+      let mut present = present.into_iter();
+      let mut absent = absent.into_iter();
+
+      sortable = absent_positions
+        .iter()
+        .filter_map(|is_absent| if *is_absent { absent.next() } else { present.next() })
+        .collect();
+    }
+    _ => sortable.sort_by(compare),
+  }
 
   let sorted_bodies: Vec<String> = sortable.iter().map(|(_, group)| group.body.clone()).collect();
 
@@ -449,7 +476,13 @@ fn entry_sort_values(entry: &yaml_parser::ast::BlockSeqEntry, sort_fields: &[Sor
     .collect()
 }
 
-fn compare_sort_values(values_a: &[String], values_b: &[String], sort_fields: &[SortField], case_sensitive: bool) -> std::cmp::Ordering {
+fn compare_sort_values(
+  values_a: &[String],
+  values_b: &[String],
+  sort_fields: &[SortField],
+  case_sensitive: bool,
+  missing: Option<SortMissing>,
+) -> std::cmp::Ordering {
   let compare = |value_a: &String, value_b: &String| {
     if case_sensitive {
       value_a.cmp(value_b)
@@ -458,7 +491,19 @@ fn compare_sort_values(values_a: &[String], values_b: &[String], sort_fields: &[
     }
   };
 
+  let missing_ordering = |value_a: &String, value_b: &String| match (missing, value_a.is_empty(), value_b.is_empty()) {
+    (Some(SortMissing::First), true, false) => Some(std::cmp::Ordering::Less),
+    (Some(SortMissing::First), false, true) => Some(std::cmp::Ordering::Greater),
+    (Some(SortMissing::Last), true, false) => Some(std::cmp::Ordering::Greater),
+    (Some(SortMissing::Last), false, true) => Some(std::cmp::Ordering::Less),
+    _ => None,
+  };
+
   for (index, field) in sort_fields.iter().enumerate().take(values_a.len()) {
+    if let Some(ordering) = missing_ordering(&values_a[index], &values_b[index]) {
+      return ordering;
+    }
+
     let ordering = compare(&values_a[index], &values_b[index]);
     let ordering = if field.ascending { ordering } else { ordering.reverse() };
 
@@ -468,7 +513,7 @@ fn compare_sort_values(values_a: &[String], values_b: &[String], sort_fields: &[
   }
 
   if sort_fields.is_empty() && !values_a.is_empty() && !values_b.is_empty() {
-    return compare(&values_a[0], &values_b[0]);
+    return missing_ordering(&values_a[0], &values_b[0]).unwrap_or_else(|| compare(&values_a[0], &values_b[0]));
   }
 
   std::cmp::Ordering::Equal

@@ -22,10 +22,42 @@ pub struct Yerbafile {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Rule {
   pub files: String,
+  #[serde(default, deserialize_with = "string_or_list")]
+  pub exclude: Vec<String>,
   #[serde(default)]
   #[serde(alias = "path")]
   pub selector: Option<String>,
   pub pipeline: Vec<PipelineStep>,
+}
+
+impl Rule {
+  pub fn matches(&self, file: &str) -> bool {
+    matches_glob(&self.files, file) && !self.excludes(file)
+  }
+
+  pub fn excludes(&self, file: &str) -> bool {
+    self.exclude.iter().any(|pattern| matches_glob(pattern, file))
+  }
+}
+
+fn matches_glob(pattern: &str, file: &str) -> bool {
+  glob::Pattern::new(pattern)
+    .map(|pattern| pattern.matches(file) || pattern.matches_path(Path::new(file)))
+    .unwrap_or(false)
+}
+
+fn string_or_list<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<String>, D::Error> {
+  #[derive(Deserialize)]
+  #[serde(untagged)]
+  enum StringOrList {
+    String(String),
+    List(Vec<String>),
+  }
+
+  Ok(match StringOrList::deserialize(deserializer)? {
+    StringOrList::String(string) => vec![string],
+    StringOrList::List(list) => list,
+  })
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +89,8 @@ pub struct SortConfig {
   pub by: Option<String>,
   #[serde(default)]
   pub case_sensitive: bool,
+  #[serde(default)]
+  pub missing: Option<crate::SortMissing>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -391,10 +425,8 @@ impl Yerbafile {
           continue;
         }
 
-        if let Ok(pattern) = glob::Pattern::new(&rule.files) {
-          if pattern.matches(file_path) || pattern.matches_path(Path::new(file_path)) {
-            return Some(config.order.clone());
-          }
+        if rule.matches(file_path) {
+          return Some(config.order.clone());
         }
       }
     }
@@ -421,7 +453,11 @@ impl Yerbafile {
         }
       };
 
-      let file_strings: Vec<String> = files.iter().map(|path| path.to_string_lossy().to_string()).collect();
+      let file_strings: Vec<String> = files
+        .iter()
+        .map(|path| path.to_string_lossy().to_string())
+        .filter(|file| !rule.excludes(file))
+        .collect();
 
       let file_results: Vec<RuleResult> = file_strings
         .par_iter()
@@ -526,11 +562,7 @@ impl Yerbafile {
     let mut ran_global = false;
 
     for rule in &self.rules {
-      if let Ok(pattern) = glob::Pattern::new(&rule.files) {
-        if !pattern.matches(file) && !pattern.matches_path(Path::new(file)) {
-          continue;
-        }
-      } else {
+      if !rule.matches(file) {
         continue;
       }
 
@@ -642,14 +674,8 @@ impl Yerbafile {
     }
 
     for rule in &self.rules {
-      if !match_path.is_empty() {
-        if let Ok(pattern) = glob::Pattern::new(&rule.files) {
-          if !pattern.matches(match_path) && !pattern.matches_path(Path::new(match_path)) {
-            continue;
-          }
-        } else {
-          continue;
-        }
+      if !match_path.is_empty() && !rule.matches(match_path) {
+        continue;
       }
 
       let base_selector = rule.selector.as_deref();
@@ -873,7 +899,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_selector: Opt
       let full_selector = resolve_step_selector(base_selector, config.selector.as_deref());
       let sort_fields = config.by.as_deref().map(crate::SortField::parse_list).unwrap_or_default();
 
-      document.sort_items(&full_selector, &sort_fields, config.case_sensitive)
+      document.sort_items_with(&full_selector, &sort_fields, config.case_sensitive, config.missing)
     }
 
     PipelineStep::Directives(config) => {

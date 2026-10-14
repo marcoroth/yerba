@@ -12,6 +12,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
     yerba sort config.yml "tags"
     yerba sort videos.yml --by ".title"
     yerba sort videos.yml --by ".date" --order desc --by ".title"
+    yerba sort videos.yml --by ".date" --by ".start_time" --missing keep
     yerba sort videos.yml "[].speakers" --by ".name"
     yerba sort videos.yml "[]" --by ".id" --order "talk-3,talk-1,talk-2"
     yerba sort speakers.yml "[]" --by ".name" --order "Charlie,Alice,Bob"
@@ -40,6 +41,9 @@ pub struct Args {
   /// Case-sensitive sort (default: case-insensitive)
   #[arg(long)]
   case_sensitive: bool,
+  /// Items without a value for a sort field: first, last, keep (stay in place) or skip (leave the sequence unsorted)
+  #[arg(long)]
+  missing: Option<yerba::SortMissing>,
   #[arg(long)]
   dry_run: bool,
 }
@@ -199,7 +203,7 @@ impl Args {
         }
       }
 
-      if document.sort_items(selector, &sort_fields, self.case_sensitive).is_ok() {
+      if document.sort_items_with(selector, &sort_fields, self.case_sensitive, self.missing).is_ok() {
         output(&resolved_file, &document, self.dry_run);
       }
     }

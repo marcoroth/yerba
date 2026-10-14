@@ -902,10 +902,11 @@ static VALUE document_rename(VALUE self, VALUE source, VALUE destination) {
   return self;
 }
 
-/* document.sort(selector = "", by: nil, order: nil, case_sensitive: false)
+/* document.sort(selector = "", by: nil, order: nil, case_sensitive: false, missing: nil)
  *
  * by:    a field, several fields separated by commas or spaces, or an Array of fields
  * order: :asc, :desc, or an explicit order of values (Array or comma-separated String)
+ * missing: :first, :last, :keep or :skip, for items without a value for a sort field
  */
 static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
   VALUE selector, opts;
@@ -917,6 +918,7 @@ static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
   VALUE order_csv = Qnil;
   bool descending = false;
   bool case_sensitive = false;
+  VALUE missing_value = Qnil;
 
   if (!NIL_P(opts)) {
     VALUE v_by = rb_hash_aref(opts, ID2SYM(rb_intern("by")));
@@ -947,11 +949,20 @@ static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
     if (RTEST(v_case_sensitive)) {
       case_sensitive = true;
     }
+
+    VALUE v_missing = rb_hash_aref(opts, ID2SYM(rb_intern("missing")));
+
+    if (SYMBOL_P(v_missing)) {
+      missing_value = rb_sym2str(v_missing);
+    } else if (!NIL_P(v_missing)) {
+      missing_value = rb_obj_as_string(v_missing);
+    }
   }
 
   struct Document *document = get_document(self);
   const char *path_string = StringValueCStr(selector);
   const char *by = NIL_P(by_value) ? NULL : StringValueCStr(by_value);
+  const char *missing = NIL_P(missing_value) ? NULL : StringValueCStr(missing_value);
 
   if (!NIL_P(order_csv)) {
     YerbaResult result = yerba_document_reorder(document, path_string, by ? by : ".", StringValueCStr(order_csv));
@@ -970,11 +981,12 @@ static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
     by = StringValueCStr(by_with_order);
   }
 
-  YerbaResult result = yerba_document_sort(document, path_string, by, case_sensitive);
+  YerbaResult result = yerba_document_sort(document, path_string, by, case_sensitive, missing);
   check_result(result);
 
   RB_GC_GUARD(by_value);
   RB_GC_GUARD(by_with_order);
+  RB_GC_GUARD(missing_value);
 
   return self;
 }

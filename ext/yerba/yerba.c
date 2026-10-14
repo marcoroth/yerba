@@ -622,6 +622,19 @@ static VALUE document_set_sequence_indent(VALUE self, VALUE selector, VALUE styl
   return self;
 }
 
+/* TODO(v1.0): stop reading the deprecated path: keyword. */
+static VALUE selector_option(VALUE opts) {
+  VALUE selector = rb_hash_aref(opts, ID2SYM(rb_intern("selector")));
+
+  if (!NIL_P(selector)) return selector;
+
+  VALUE path = rb_hash_aref(opts, ID2SYM(rb_intern("path")));
+
+  if (!NIL_P(path)) rb_warn("Yerba: the path: keyword is deprecated, use selector: instead");
+
+  return path;
+}
+
 /* document.condition?(condition, selector: "") */
 static VALUE document_condition_p(int argc, VALUE *argv, VALUE self) {
   VALUE condition, opts;
@@ -629,8 +642,7 @@ static VALUE document_condition_p(int argc, VALUE *argv, VALUE self) {
 
   const char *parent_selector = "";
   if (!NIL_P(opts)) {
-    VALUE v_selector = rb_hash_aref(opts, ID2SYM(rb_intern("selector")));
-    if (NIL_P(v_selector)) v_selector = rb_hash_aref(opts, ID2SYM(rb_intern("path")));
+    VALUE v_selector = selector_option(opts);
 
     if (!NIL_P(v_selector)) {
       parent_selector = StringValueCStr(v_selector);
@@ -993,8 +1005,7 @@ static VALUE document_quote_style(int argc, VALUE *argv, VALUE self) {
   const char *value_style = NULL;
 
   if (!NIL_P(opts)) {
-    VALUE v_selector = rb_hash_aref(opts, ID2SYM(rb_intern("selector")));
-    if (NIL_P(v_selector)) v_selector = rb_hash_aref(opts, ID2SYM(rb_intern("path")));
+    VALUE v_selector = selector_option(opts);
     VALUE v_key_style = rb_hash_aref(opts, ID2SYM(rb_intern("key_style")));
     VALUE v_value_style = rb_hash_aref(opts, ID2SYM(rb_intern("value_style")));
 

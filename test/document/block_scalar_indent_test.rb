@@ -43,7 +43,9 @@ class DocumentBlockScalarIndentTest < Minitest::Spec
 
   test "quote_style still accepts path: as the older name for selector:" do
     document = Yerba.parse(%(---\n- desc: "a"\n))
-    document.quote_style(path: "[].desc", value_style: "single")
+    assert_output(nil, /path: keyword is deprecated, use selector:/) do
+      document.quote_style(path: "[].desc", value_style: "single")
+    end
 
     assert_equal "---\n- desc: 'a'\n", document.to_s
   end

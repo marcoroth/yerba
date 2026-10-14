@@ -196,6 +196,24 @@ pub(crate) fn run_yerbafile(write: bool, files: Vec<String>) {
     ui::subtle(format!("(from {})", yerbafile_path.display()))
   );
 
+  if !yerbafile.deprecated_path_keys.is_empty() {
+    let keys = &yerbafile.deprecated_path_keys;
+    let mut places = keys.iter().take(3).cloned().collect::<Vec<_>>().join(", ");
+
+    if keys.len() > 3 {
+      places.push_str(&format!(" and {} more", keys.len() - 3));
+    }
+
+    eprintln!(
+      "{} {} is deprecated, use {} instead ({}: {})\n",
+      ui::pending("Warning:"),
+      ui::strong("path:"),
+      ui::strong("selector:"),
+      pluralize(keys.len(), "place", "places"),
+      places
+    );
+  }
+
   let started = std::time::Instant::now();
 
   let results = if files.is_empty() {

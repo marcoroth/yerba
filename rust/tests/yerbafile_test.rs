@@ -2098,9 +2098,30 @@ fn test_path_is_accepted_as_an_alias_for_selector() {
   let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
 
   assert_eq!(yerbafile.rules[0].selector.as_deref(), Some("[]"));
+  assert_eq!(yerbafile.deprecated_path_keys, vec!["rules[0]", "rules[0].pipeline[0].sort_keys"]);
 
   let mut document = yerba::Document::parse("- slug: alice\n  name: Alice\n").unwrap();
 
   assert!(yerbafile.apply_to_document(&mut document, "data/speakers.yml").unwrap());
   assert_eq!(document.to_string(), "- name: Alice\n  slug: alice\n");
+}
+
+#[test]
+fn test_selector_keys_are_not_reported_as_deprecated() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    pipeline:
+      - sort_keys:
+          selector: ""
+          order:
+            - name
+  "#},
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  assert!(yerbafile.deprecated_path_keys.is_empty());
 }

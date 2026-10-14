@@ -15,6 +15,8 @@ pub struct Yerbafile {
   pub rules: Vec<Rule>,
   #[serde(skip)]
   pub directory: Option<PathBuf>,
+  #[serde(skip)]
+  pub deprecated_path_keys: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -315,6 +317,7 @@ impl Yerbafile {
     let content = fs::read_to_string(path.as_ref())?;
     let mut yerbafile: Yerbafile = yaml_serde::from_str(&content).map_err(|error| YerbaError::ParseError(format!("{}", error)))?;
     yerbafile.directory = path.as_ref().parent().map(|p| p.to_path_buf());
+    yerbafile.deprecated_path_keys = deprecated_path_keys(&content);
     yerbafile.validate_conditions()?;
     Ok(yerbafile)
   }
@@ -947,4 +950,35 @@ fn resolve_step_selector(base_selector: Option<&str>, step_selector: Option<&str
     (false, true) => base.to_string(),
     (false, false) => format!("{}.{}", base, step),
   }
+}
+
+// TODO(v1.0): remove together with the `path` aliases on the rule and step configs.
+fn deprecated_path_keys(content: &str) -> Vec<String> {
+  let Ok(yerbafile) = yaml_serde::from_str::<yaml_serde::Value>(content) else {
+    return Vec::new();
+  };
+
+  let mut found = Vec::new();
+
+  let check_pipeline = |pipeline: Option<&yaml_serde::Value>, prefix: &str, found: &mut Vec<String>| {
+    for (index, step) in pipeline.and_then(|pipeline| pipeline.as_sequence()).into_iter().flatten().enumerate() {
+      for (name, config) in step.as_mapping().into_iter().flatten() {
+        if config.get("path").is_some() {
+          found.push(format!("{}pipeline[{}].{}", prefix, index, name.as_str().unwrap_or_default()));
+        }
+      }
+    }
+  };
+
+  check_pipeline(yerbafile.get("pipeline"), "", &mut found);
+
+  for (index, rule) in yerbafile.get("rules").and_then(|rules| rules.as_sequence()).into_iter().flatten().enumerate() {
+    if rule.get("path").is_some() {
+      found.push(format!("rules[{}]", index));
+    }
+
+    check_pipeline(rule.get("pipeline"), &format!("rules[{}].", index), &mut found);
+  }
+
+  found
 }

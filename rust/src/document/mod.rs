@@ -849,6 +849,7 @@ pub(crate) fn navigate_from_node(node: &SyntaxNode, selector: &str) -> Vec<Synta
 pub(crate) struct EntryGroup {
   pub(crate) separator: String,
   pub(crate) preceding: String,
+  pub(crate) gap: String,
   pub(crate) body: String,
 }
 
@@ -857,7 +858,7 @@ impl EntryGroup {
     if self.preceding.is_empty() {
       self.body.clone()
     } else {
-      format!("{}\n{}", self.preceding, self.body)
+      format!("{}{}{}", self.preceding, self.gap, self.body)
     }
   }
 }
@@ -892,15 +893,17 @@ fn collect_entry_groups(parent: &SyntaxNode) -> Vec<EntryGroup> {
       let entry_text = child.as_node().unwrap().text().to_string();
 
       if groups.is_empty() {
-        let preceding = buffer.trim_start_matches('\n').to_string();
+        let (preceding, gap) = split_gap(buffer.trim_start_matches('\n'));
 
         groups.push(EntryGroup {
           separator: String::new(),
           preceding,
+          gap,
           body: entry_text,
         });
       } else {
         let (trailing, separator, preceding) = split_at_blank_line(&buffer);
+        let (preceding, gap) = split_gap(&preceding);
 
         if let Some(last) = groups.last_mut() {
           last.body.push_str(&trailing);
@@ -909,6 +912,7 @@ fn collect_entry_groups(parent: &SyntaxNode) -> Vec<EntryGroup> {
         groups.push(EntryGroup {
           separator,
           preceding,
+          gap,
           body: entry_text,
         });
       }
@@ -947,7 +951,7 @@ fn split_at_blank_line(text: &str) -> (String, String, String) {
     let rest = &text[position..];
     let content_start = rest.len() - rest.trim_start_matches('\n').len();
     let separator = rest[..content_start].to_string();
-    let preceding = rest[content_start..].trim_end_matches(['\n', ' ', '\t']).to_string();
+    let preceding = rest[content_start..].to_string();
 
     (trailing, separator, preceding)
   } else {
@@ -955,8 +959,16 @@ fn split_at_blank_line(text: &str) -> (String, String, String) {
   }
 }
 
-pub(crate) fn collect_preceding_sibling_comments(parent: &SyntaxNode) -> (String, Option<rowan::TextSize>) {
-  let mut comments: Vec<String> = Vec::new();
+fn split_gap(text: &str) -> (String, String) {
+  let content = text.trim_end_matches(['\n', ' ', '\t']);
+  let newlines = text[content.len()..].matches('\n').count().max(1);
+
+  (content.to_string(), "\n".repeat(newlines))
+}
+
+pub(crate) fn collect_preceding_sibling_comments(parent: &SyntaxNode) -> (String, String, Option<rowan::TextSize>) {
+  let mut comments: Vec<(String, usize)> = Vec::new();
+  let mut newlines = 0;
   let mut earliest_start = None;
   let mut node = parent.clone();
 
@@ -967,10 +979,11 @@ pub(crate) fn collect_preceding_sibling_comments(parent: &SyntaxNode) -> (String
       match element {
         rowan::NodeOrToken::Token(token) => {
           if token.kind() == SyntaxKind::COMMENT {
-            comments.push(token.text().to_string());
+            comments.push((token.text().to_string(), newlines));
+            newlines = 0;
             earliest_start = Some(token.text_range().start());
           } else if token.kind() == SyntaxKind::WHITESPACE {
-            // Keep looking past whitespace
+            newlines += token.text().matches('\n').count();
           } else {
             break;
           }
@@ -984,7 +997,7 @@ pub(crate) fn collect_preceding_sibling_comments(parent: &SyntaxNode) -> (String
       };
     }
 
-    if !comments.is_empty() {
+    if !comments.is_empty() || sibling.is_some() {
       break;
     }
 
@@ -996,21 +1009,37 @@ pub(crate) fn collect_preceding_sibling_comments(parent: &SyntaxNode) -> (String
     }
   }
 
+  let gap = "\n".repeat(comments.first().map_or(1, |(_, newlines)| (*newlines).max(1)));
+
   comments.reverse();
-  (comments.join("\n"), earliest_start)
+
+  let text = comments
+    .iter()
+    .enumerate()
+    .map(|(index, (comment, newlines))| {
+      if index + 1 < comments.len() {
+        format!("{}{}", comment, "\n".repeat((*newlines).max(1)))
+      } else {
+        comment.clone()
+      }
+    })
+    .collect();
+
+  (text, gap, earliest_start)
 }
 
 pub(crate) fn collect_groups_with_range(parent: &SyntaxNode) -> (Vec<EntryGroup>, TextRange) {
   let mut groups = collect_entry_groups(parent);
 
-  let (sibling_comments, earliest_start) = collect_preceding_sibling_comments(parent);
+  let (sibling_comments, sibling_gap, earliest_start) = collect_preceding_sibling_comments(parent);
 
   if !sibling_comments.is_empty() {
     if let Some(first) = groups.first_mut() {
       if first.preceding.is_empty() {
         first.preceding = sibling_comments;
+        first.gap = sibling_gap;
       } else {
-        first.preceding = format!("{}\n{}", sibling_comments, first.preceding);
+        first.preceding = format!("{}{}{}", sibling_comments, sibling_gap, first.preceding);
       }
     }
   }
@@ -1050,7 +1079,7 @@ pub(crate) fn rebuild_from_groups(groups: &[EntryGroup], indent: &str, preserve_
         if group.preceding.is_empty() {
           format!("{}{}{}", separator, indent, group.body)
         } else {
-          format!("{}{}\n{}{}", separator, group.preceding, indent, group.body)
+          format!("{}{}{}{}{}", separator, group.preceding, group.gap, indent, group.body)
         }
       }
     })

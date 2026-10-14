@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use indoc::indoc;
 
 use super::colorize_examples;
-use super::{output, parse_file, resolve_files, run_op};
+use super::{default_insert_position, output, parse_file, resolve_files, run_op};
 
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
@@ -81,8 +81,6 @@ impl Args {
       std::process::exit(1);
     };
 
-    let parent_path = self.selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
-
     let position = if let Some(index) = self.at {
       yerba::InsertPosition::At(index)
     } else if let Some(target) = self.before {
@@ -90,11 +88,7 @@ impl Args {
     } else if let Some(target) = self.after {
       yerba::InsertPosition::after(target)
     } else {
-      yerba::Yerbafile::find()
-        .and_then(|yerbafile_path| yerba::Yerbafile::load(&yerbafile_path).ok())
-        .and_then(|yerbafile| yerbafile.sort_order_for(&self.file, parent_path))
-        .map(yerba::InsertPosition::FromSortOrder)
-        .unwrap_or(yerba::InsertPosition::Last)
+      default_insert_position(&self.file, &self.selector)
     };
 
     for resolved_file in resolve_files(&self.file) {

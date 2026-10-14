@@ -116,13 +116,14 @@ class ConditionTest < Minitest::Spec
     assert_includes document.to_s, "age: 30"
   end
 
-  test "set with if_missing raises when key is absent" do
+  test "set with if_missing inserts the key when it is absent" do
     document = Yerba::Document.parse(<<~YAML)
       name: Alice
     YAML
+    document.set("age", 30, if_missing: true)
+    document.set("nickname", "yes", if_missing: true)
 
-    assert_raises(Yerba::Error) do
-      document.set("age", 30, if_missing: true)
-    end
+    assert_equal 30, document.value_at("age")
+    assert_equal "yes", document.value_at("nickname")
   end
 end

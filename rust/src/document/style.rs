@@ -49,10 +49,7 @@ impl Document {
             if let Some(ref entry) = entry_node {
               let entry_start: usize = entry.text_range().start().into();
               let key_indent = column_at(&source, entry_start);
-              let entry_text = entry.text().to_string();
-
-              if let Some(colon_offset) = entry_text.find(':') {
-                let colon_position = entry_start + colon_offset;
+              if let Some(colon_position) = entry_colon_position(entry) {
                 let value_indent = key_indent + 2;
                 let block_text = crate::yaml_writer::yaml_value_to_block_text(&value, value_indent);
                 let replace_range = TextRange::new(rowan::TextSize::from((colon_position + 1) as u32), node.text_range().end());
@@ -536,10 +533,7 @@ impl Document {
       let entry_start: usize = entry.text_range().start().into();
       let indent = column_at(&source, entry_start);
 
-      let entry_text = entry.text().to_string();
-      let colon_offset = entry_text.find(':').map(|offset| entry_start + offset);
-
-      (indent, colon_offset)
+      (indent, entry_colon_position(entry))
     } else {
       (0, None)
     };
@@ -1074,4 +1068,11 @@ fn inline_quote_replacement(raw_value: &str, current_kind: SyntaxKind, style: &Q
 
     _ => None,
   }
+}
+
+fn entry_colon_position(entry: &SyntaxNode) -> Option<usize> {
+  entry
+    .children_with_tokens()
+    .find(|element| element.kind() == SyntaxKind::COLON)
+    .map(|colon| colon.text_range().start().into())
 }

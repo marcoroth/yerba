@@ -40,11 +40,14 @@ module Yerba
           all_keys = keys
           key_index = all_keys.index(key.to_s)
           after_key = key_index&.positive? ? all_keys[key_index - 1] : nil
+          before_key = key_index&.zero? ? all_keys[1] : nil
 
           document.delete(new_path)
 
           if after_key
             document.insert(new_path, coerced, after: after_key, plain: true)
+          elsif before_key
+            document.insert(new_path, coerced, before: before_key, plain: true)
           else
             document.insert(new_path, coerced, plain: true)
           end

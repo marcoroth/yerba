@@ -468,3 +468,13 @@ pub(crate) fn output(file: &str, document: &yerba::Document, dry_run: bool) {
     });
   }
 }
+
+pub(crate) fn default_insert_position(file: &str, selector: &str) -> yerba::InsertPosition {
+  let parent_path = selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+
+  yerba::Yerbafile::find()
+    .and_then(|yerbafile_path| yerba::Yerbafile::load(&yerbafile_path).ok())
+    .and_then(|yerbafile| yerbafile.sort_order_for(file, parent_path))
+    .map(yerba::InsertPosition::FromSortOrder)
+    .unwrap_or(yerba::InsertPosition::Last)
+}

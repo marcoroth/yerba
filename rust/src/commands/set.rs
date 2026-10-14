@@ -3,12 +3,13 @@ use std::sync::LazyLock;
 use indoc::indoc;
 
 use super::colorize_examples;
-use super::{output, parse_file, resolve_files, run_op_with_hint};
+use super::{default_insert_position, output, parse_file, resolve_files, run_op_with_hint};
 
 static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
   colorize_examples(indoc! {r#"
     yerba set config.yml "database.host" "0.0.0.0"
     yerba set config.yml "database.host" "0.0.0.0" --if-exists
+    yerba set config.yml "database.pool" 5 --plain --if-missing
     yerba set config.yml "database.host" "0.0.0.0" --condition ".port == 5432"
     yerba set videos.yml "[0].title" "New Title"
     yerba set videos.yml "[].title" "New Title" --condition ".id == talk-1"
@@ -76,6 +77,11 @@ impl Args {
 
       if should_set {
         let result = match &self.condition {
+          _ if self.if_missing => {
+            let value = if self.plain { self.value.clone() } else { yerba::quote_scalar(&self.value) };
+
+            document.insert_into(&self.selector, &value, default_insert_position(&self.file, &self.selector))
+          }
           Some(condition) if per_item => document.set_where(parent_path, leaf, &self.value, condition, self.all, self.plain).map(|_| ()),
           _ if self.all && self.plain => document.set_all_plain(&self.selector, &self.value),
           _ if self.all => document.set_all(&self.selector, &self.value),

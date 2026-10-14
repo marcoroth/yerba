@@ -945,4 +945,29 @@ class MapTest < Minitest::Spec
           - rails
     YAML
   end
+
+  test "assigning a collection to the first key keeps its position" do
+    document = Yerba::Document.parse(<<~YAML)
+      first: 1
+      second: 2
+    YAML
+
+    document.root["first"] = [1, 2]
+
+    assert_equal "first:\n  - 1\n  - 2\nsecond: 2\n", document.to_s
+  end
+
+  test "collection_style converts a quoted key containing a colon" do
+    document = Yerba::Document.parse(<<~YAML)
+      "a:b": [1, 2]
+    YAML
+
+    document["a:b"].collection_style = :block
+
+    assert_equal "\"a:b\":\n  - 1\n  - 2\n", document.to_s
+
+    document["a:b"].collection_style = :flow
+
+    assert_equal "\"a:b\": [1, 2]\n", document.to_s
+  end
 end

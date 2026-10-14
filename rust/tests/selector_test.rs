@@ -425,3 +425,20 @@ fn test_all_keys_is_not_a_bracket() {
   assert!(!path.has_brackets());
   assert!(!path.ends_with_bracket());
 }
+
+#[test]
+fn test_parse_keeps_invalid_bracket_segments_as_keys() {
+  assert_eq!(
+    Selector::parse("tags[abc].name"),
+    Selector::Absolute(vec![
+      SelectorSegment::Key("tags".to_string()),
+      SelectorSegment::Key("[abc]".to_string()),
+      SelectorSegment::Key("name".to_string()),
+    ])
+  );
+
+  assert_eq!(
+    Selector::parse("tags[0"),
+    Selector::Absolute(vec![SelectorSegment::Key("tags".to_string()), SelectorSegment::Key("[0".to_string())])
+  );
+}

@@ -1443,3 +1443,17 @@ fn test_get_values_nested_wildcard_with_missing() {
     panic!("Expected Mapping for Charlie, got: {:?}", values[3]);
   }
 }
+
+#[test]
+fn test_get_with_invalid_bracket_segment_matches_nothing() {
+  let document = parse(indoc! {"
+    tags:
+      - ruby
+      - rails
+  "});
+
+  assert_eq!(document.get("tags[abc]"), None);
+  assert_eq!(document.get("tags[0"), None);
+  assert_eq!(document.get_all("tags[abc]"), Vec::<String>::new());
+  assert!(!document.exists("tags[abc]"));
+}

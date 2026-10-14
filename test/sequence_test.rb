@@ -1363,4 +1363,50 @@ class SequenceTest < Minitest::Spec
     refute document.exists?("tags[abc]")
     assert_raises(Yerba::Error) { document.set("tags[abc]", "x") }
   end
+
+  test "where results drop items that no longer match after an edit" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - a
+        - b
+        - c
+    YAML
+
+    result = document["items"].where("a")
+    document["items"].delete_at(0)
+
+    assert_nil result.first
+    assert_empty result
+  end
+
+  test "where results follow items that move after an edit" do
+    document = Yerba::Document.parse(<<~YAML)
+      items:
+        - b
+        - a
+        - c
+    YAML
+
+    result = document["items"].where("a")
+    document["items"].delete_at(0)
+
+    assert_equal ["a"], result.map(&:to_s)
+    assert_equal [0], result.indices
+  end
+
+  test "where results include items that match after an edit" do
+    document = Yerba::Document.parse(<<~YAML)
+      talks:
+        - id: x
+          kind: talk
+        - id: y
+          kind: keynote
+    YAML
+
+    result = document["talks"].where(kind: "keynote")
+    document.set("talks[0].kind", "keynote")
+    document["talks"] << { id: "z", kind: "keynote" }
+
+    assert_equal(["x", "y", "z"], result.map { |talk| talk["id"].to_s })
+  end
 end

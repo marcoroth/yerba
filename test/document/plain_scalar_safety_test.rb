@@ -185,4 +185,43 @@ class PlainScalarSafetyTest < Minitest::Spec
 
     assert_equal "- new", loaded["tags"]
   end
+
+  PSYCH_NON_STRINGS = [
+    "12:30:00", "-1:30:15.5", "0755", "0b1010", "1_000", "1,000", "1_000.5", "2025-01-01",
+    "2025-01-01T10:00:00Z", ":symbol", "tRuE", "YeS", "nUlL"
+  ].freeze
+
+  test "strings Psych would load as another type are quoted by every writer" do
+    PSYCH_NON_STRINGS.each do |string|
+      document = Yerba::Document.parse(<<~YAML)
+        value: x
+        list:
+          - a
+      YAML
+
+      document.set("value", string)
+      document.insert("inserted", string)
+      document.root["block"] = [string]
+      document.root.set("flow", [string], style: :flow)
+      items = [string]
+      document["list"].concat(items)
+
+      loaded = Psych.unsafe_load(document.to_s)
+
+      assert_equal string, loaded["value"], string
+      assert_equal string, loaded["inserted"], string
+      assert_equal [string], loaded["block"], string
+      assert_equal [string], loaded["flow"], string
+      assert_equal string, loaded["list"].last, string
+      assert_equal({ "value" => string }, Psych.unsafe_load(Yerba::Document.from({ "value" => string }).to_s), string)
+    end
+  end
+
+  test "flow collections quote strings that would change type or structure" do
+    document = Yerba::Document.parse("tags: x\n")
+
+    document.root.set("tags", ["yes", "x, y", "a: b", "plain"], style: :flow)
+
+    assert_equal %(tags: ["yes", "x, y", "a: b", plain]\n), document.to_s
+  end
 end

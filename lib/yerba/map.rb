@@ -42,14 +42,12 @@ module Yerba
           after_key = key_index&.positive? ? all_keys[key_index - 1] : nil
           before_key = key_index&.zero? ? all_keys[1] : nil
 
-          document.delete(new_path)
-
-          if after_key
-            document.insert(new_path, coerced, after: after_key, plain: true)
-          elsif before_key
-            document.insert(new_path, coerced, before: before_key, plain: true)
+          if after_key || before_key
+            document.delete(new_path)
+            document.insert(new_path, coerced, after: after_key, before: before_key, plain: true)
           else
-            document.insert(new_path, coerced, plain: true)
+            document.set(new_path, coerce_value(value, style: :flow), plain: true)
+            document[new_path].collection_style = :block unless value.empty?
           end
         elsif document.exists?(new_path)
           document.set(new_path, coerced, plain: is_collection)

@@ -970,4 +970,20 @@ class MapTest < Minitest::Spec
 
     assert_equal "\"a:b\": [1, 2]\n", document.to_s
   end
+
+  test "assigning a collection to the only key of the root map" do
+    document = Yerba::Document.parse("only: 1\n")
+
+    document.root["only"] = [1, 2]
+
+    assert_equal "only:\n  - 1\n  - 2\n", document.to_s
+  end
+
+  test "assigning a collection to the only key of a nested map" do
+    document = Yerba::Document.parse("db:\n  only: 1\nother: x\n")
+
+    document["db"]["only"] = { host: "localhost", ports: [1, 2] }
+
+    assert_equal "db:\n  only:\n    host: localhost\n    ports:\n      - 1\n      - 2\nother: x\n", document.to_s
+  end
 end

@@ -12,7 +12,10 @@ module Yerba
     end
 
     def value
-      return @value.is_a?(String) ? @value.dup : @value if @tree
+      live = live_document if @selector
+      adopt_current_node(live) if live && !tree_node?
+
+      return @value.is_a?(String) ? @value.dup : @value if tree_node?
 
       @value ||= document&.value_at(@selector)
     end
@@ -74,7 +77,31 @@ module Yerba
       end
     end
 
+    protected
+
+    def stored_value
+      @value
+    end
+
     private
+
+    def live_document
+      return @document if @document
+
+      document if @file_path && Document.cache.key?(@file_path)
+    end
+
+    def adopt_current_node(live)
+      node = live[@selector]
+
+      if node.is_a?(Scalar) && node.tree_node?
+        @value = node.stored_value
+        attach_tree(live.nodes, nil, node.valueless?)
+      else
+        @value = nil
+        @tree = nil
+      end
+    end
 
     def init_from(value: nil, quote_style: nil, **)
       @value = value

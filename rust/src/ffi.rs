@@ -64,6 +64,8 @@ pub struct YerbaLocation {
   pub start_column: usize,
   pub end_line: usize,
   pub end_column: usize,
+  pub start_character_column: usize,
+  pub end_character_column: usize,
 }
 
 #[repr(C)]
@@ -233,6 +235,8 @@ const EMPTY_LOCATION: YerbaLocation = YerbaLocation {
   start_column: 0,
   end_line: 0,
   end_column: 0,
+  start_character_column: 0,
+  end_character_column: 0,
 };
 
 #[no_mangle]
@@ -298,7 +302,22 @@ fn location_to_ffi(location: crate::Location) -> YerbaLocation {
     start_column: location.start_column,
     end_line: location.end_line,
     end_column: location.end_column,
+    start_character_column: location.start_character_column,
+    end_character_column: location.end_character_column,
   }
+}
+
+fn location_json(location: &crate::Location) -> serde_json::Value {
+  serde_json::json!({
+    "start_line": location.start_line,
+    "start_column": location.start_column,
+    "end_line": location.end_line,
+    "end_column": location.end_column,
+    "start_offset": location.start_offset,
+    "end_offset": location.end_offset,
+    "start_character_column": location.start_character_column,
+    "end_character_column": location.end_character_column,
+  })
 }
 
 /// Caller must free with yerba_string_free.
@@ -1062,14 +1081,7 @@ fn located_nodes_to_list(nodes: &[crate::LocatedNode]) -> YerbaTypedList {
         "node_type": node.node_type,
         "selector": node.selector,
         "line": node.line,
-        "location": {
-          "start_line": node.location.start_line,
-          "start_column": node.location.start_column,
-          "end_line": node.location.end_line,
-          "end_column": node.location.end_column,
-          "start_offset": node.location.start_offset,
-          "end_offset": node.location.end_offset,
-        },
+        "location": location_json(&node.location),
       });
 
       if let Some(file_path) = &node.file_path {
@@ -1086,14 +1098,7 @@ fn located_nodes_to_list(nodes: &[crate::LocatedNode]) -> YerbaTypedList {
 
       if let Some(key_name) = &node.key_name {
         value["key_name"] = serde_json::json!(key_name);
-        value["key_location"] = serde_json::json!({
-          "start_line": node.key_location.start_line,
-          "start_column": node.key_location.start_column,
-          "end_line": node.key_location.end_line,
-          "end_column": node.key_location.end_column,
-          "start_offset": node.key_location.start_offset,
-          "end_offset": node.key_location.end_offset,
-        });
+        value["key_location"] = location_json(&node.key_location);
       }
 
       value

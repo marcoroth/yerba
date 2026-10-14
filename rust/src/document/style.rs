@@ -660,7 +660,7 @@ impl Document {
       .map(|element| {
         let offset: usize = element.text_range().start().into();
 
-        (line_at(&source, offset), column_at(&source, offset) + 1)
+        (line_at(&source, offset), column_at(&source, offset))
       })
       .collect()
   }

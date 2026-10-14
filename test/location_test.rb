@@ -224,4 +224,33 @@ class LocationTest < Minitest::Spec
     assert_equal 1, scalar.location.start_line
     assert_equal 25, scalar.location.end_column
   end
+
+  test "columns count bytes and characters like Prism" do
+    document = Yerba::Document.parse("title: caf\u00E9 bar\n")
+
+    location = document["title"].location
+
+    assert_equal [7, 16], [location.start_column, location.end_column]
+    assert_equal [7, 15], [location.start_character_column, location.end_character_column]
+  end
+
+  test "Collection.get locations carry character columns" do
+    file = Tempfile.new(["test", ".yml"])
+    file.write("- tag: caf\u00E9\n")
+    file.close
+
+    location = Yerba::Collection.get(file.path, "[].tag").first.location
+
+    assert_equal [7, 12], [location.start_column, location.end_column]
+    assert_equal [7, 11], [location.start_character_column, location.end_character_column]
+  ensure
+    file&.unlink
+  end
+
+  test "a location built without character columns uses the byte columns" do
+    location = Yerba::Location.new(start_line: 1, start_column: 2, end_line: 1, end_column: 4, start_offset: 2, end_offset: 4)
+
+    assert_equal 2, location.start_character_column
+    assert_equal 4, location.end_character_column
+  end
 end

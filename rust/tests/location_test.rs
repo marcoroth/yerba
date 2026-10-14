@@ -252,3 +252,22 @@ fn test_locations_reflect_edits_after_being_read() {
   assert_eq!((b.start_line, b.start_column), (3, 3));
   assert_eq!(document.get_all_located("*")[2].line, 3);
 }
+
+#[test]
+fn test_location_reports_byte_and_character_columns() {
+  let document = parse("title: caf\u{e9} bar\n");
+
+  let location = document.get_node_info("title").location;
+
+  assert_eq!(location.start_column, 7);
+  assert_eq!(location.start_character_column, 7);
+  assert_eq!(location.end_column, 16);
+  assert_eq!(location.end_character_column, 15);
+}
+
+#[test]
+fn test_directive_locations_use_zero_based_columns() {
+  let document = parse("---\na: 1\n---\nb: 2\n");
+
+  assert_eq!(document.directive_locations(), vec![(1, 0), (3, 0)]);
+}

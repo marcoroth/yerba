@@ -49,6 +49,8 @@ impl Args {
       "end_column": info.location.end_column,
       "start_offset": info.location.start_offset,
       "end_offset": info.location.end_offset,
+      "start_character_column": info.location.start_character_column,
+      "end_character_column": info.location.end_character_column,
     });
 
     println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());

@@ -199,13 +199,15 @@ static VALUE document_s_parse(VALUE klass, VALUE content) {
 static VALUE location_to_ruby(YerbaLocation location) {
   VALUE klass = rb_path2class("Yerba::Location");
 
-  return rb_funcall(klass, rb_intern("new"), 6,
+  return rb_funcall(klass, rb_intern("new"), 8,
     SIZET2NUM(location.start_line),
     SIZET2NUM(location.start_column),
     SIZET2NUM(location.end_line),
     SIZET2NUM(location.end_column),
     SIZET2NUM(location.start_offset),
-    SIZET2NUM(location.end_offset)
+    SIZET2NUM(location.end_offset),
+    SIZET2NUM(location.start_character_column),
+    SIZET2NUM(location.end_character_column)
   );
 }
 

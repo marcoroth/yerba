@@ -12,7 +12,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 
-use crate::syntax::{detect_yaml_type, YerbaValueType};
+use crate::syntax::{detect_yaml_type, resolve_plain_scalar, PlainScalar, YerbaValueType};
 use crate::NodeType;
 use crate::{Document, InsertPosition, QuoteStyle};
 
@@ -42,6 +42,30 @@ impl YerbaResult {
 pub struct YerbaTypedValue {
   pub text: *mut c_char,
   pub value_type: YerbaValueType,
+}
+
+impl YerbaTypedValue {
+  fn new(text: &str, value_type: YerbaValueType) -> Self {
+    YerbaTypedValue {
+      text: CString::new(typed_text(text, value_type)).unwrap_or_default().into_raw(),
+      value_type,
+    }
+  }
+}
+
+fn typed_text(text: &str, value_type: YerbaValueType) -> String {
+  if value_type == YerbaValueType::String {
+    return text.to_string();
+  }
+
+  match resolve_plain_scalar(text) {
+    PlainScalar::Boolean(boolean) => boolean.to_string(),
+    PlainScalar::Integer(integer) => integer.to_string(),
+    PlainScalar::Float(float) if float.is_nan() => ".nan".to_string(),
+    PlainScalar::Float(float) if float.is_infinite() => (if float > 0.0 { ".inf" } else { "-.inf" }).to_string(),
+    PlainScalar::Float(float) => format!("{:?}", float),
+    PlainScalar::Null | PlainScalar::String => text.to_string(),
+  }
 }
 
 #[repr(C)]
@@ -136,11 +160,7 @@ impl YerbaGetResult {
 
   fn scalar(mut self, text: &str, value_type: YerbaValueType) -> Self {
     self.node_type = NodeType::Scalar;
-
-    self.single = YerbaTypedValue {
-      text: CString::new(text).unwrap_or_default().into_raw(),
-      value_type,
-    };
+    self.single = YerbaTypedValue::new(text, value_type);
 
     self
   }
@@ -277,7 +297,7 @@ pub unsafe extern "C" fn yerba_document_get(document: *const Document, path: *co
       .iter()
       .map(|value| {
         serde_json::json!({
-          "text": value.text,
+          "text": typed_text(&value.text, detect_yaml_type(value)),
           "type": detect_yaml_type(value) as u8
         })
       })
@@ -340,8 +360,7 @@ pub unsafe extern "C" fn yerba_document_get_value(document: *const Document, pat
 
   match document.get_value(selector_string) {
     Some(value) => {
-      let json = crate::json::yaml_to_json(&value);
-      let json_string = serde_json::to_string(&json).unwrap_or_else(|_| "null".to_string());
+      let json_string = crate::json::yaml_to_json_string_allowing_nan(&value);
 
       CString::new(json_string).unwrap_or_default().into_raw()
     }
@@ -1015,10 +1034,7 @@ pub unsafe extern "C" fn yerba_document_nodes(document: *const Document) -> Yerb
         .map(|name| CString::new(name).unwrap_or_default().into_raw())
         .unwrap_or(ptr::null_mut()),
       value: match record.scalar {
-        Some(scalar) => YerbaTypedValue {
-          value_type: crate::syntax::detect_yaml_type(&scalar),
-          text: CString::new(scalar.text).unwrap_or_default().into_raw(),
-        },
+        Some(scalar) => YerbaTypedValue::new(&scalar.text, detect_yaml_type(&scalar)),
         None => YerbaTypedValue {
           text: ptr::null_mut(),
           value_type: YerbaValueType::Null,
@@ -1089,7 +1105,7 @@ fn located_nodes_to_list(nodes: &[crate::LocatedNode]) -> YerbaTypedList {
       }
 
       if let Some(text) = &node.text {
-        value["text"] = serde_json::json!(text);
+        value["text"] = serde_json::json!(typed_text(text, node.value_type.unwrap_or(YerbaValueType::String)));
       }
 
       if let Some(vt) = node.value_type {

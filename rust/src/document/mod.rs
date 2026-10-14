@@ -697,25 +697,17 @@ pub(crate) fn node_to_yaml_value(node: &SyntaxNode) -> yaml_serde::Value {
   }
 
   if let Some(scalar) = extract_scalar(node) {
-    use crate::syntax::{detect_yaml_type, is_yaml_truthy, YerbaValueType};
+    use crate::syntax::{resolve_scalar, PlainScalar};
 
-    return match detect_yaml_type(&scalar) {
-      YerbaValueType::Null => yaml_serde::Value::Null,
-      YerbaValueType::Boolean => yaml_serde::Value::Bool(is_yaml_truthy(&scalar.text)),
-
-      YerbaValueType::Integer => scalar
-        .text
-        .parse::<i64>()
-        .map(|n| yaml_serde::Value::Number(yaml_serde::Number::from(n)))
-        .unwrap_or(yaml_serde::Value::String(scalar.text)),
-
-      YerbaValueType::Float => scalar
-        .text
-        .parse::<f64>()
-        .map(|n| yaml_serde::Value::Number(yaml_serde::Number::from(n)))
-        .unwrap_or(yaml_serde::Value::String(scalar.text)),
-
-      YerbaValueType::String => yaml_serde::Value::String(scalar.text),
+    return match resolve_scalar(&scalar) {
+      PlainScalar::Null => yaml_serde::Value::Null,
+      PlainScalar::Boolean(boolean) => yaml_serde::Value::Bool(boolean),
+      PlainScalar::Integer(integer) => yaml_serde::Value::Number(match i64::try_from(integer) {
+        Ok(integer) => yaml_serde::Number::from(integer),
+        Err(_) => yaml_serde::Number::from(integer as u64),
+      }),
+      PlainScalar::Float(float) => yaml_serde::Value::Number(yaml_serde::Number::from(float)),
+      PlainScalar::String => yaml_serde::Value::String(scalar.text),
     };
   }
 

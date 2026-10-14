@@ -24,11 +24,7 @@ pub enum YerbaValueType {
 }
 
 pub fn detect_yaml_type(scalar: &ScalarValue) -> YerbaValueType {
-  if scalar.kind != SyntaxKind::PLAIN_SCALAR {
-    return YerbaValueType::String;
-  }
-
-  detect_yaml_type_from_plain(&scalar.text)
+  resolve_scalar(scalar).value_type()
 }
 
 pub fn raw_scalar_value(token: &SyntaxToken) -> Option<String> {
@@ -332,21 +328,265 @@ pub fn needs_quoting_in_flow(value: &str) -> bool {
   is_yaml_non_string(value) || resolves_to_non_string_in_psych(value) || !is_plain_safe_in_flow(value)
 }
 
+/// Psych loads dates, times and symbols as `Date`, `Time` and `Symbol`, which Yerba reads as strings,
+/// and raises on float-shaped values like `.e+5`, so those need quoting even though they read as strings.
 pub fn resolves_to_non_string_in_psych(value: &str) -> bool {
-  let lower = value.to_ascii_lowercase();
+  !matches!(resolve_plain_scalar(value), PlainScalar::String)
+    || is_psych_float(value)
+    || is_psych_date_or_time(value)
+    || (value.len() > 1 && value.starts_with(':'))
+}
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PlainScalar {
+  Null,
+  Boolean(bool),
+  Integer(i128),
+  Float(f64),
+  String,
+}
+
+impl PlainScalar {
+  pub fn value_type(self) -> YerbaValueType {
+    match self {
+      PlainScalar::Null => YerbaValueType::Null,
+      PlainScalar::Boolean(_) => YerbaValueType::Boolean,
+      PlainScalar::Integer(_) => YerbaValueType::Integer,
+      PlainScalar::Float(_) => YerbaValueType::Float,
+      PlainScalar::String => YerbaValueType::String,
+    }
+  }
+}
+
+pub fn resolve_scalar(scalar: &ScalarValue) -> PlainScalar {
+  if scalar.kind != SyntaxKind::PLAIN_SCALAR {
+    return PlainScalar::String;
+  }
+
+  resolve_plain_scalar(&scalar.text)
+}
+
+/// Resolves a plain scalar the way Psych's `ScalarScanner#tokenize` does (YAML 1.1 with Psych's
+/// extensions, legacy integers included), except that dates, times and symbols stay strings.
+pub fn resolve_plain_scalar(value: &str) -> PlainScalar {
+  if value.is_empty() {
+    return PlainScalar::Null;
+  }
+
+  if value.len() <= 5 {
+    let is = |word: &str| value.eq_ignore_ascii_case(word);
+
+    if is("~") || is("null") {
+      return PlainScalar::Null;
+    }
+
+    if is("yes") || is("true") || is("on") {
+      return PlainScalar::Boolean(true);
+    }
+
+    if is("no") || is("false") || is("off") {
+      return PlainScalar::Boolean(false);
+    }
+
+    if is(".inf") || is("+.inf") {
+      return PlainScalar::Float(f64::INFINITY);
+    }
+
+    if is("-.inf") {
+      return PlainScalar::Float(f64::NEG_INFINITY);
+    }
+
+    if is(".nan") {
+      return PlainScalar::Float(f64::NAN);
+    }
+  }
+
+  if is_psych_sexagesimal(value) {
+    return sexagesimal_value(value);
+  }
+
+  if is_psych_float(value) {
+    let mut cleaned: String = value.chars().filter(|character| !matches!(character, ',' | '_')).collect();
+
+    if let Some(dot) = cleaned.find('.') {
+      if matches!(cleaned.as_bytes().get(dot + 1), None | Some(b'e') | Some(b'E')) {
+        cleaned.remove(dot);
+      }
+    }
+
+    return cleaned.parse::<f64>().map(PlainScalar::Float).unwrap_or(PlainScalar::String);
+  }
+
+  if is_psych_integer(value) {
+    return integer_value(value);
+  }
+
+  PlainScalar::String
+}
+
+fn integer_value(value: &str) -> PlainScalar {
+  let cleaned: String = value.chars().filter(|character| !matches!(character, ',' | '_')).collect();
+
+  let (negative, digits) = match cleaned.as_bytes()[0] {
+    b'-' => (true, &cleaned[1..]),
+    b'+' => (false, &cleaned[1..]),
+    _ => (false, cleaned.as_str()),
+  };
+
+  let (radix, digits) = if let Some(digits) = digits.strip_prefix("0b") {
+    (2, digits)
+  } else if let Some(digits) = digits.strip_prefix("0x") {
+    (16, digits)
+  } else if digits.len() > 1 && digits.starts_with('0') {
+    (8, &digits[1..])
+  } else {
+    (10, digits)
+  };
+
+  let magnitude = u128::from_str_radix(digits, radix).ok().and_then(|magnitude| i128::try_from(magnitude).ok());
+  let integer = magnitude.map(|magnitude| if negative { -magnitude } else { magnitude });
+
+  integer_or_float(integer, || {
+    let magnitude = match radix {
+      10 => digits.parse::<f64>().unwrap_or(f64::INFINITY),
+      _ => digits
+        .chars()
+        .fold(0.0, |total, digit| total * f64::from(radix) + f64::from(digit.to_digit(radix).unwrap_or(0))),
+    };
+
+    if negative {
+      -magnitude
+    } else {
+      magnitude
+    }
+  })
+}
+
+fn integer_or_float(integer: Option<i128>, approximate: impl FnOnce() -> f64) -> PlainScalar {
+  match integer {
+    Some(integer) if i64::try_from(integer).is_ok() || u64::try_from(integer).is_ok() => PlainScalar::Integer(integer),
+    _ => PlainScalar::Float(approximate()),
+  }
+}
+
+/// Psych sums the parts as `part * 60 ** (index - 2).abs`, so `1:30` is 5400, not 90.
+fn sexagesimal_value(value: &str) -> PlainScalar {
+  let parts: Vec<&str> = value.split(':').collect();
+  let exponent = |index: usize| (index as i32 - 2).unsigned_abs();
+
+  let float_total = || {
+    parts.iter().enumerate().fold(0.0, |total, (index, part)| {
+      total + ruby_number_prefix(part, true).parse::<f64>().unwrap_or(0.0) * 60f64.powi(exponent(index) as i32)
+    })
+  };
+
+  if value.contains('.') {
+    return PlainScalar::Float(float_total());
+  }
+
+  let integer_total = parts.iter().enumerate().try_fold(0i128, |total, (index, part)| {
+    let part = ruby_number_prefix(part, false).parse::<i128>().ok()?;
+
+    total.checked_add(part.checked_mul(60i128.pow(exponent(index)))?)
+  });
+
+  integer_or_float(integer_total, float_total)
+}
+
+/// The leading number Ruby's `String#to_i` (or `#to_f` with `fraction`) reads, without underscores.
+fn ruby_number_prefix(text: &str, fraction: bool) -> String {
+  let bytes = text.as_bytes();
+  let mut number = String::new();
+  let mut position = skip_sign(bytes);
+
+  if position == 1 {
+    number.push(bytes[0] as char);
+  }
+
+  position = push_ruby_digits(bytes, position, &mut number);
+
+  if fraction && bytes.get(position) == Some(&b'.') && bytes.get(position + 1).is_some_and(u8::is_ascii_digit) {
+    number.push('.');
+    push_ruby_digits(bytes, position + 1, &mut number);
+  }
+
+  number
+}
+
+fn push_ruby_digits(bytes: &[u8], mut position: usize, number: &mut String) -> usize {
+  let start = position;
+
+  while let Some(&byte) = bytes.get(position) {
+    let underscore_between_digits =
+      byte == b'_' && position > start && bytes[position - 1].is_ascii_digit() && bytes.get(position + 1).is_some_and(u8::is_ascii_digit);
+
+    if byte.is_ascii_digit() {
+      number.push(byte as char);
+    } else if !underscore_between_digits {
+      break;
+    }
+
+    position += 1;
+  }
+
+  position
+}
+
+pub fn is_yaml_1_2_core_non_string(value: &str) -> bool {
   if matches!(
-    lower.as_str(),
-    "yes" | "true" | "on" | "no" | "false" | "off" | "null" | "~" | ".inf" | "+.inf" | "-.inf" | ".nan"
+    value,
+    "" | "~" | "null" | "Null" | "NULL" | "true" | "True" | "TRUE" | "false" | "False" | "FALSE" | ".nan" | ".NaN" | ".NAN"
   ) {
     return true;
   }
 
-  if value.len() > 1 && value.starts_with(':') {
+  let bytes = value.as_bytes();
+  let unsigned = &bytes[skip_sign(bytes)..];
+
+  if matches!(unsigned, b".inf" | b".Inf" | b".INF") {
     return true;
   }
 
-  is_psych_date_or_time(value) || is_psych_sexagesimal(value) || is_psych_float(value) || is_psych_integer(value)
+  let all = |digits: &[u8], valid: fn(&u8) -> bool| !digits.is_empty() && digits.iter().all(valid);
+
+  match bytes {
+    [b'0', b'o', digits @ ..] if all(digits, |byte| matches!(byte, b'0'..=b'7')) => return true,
+    [b'0', b'x', digits @ ..] if all(digits, u8::is_ascii_hexdigit) => return true,
+    _ => {}
+  }
+
+  let integer = unsigned.iter().take_while(|byte| byte.is_ascii_digit()).count();
+  let mut position = integer;
+
+  if unsigned.get(position) == Some(&b'.') {
+    let fraction = unsigned[position + 1..].iter().take_while(|byte| byte.is_ascii_digit()).count();
+
+    if integer == 0 && fraction == 0 {
+      return false;
+    }
+
+    position += 1 + fraction;
+  } else if integer == 0 {
+    return false;
+  }
+
+  if matches!(unsigned.get(position), Some(b'e') | Some(b'E')) {
+    let exponent_start = position + 1 + usize::from(matches!(unsigned.get(position + 1), Some(b'+') | Some(b'-')));
+    let exponent = unsigned
+      .get(exponent_start..)
+      .unwrap_or_default()
+      .iter()
+      .take_while(|byte| byte.is_ascii_digit())
+      .count();
+
+    if exponent == 0 {
+      return false;
+    }
+
+    position = exponent_start + exponent;
+  }
+
+  position == unsigned.len()
 }
 
 fn take_digits(bytes: &[u8], mut position: usize, min: usize, max: usize) -> Option<usize> {
@@ -431,12 +671,11 @@ fn is_psych_sexagesimal(value: &str) -> bool {
 
 fn is_psych_float(value: &str) -> bool {
   let bytes = value.as_bytes();
-  let mut position = skip_sign(bytes);
-  let mut digits = 0;
+  let sign = skip_sign(bytes);
+  let mut position = sign;
 
   if bytes.get(position).is_some_and(u8::is_ascii_digit) {
     while bytes.get(position).is_some_and(|byte| byte.is_ascii_digit() || *byte == b'_' || *byte == b',') {
-      digits += usize::from(bytes[position].is_ascii_digit());
       position += 1;
     }
   }
@@ -448,7 +687,6 @@ fn is_psych_float(value: &str) -> bool {
   position += 1;
 
   while bytes.get(position).is_some_and(u8::is_ascii_digit) {
-    digits += 1;
     position += 1;
   }
 
@@ -463,7 +701,7 @@ fn is_psych_float(value: &str) -> bool {
     position = next;
   }
 
-  digits > 0 && position == bytes.len()
+  position == bytes.len() && bytes.len() > sign + 1
 }
 
 fn is_psych_integer(value: &str) -> bool {
@@ -804,56 +1042,9 @@ pub fn removal_range(node: &SyntaxNode) -> TextRange {
 }
 
 pub fn is_yaml_non_string(value: &str) -> bool {
-  detect_yaml_type_from_plain(value) != YerbaValueType::String
-}
-
-pub fn is_yaml_truthy(value: &str) -> bool {
-  matches!(value, "true" | "True" | "TRUE" | "yes" | "Yes" | "YES" | "on" | "On" | "ON")
+  detect_yaml_type_from_plain(value) != YerbaValueType::String || is_yaml_1_2_core_non_string(value)
 }
 
 pub fn detect_yaml_type_from_plain(value: &str) -> YerbaValueType {
-  // Null (YAML 1.1 + 1.2)
-  if matches!(value, "null" | "Null" | "NULL" | "~" | "") {
-    return YerbaValueType::Null;
-  }
-
-  // Boolean, resolved the way libyaml/Psych resolve it: the YAML 1.1 bool set
-  // without the single-letter y/Y/n/N forms (which libyaml treats as strings),
-  // and broader than YAML 1.2 core schema (which only accepts true/false).
-  if matches!(
-    value,
-    "true" | "True" | "TRUE" | "false" | "False" | "FALSE" | "yes" | "Yes" | "YES" | "no" | "No" | "NO" | "on" | "On" | "ON" | "off" | "Off" | "OFF"
-  ) {
-    return YerbaValueType::Boolean;
-  }
-
-  // Integer
-  if value.parse::<i64>().is_ok() {
-    return YerbaValueType::Integer;
-  }
-
-  // Hex (0x...) — only valid hex digits after prefix
-  if (value.starts_with("0x") || value.starts_with("0X")) && value.len() > 2 && value[2..].chars().all(|c| c.is_ascii_hexdigit()) {
-    return YerbaValueType::Integer;
-  }
-
-  // Octal (0o...) — only valid octal digits after prefix
-  if (value.starts_with("0o") || value.starts_with("0O")) && value.len() > 2 && value[2..].chars().all(|c| matches!(c, '0'..='7')) {
-    return YerbaValueType::Integer;
-  }
-
-  // Special floats (YAML 1.1 + 1.2)
-  if matches!(
-    value,
-    ".inf" | ".Inf" | ".INF" | "-.inf" | "-.Inf" | "-.INF" | "+.inf" | "+.Inf" | "+.INF" | ".nan" | ".NaN" | ".NAN"
-  ) {
-    return YerbaValueType::Float;
-  }
-
-  // Float
-  if value.parse::<f64>().is_ok() {
-    return YerbaValueType::Float;
-  }
-
-  YerbaValueType::String
+  resolve_plain_scalar(value).value_type()
 }

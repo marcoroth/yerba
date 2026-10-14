@@ -1,5 +1,6 @@
 #include <ruby.h>
 #include <ruby/encoding.h>
+#include <math.h>
 #include <string.h>
 #include "include/yerba.h"
 
@@ -72,21 +73,23 @@ static VALUE typed_value_to_ruby(YerbaTypedValue typed_value) {
       break;
 
     case YERBA_VALUE_TYPE_BOOLEAN:
-      result = (strcmp(typed_value.text, "true") == 0 || strcmp(typed_value.text, "True") == 0 ||
-                strcmp(typed_value.text, "TRUE") == 0 || strcmp(typed_value.text, "yes") == 0 ||
-                strcmp(typed_value.text, "Yes") == 0 || strcmp(typed_value.text, "YES") == 0 ||
-                strcmp(typed_value.text, "on") == 0 || strcmp(typed_value.text, "On") == 0 ||
-                strcmp(typed_value.text, "ON") == 0 || strcmp(typed_value.text, "y") == 0 ||
-                strcmp(typed_value.text, "Y") == 0)
-               ? Qtrue : Qfalse;
+      result = strcmp(typed_value.text, "true") == 0 ? Qtrue : Qfalse;
       break;
 
     case YERBA_VALUE_TYPE_INTEGER:
-      result = rb_cstr_to_inum(typed_value.text, 0, 0);
+      result = rb_cstr_to_inum(typed_value.text, 10, 0);
       break;
 
     case YERBA_VALUE_TYPE_FLOAT:
-      result = rb_float_new(rb_cstr_to_dbl(typed_value.text, 0));
+      if (strcmp(typed_value.text, ".inf") == 0) {
+        result = rb_float_new(HUGE_VAL);
+      } else if (strcmp(typed_value.text, "-.inf") == 0) {
+        result = rb_float_new(-HUGE_VAL);
+      } else if (strcmp(typed_value.text, ".nan") == 0) {
+        result = rb_float_new(nan(""));
+      } else {
+        result = rb_float_new(rb_cstr_to_dbl(typed_value.text, 0));
+      }
       break;
 
     case YERBA_VALUE_TYPE_STRING:
@@ -353,7 +356,10 @@ static VALUE document_get_value(VALUE self, VALUE path) {
   VALUE json_string = make_utf8_string(json);
   yerba_string_free(json);
 
-  return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
+  VALUE options = rb_hash_new();
+  rb_hash_aset(options, ID2SYM(rb_intern("allow_nan")), Qtrue);
+
+  return rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 2, json_string, options);
 }
 
 /* document.values → the whole document as Ruby objects, cached until the document changes */

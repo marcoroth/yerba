@@ -170,7 +170,11 @@ impl GitHubAnnotations for YerbaError {
           level: "error ",
           file: file.to_string(),
           line: Some(control.line),
-          message: format!("control character U+{:04X} at column {}", control.character as u32, control.column),
+          message: format!(
+            "control character U+{:04X} at column {}",
+            control.character as u32,
+            control.character_column + 1
+          ),
         })
         .collect(),
 

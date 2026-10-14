@@ -470,9 +470,13 @@ Output:
   "end_line": 2,
   "end_column": 19,
   "start_offset": 22,
-  "end_offset": 32
+  "end_offset": 32,
+  "start_character_column": 9,
+  "end_character_column": 19
 }
 ```
+
+Lines are 1-based and columns are 0-based, like Prism. `start_column` and `end_column` count bytes, `start_character_column` and `end_character_column` count characters, and offsets are byte offsets into the file.
 
 ### `schema`
 
@@ -1044,7 +1048,11 @@ loc.end_line      # => 2
 loc.end_column    # => 19
 loc.start_offset  # => 22
 loc.end_offset    # => 32
+loc.start_character_column  # => 9
+loc.end_character_column    # => 19
 ```
+
+Lines are 1-based and columns are 0-based, matching `Prism::Location`. `start_column` and `end_column` count bytes, `start_character_column` and `end_character_column` count characters, so they differ on lines with non-ASCII text before the value.
 
 You can also get a location by selector string:
 

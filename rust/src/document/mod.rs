@@ -133,6 +133,8 @@ pub struct Location {
   pub end_column: usize,
   pub start_offset: usize,
   pub end_offset: usize,
+  pub start_character_column: usize,
+  pub end_character_column: usize,
 }
 
 #[derive(Debug)]
@@ -607,6 +609,8 @@ pub(crate) fn compute_location(index: &LineIndex, start_offset: usize, end_offse
     start_column: index.column_at(start),
     end_line: index.line_at(end),
     end_column: index.column_at(end),
+    start_character_column: index.character_column_at(start),
+    end_character_column: index.character_column_at(end),
   }
 }
 

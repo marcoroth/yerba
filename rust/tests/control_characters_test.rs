@@ -11,7 +11,18 @@ fn test_find_control_characters_reports_line_and_column() {
   assert_eq!(found.len(), 1);
   assert_eq!(found[0].character, '\u{8}');
   assert_eq!(found[0].line, 2);
-  assert_eq!(found[0].column, 14);
+  assert_eq!(found[0].column, 13);
+  assert_eq!(found[0].character_column, 13);
+  assert_eq!(found[0].to_string(), "U+0008 at line 2, column 14");
+}
+
+#[test]
+fn test_find_control_characters_reports_byte_and_character_columns() {
+  let found = find_control_characters("title: \"caf\u{e9}\u{8}\"\n");
+
+  assert_eq!(found[0].column, 13);
+  assert_eq!(found[0].character_column, 12);
+  assert_eq!(found[0].to_string(), "U+0008 at line 1, column 13");
 }
 
 #[test]

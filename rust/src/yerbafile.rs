@@ -868,7 +868,7 @@ fn execute_step(document: &mut Document, step: &PipelineStep, base_path: Option<
         let locations = document.directive_locations();
 
         if locations.len() > max {
-          let positions: Vec<String> = locations.iter().map(|(line, col)| format!("{}:{}", line, col)).collect();
+          let positions: Vec<String> = locations.iter().map(|(line, column)| format!("{}:{}", line, column + 1)).collect();
 
           return Err(YerbaError::ParseError(format!(
             "found {} directive markers (---) at {}, expected at most {}",

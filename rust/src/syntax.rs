@@ -708,6 +708,7 @@ pub fn column_at(source: &str, offset: usize) -> usize {
 
 #[derive(Debug)]
 pub struct LineIndex {
+  source: String,
   line_starts: Vec<usize>,
   length: usize,
 }
@@ -717,6 +718,7 @@ impl LineIndex {
     let line_starts = std::iter::once(0).chain(source.match_indices('\n').map(|(position, _)| position + 1)).collect();
 
     Self {
+      source: source.to_string(),
       line_starts,
       length: source.len(),
     }
@@ -732,6 +734,12 @@ impl LineIndex {
 
   pub fn column_at(&self, offset: usize) -> usize {
     offset - self.line_starts[self.line_at(offset) - 1]
+  }
+
+  pub fn character_column_at(&self, offset: usize) -> usize {
+    let line_start = self.line_starts[self.line_at(offset) - 1];
+
+    self.source.get(line_start..offset).map_or(offset - line_start, |text| text.chars().count())
   }
 }
 

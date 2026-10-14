@@ -441,10 +441,112 @@ fn test_sort_preserves_multiple_section_headers() {
     document.to_string(),
     indoc! {"
       ## Day 1
+
       - id: talk-a
         title: A
 
       ## Day 2
+
+      - id: talk-b
+        title: B
+    "}
+  );
+}
+
+#[test]
+fn test_sort_keeps_blank_lines_after_section_comments() {
+  let mut document = parse(indoc! {"
+    - id: talk-c
+      title: C
+
+    # LUNCH BREAK
+
+    - id: talk-a
+      title: A
+
+    - id: talk-b
+      title: B
+  "});
+
+  document.sort_items("", &[SortField::asc("title")], false).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      # LUNCH BREAK
+
+      - id: talk-a
+        title: A
+
+      - id: talk-b
+        title: B
+
+      - id: talk-c
+        title: C
+    "}
+  );
+}
+
+#[test]
+fn test_sort_keeps_blank_lines_between_comments_before_the_first_item() {
+  let mut document = parse(indoc! {"
+    # REGISTRATION
+
+    # - id: commented-out
+    #   title: Commented out
+
+    - id: talk-b
+      title: B
+
+    - id: talk-a
+      title: A
+  "});
+
+  document.sort_items("", &[SortField::asc("title")], false).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      - id: talk-a
+        title: A
+
+      # REGISTRATION
+
+      # - id: commented-out
+      #   title: Commented out
+
+      - id: talk-b
+        title: B
+    "}
+  );
+}
+
+#[test]
+fn test_sort_keeps_the_document_start_after_comments() {
+  let mut document = parse(indoc! {"
+    # TODO: Add recordings
+    ---
+
+
+    - id: talk-b
+      title: B
+
+    - id: talk-a
+      title: A
+  "});
+
+  document.sort_items("", &[SortField::asc("title")], false).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {"
+      # TODO: Add recordings
+      ---
+
+
+      - id: talk-a
+        title: A
+
       - id: talk-b
         title: B
     "}

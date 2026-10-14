@@ -537,8 +537,6 @@ pub fn column_at(source: &str, offset: usize) -> usize {
   offset - line_start_at(source, offset)
 }
 
-/// Precomputed line starts, for answering many `line_at`/`column_at` lookups
-/// against the same source without rescanning it each time.
 #[derive(Debug)]
 pub struct LineIndex {
   line_starts: Vec<usize>,

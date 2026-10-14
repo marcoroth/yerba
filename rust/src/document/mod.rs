@@ -541,8 +541,6 @@ impl Document {
     self.root.text().to_string()
   }
 
-  /// Line starts for the current source, built on first use. Every edit reparses
-  /// into a fresh `Document`, which discards this along with the old tree.
   fn line_index(&self) -> &LineIndex {
     self.line_index.get_or_init(|| LineIndex::new(&self.source_text()))
   }

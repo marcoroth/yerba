@@ -12,39 +12,8 @@ pub struct NodeRecord {
   pub key_location: Location,
 }
 
-struct LineIndex {
-  starts: Vec<usize>,
-  length: usize,
-}
-
-impl LineIndex {
-  fn new(source: &str) -> Self {
-    let starts = std::iter::once(0).chain(source.match_indices('\n').map(|(index, _)| index + 1)).collect();
-
-    LineIndex { starts, length: source.len() }
-  }
-
-  fn location(&self, range: TextRange) -> Location {
-    let start = usize::from(range.start()).min(self.length);
-    let end = usize::from(range.end()).min(self.length);
-    let (start_line, start_column) = self.line_column(start);
-    let (end_line, end_column) = self.line_column(end);
-
-    Location {
-      start_offset: start,
-      end_offset: end,
-      start_line,
-      start_column,
-      end_line,
-      end_column,
-    }
-  }
-
-  fn line_column(&self, offset: usize) -> (usize, usize) {
-    let line = self.starts.partition_point(|&start| start <= offset);
-
-    (line, offset - self.starts[line - 1])
-  }
+fn location_of(lines: &LineIndex, range: TextRange) -> Location {
+  compute_location(lines, range.start().into(), range.end().into())
 }
 
 fn collection_type(node: &SyntaxNode) -> Option<NodeType> {
@@ -81,7 +50,7 @@ impl Walker<'_> {
       (None, None) => NodeType::NotFound,
     };
     let location = match node {
-      Some(node) if parent.is_some() || !matches!(node_type, NodeType::Sequence) => self.lines.location(node.text_range()),
+      Some(node) if parent.is_some() || !matches!(node_type, NodeType::Sequence) => location_of(self.lines, node.text_range()),
       _ => Location::default(),
     };
     let (key_name, key_location) = key.map(|(name, location)| (Some(name), location)).unwrap_or((None, Location::default()));
@@ -153,7 +122,7 @@ impl Walker<'_> {
       let Some(key_node) = key_node else { continue };
       let Some(key_name) = extract_scalar_text(&key_node) else { continue };
 
-      let key_location = self.lines.location(key_node.text_range());
+      let key_location = location_of(self.lines, key_node.text_range());
       let child_selector = if selector.is_empty() {
         key_name.clone()
       } else {
@@ -169,7 +138,7 @@ impl Walker<'_> {
           key_name: Some(key_name),
           scalar: None,
           has_value: false,
-          location: self.lines.location(entry_node.text_range()),
+          location: location_of(self.lines, entry_node.text_range()),
           key_location,
         }),
       }
@@ -179,10 +148,8 @@ impl Walker<'_> {
 
 impl Document {
   pub fn node_records(&self) -> Vec<NodeRecord> {
-    let source = self.source_text();
-    let lines = LineIndex::new(&source);
     let mut walker = Walker {
-      lines: &lines,
+      lines: self.line_index(),
       records: Vec::new(),
     };
 

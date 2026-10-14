@@ -44,7 +44,10 @@ class ConditionTest < Minitest::Spec
         port: 5432
     YAML
 
-    assert document.condition?('.host == "localhost"', path: "database")
+    assert document.condition?('.host == "localhost"', selector: "database")
+    assert_output(nil, /path: keyword is deprecated, use selector:/) do
+      assert document.condition?('.host == "localhost"', path: "database")
+    end
   end
 
   test "delete with condition removes key when condition matches" do

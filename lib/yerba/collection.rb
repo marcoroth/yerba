@@ -12,12 +12,12 @@ module Yerba
       Dir.glob(@glob).each { |path| yield Document.new(path) }
     end
 
-    def get(path)
-      self.class.get(@glob, path)
+    def get(selector)
+      self.class.get(@glob, selector)
     end
 
-    def find(path, condition: nil, select: nil)
-      self.class.find(@glob, path, condition: condition, select: select)
+    def find(selector, condition: nil, select: nil)
+      self.class.find(@glob, selector, condition: condition, select: select)
     end
 
     def find_by(...)

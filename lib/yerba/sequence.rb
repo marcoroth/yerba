@@ -276,7 +276,7 @@ module Yerba
 
     # Deletes the entire sequence node from the YAML document.
     #
-    # Removes the sequence at its selector path from the parent document.
+    # Removes the sequence at its selector from the parent document.
     # Has no effect if the sequence is not connected to a document.
     #
     # Returns the document, or +nil+ if the sequence is not connected to a document.
@@ -350,8 +350,8 @@ module Yerba
 
     private
 
-    def dig_into(hash, path)
-      keys = path.split(".")
+    def dig_into(hash, selector)
+      keys = selector.split(".")
 
       keys.reduce(hash) { |current, key| current.is_a?(Hash) ? current[key] : nil }
     end
@@ -361,8 +361,8 @@ module Yerba
 
       criteria.each do |field, value|
         if value.is_a?(Hash)
-          flatten_hash("#{field}[]", value).each do |path, leaf_value|
-            expanded << [path, leaf_value]
+          flatten_hash("#{field}[]", value).each do |selector, leaf_value|
+            expanded << [selector, leaf_value]
           end
         elsif value.is_a?(Array)
           value.each do |item|
@@ -380,12 +380,12 @@ module Yerba
       result = {}
 
       hash.each do |key, value|
-        path = "#{prefix}.#{key}"
+        selector = "#{prefix}.#{key}"
 
         if value.is_a?(Hash)
-          flatten_hash("#{path}[]", value).each { |nested_path, leaf| result[nested_path] = leaf }
+          flatten_hash("#{selector}[]", value).each { |nested_selector, leaf| result[nested_selector] = leaf }
         else
-          result[path] = value
+          result[selector] = value
         end
       end
 
@@ -404,8 +404,8 @@ module Yerba
       end
     end
 
-    def dig_values(hash, path)
-      parts = path.split(".")
+    def dig_values(hash, selector)
+      parts = selector.split(".")
       current = [hash]
 
       parts.each do |part|

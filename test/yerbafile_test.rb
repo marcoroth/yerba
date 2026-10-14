@@ -94,7 +94,7 @@ class YerbafileTest < Minitest::Spec
         - files: "**/*.yml"
           pipeline:
             - sort_keys:
-                path: "[]"
+                selector: "[]"
                 order:
                   - name
                   - slug
@@ -158,7 +158,7 @@ class YerbafileTest < Minitest::Spec
                 key_style: plain
                 value_style: double
             - sort_keys:
-                path: "[]"
+                selector: "[]"
                 order:
                   - name
                   - slug

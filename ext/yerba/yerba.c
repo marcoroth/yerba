@@ -49,9 +49,9 @@ static void check_result(YerbaResult result) {
     VALUE message = make_utf8_string(result.error);
     VALUE error_class = rb_eError;
 
-    if (strstr(result.error, "invalid path")) {
+    if (strstr(result.error, "invalid selector")) {
       error_class = rb_ePathValidationError;
-    } else if (strstr(result.error, "path not found") || strstr(result.error, "not a sequence")) {
+    } else if (strstr(result.error, "selector not found") || strstr(result.error, "not a sequence")) {
       error_class = rb_ePathNotFoundError;
     } else if (strstr(result.error, "parse error")) {
       error_class = rb_eParseError;
@@ -119,12 +119,12 @@ static int should_proceed(struct Document *document, VALUE opts) {
   VALUE v_condition = rb_hash_aref(opts, ID2SYM(rb_intern("condition")));
   if (NIL_P(v_condition)) return 1;
 
-  VALUE v_path = rb_hash_aref(opts, ID2SYM(rb_intern("condition_path")));
-  const char *parent_path = NIL_P(v_path) ? "" : StringValueCStr(v_path);
+  VALUE v_selector = rb_hash_aref(opts, ID2SYM(rb_intern("condition_path")));
+  const char *parent_selector = NIL_P(v_selector) ? "" : StringValueCStr(v_selector);
 
-  check_condition(StringValueCStr(v_condition), parent_path[0] != '\0');
+  check_condition(StringValueCStr(v_condition), parent_selector[0] != '\0');
 
-  return yerba_document_evaluate_condition(document, parent_path, StringValueCStr(v_condition));
+  return yerba_document_evaluate_condition(document, parent_selector, StringValueCStr(v_condition));
 }
 
 /* Document.new(path) */
@@ -216,7 +216,7 @@ static VALUE location_to_ruby(YerbaLocation location) {
 
 /* Build a Yerba::Scalar, Map, Sequence, or nil from a YerbaGetResult.
    Frees the result internally. */
-static VALUE node_from_get_result(YerbaGetResult result, VALUE self, VALUE path) {
+static VALUE node_from_get_result(YerbaGetResult result, VALUE self, VALUE selector) {
   if (result.error) {
     VALUE message = make_utf8_string(result.error);
     yerba_get_result_free(result);
@@ -244,18 +244,18 @@ static VALUE node_from_get_result(YerbaGetResult result, VALUE self, VALUE path)
       VALUE kwargs = rb_hash_new();
       rb_hash_aset(kwargs, ID2SYM(rb_intern("value")), value);
 
-      return rb_funcallv_kw(rb_path2class("Yerba::Scalar"), rb_intern("from_document"), 5, (VALUE[]){ self, path, location, key, kwargs }, RB_PASS_KEYWORDS);
+      return rb_funcallv_kw(rb_path2class("Yerba::Scalar"), rb_intern("from_document"), 5, (VALUE[]){ self, selector, location, key, kwargs }, RB_PASS_KEYWORDS);
     }
 
     case NODE_TYPE_MAP:
       yerba_get_result_free(result);
 
-      return rb_funcall(rb_path2class("Yerba::Map"), rb_intern("from_document"), 4, self, path, location, key);
+      return rb_funcall(rb_path2class("Yerba::Map"), rb_intern("from_document"), 4, self, selector, location, key);
 
     case NODE_TYPE_SEQUENCE:
       yerba_get_result_free(result);
 
-      return rb_funcall(rb_path2class("Yerba::Sequence"), rb_intern("from_document"), 4, self, path, location, key);
+      return rb_funcall(rb_path2class("Yerba::Sequence"), rb_intern("from_document"), 4, self, selector, location, key);
 
     default:
       yerba_get_result_free(result);
@@ -264,20 +264,20 @@ static VALUE node_from_get_result(YerbaGetResult result, VALUE self, VALUE path)
   }
 }
 
-/* document[](path) → Yerba::Scalar, Yerba::Map, Yerba::Sequence, Array, or nil */
-static VALUE document_bracket(VALUE self, VALUE path) {
+/* document[](selector) → Yerba::Scalar, Yerba::Map, Yerba::Sequence, Array, or nil */
+static VALUE document_bracket(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
   char index_buffer[32];
 
-  if (RB_TYPE_P(path, T_FIXNUM)) {
-    snprintf(index_buffer, sizeof(index_buffer), "[%ld]", FIX2LONG(path));
-    path = rb_str_new_cstr(index_buffer);
+  if (RB_TYPE_P(selector, T_FIXNUM)) {
+    snprintf(index_buffer, sizeof(index_buffer), "[%ld]", FIX2LONG(selector));
+    selector = rb_str_new_cstr(index_buffer);
   }
 
-  const char *selector = StringValueCStr(path);
+  const char *selector_string = StringValueCStr(selector);
 
-  if (yerba_selector_has_wildcard(selector)) {
-    char *json = yerba_document_resolve_selectors(document, selector);
+  if (yerba_selector_has_wildcard(selector_string)) {
+    char *json = yerba_document_resolve_selectors(document, selector_string);
 
     if (!json) return rb_ary_new();
 
@@ -289,9 +289,9 @@ static VALUE document_bracket(VALUE self, VALUE path) {
     VALUE array = rb_ary_new_capa(length);
 
     for (long i = 0; i < length; i++) {
-      VALUE concrete_path = rb_ary_entry(resolved, i);
-      YerbaGetResult result = yerba_document_get(document, StringValueCStr(concrete_path));
-      VALUE node = node_from_get_result(result, self, concrete_path);
+      VALUE concrete_selector = rb_ary_entry(resolved, i);
+      YerbaGetResult result = yerba_document_get(document, StringValueCStr(concrete_selector));
+      VALUE node = node_from_get_result(result, self, concrete_selector);
 
       if (!NIL_P(node)) rb_ary_push(array, node);
     }
@@ -299,10 +299,10 @@ static VALUE document_bracket(VALUE self, VALUE path) {
     return array;
   }
 
-  VALUE concrete_path = path;
+  VALUE concrete_selector = selector;
 
-  if (strstr(selector, "[-") != NULL) {
-    char *json = yerba_document_resolve_selectors(document, selector);
+  if (strstr(selector_string, "[-") != NULL) {
+    char *json = yerba_document_resolve_selectors(document, selector_string);
 
     if (json) {
       VALUE json_string = make_utf8_string(json);
@@ -310,33 +310,33 @@ static VALUE document_bracket(VALUE self, VALUE path) {
 
       VALUE resolved = rb_funcall(rb_path2class("JSON"), rb_intern("parse"), 1, json_string);
 
-      if (RARRAY_LEN(resolved) > 0) concrete_path = rb_ary_entry(resolved, 0);
+      if (RARRAY_LEN(resolved) > 0) concrete_selector = rb_ary_entry(resolved, 0);
     }
   }
 
-  YerbaGetResult result = yerba_document_get(document, StringValueCStr(path));
+  YerbaGetResult result = yerba_document_get(document, StringValueCStr(selector));
 
-  return node_from_get_result(result, self, concrete_path);
+  return node_from_get_result(result, self, concrete_selector);
 }
 
-/* document.exists?(path) */
-static VALUE document_exists_p(VALUE self, VALUE path) {
+/* document.exists?(selector) */
+static VALUE document_exists_p(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
 
-  return yerba_document_exists(document, StringValueCStr(path)) ? Qtrue : Qfalse;
+  return yerba_document_exists(document, StringValueCStr(selector)) ? Qtrue : Qfalse;
 }
 
 /* document.valid_selector?(selector) → true/false */
-static VALUE document_valid_selector_p(VALUE self, VALUE path) {
+static VALUE document_valid_selector_p(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
 
-  return yerba_document_valid_selector(document, StringValueCStr(path)) ? Qtrue : Qfalse;
+  return yerba_document_valid_selector(document, StringValueCStr(selector)) ? Qtrue : Qfalse;
 }
 
-/* document.source(path) → raw YAML text of the node at path */
-static VALUE document_source(VALUE self, VALUE path) {
+/* document.source(selector) → raw YAML text of the node at selector */
+static VALUE document_source(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
-  char *text = yerba_document_source(document, StringValueCStr(path));
+  char *text = yerba_document_source(document, StringValueCStr(selector));
 
   if (!text) return Qnil;
 
@@ -346,10 +346,10 @@ static VALUE document_source(VALUE self, VALUE path) {
   return result;
 }
 
-/* document.get_value(path) → parsed Ruby object (Hash/Array/String/Integer/etc) */
-static VALUE document_get_value(VALUE self, VALUE path) {
+/* document.get_value(selector) → parsed Ruby object (Hash/Array/String/Integer/etc) */
+static VALUE document_get_value(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
-  char *json = yerba_document_get_value(document, StringValueCStr(path));
+  char *json = yerba_document_get_value(document, StringValueCStr(selector));
 
   if (!json) return Qnil;
 
@@ -431,9 +431,9 @@ static VALUE document_selectors(VALUE self) {
 }
 
 /* document.keys_at(selector) → ["host", "port", ...] */
-static VALUE document_keys_at(VALUE self, VALUE path) {
+static VALUE document_keys_at(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
-  char *json = yerba_document_keys(document, StringValueCStr(path));
+  char *json = yerba_document_keys(document, StringValueCStr(selector));
 
   if (!json) return rb_ary_new();
 
@@ -444,9 +444,9 @@ static VALUE document_keys_at(VALUE self, VALUE path) {
 }
 
 /* document.locations(selector) → [Yerba::Location, ...] */
-static VALUE document_locations(VALUE self, VALUE path) {
+static VALUE document_locations(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
-  char *json = yerba_document_resolve_selectors(document, StringValueCStr(path));
+  char *json = yerba_document_resolve_selectors(document, StringValueCStr(selector));
 
   if (!json) return rb_ary_new();
 
@@ -458,8 +458,8 @@ static VALUE document_locations(VALUE self, VALUE path) {
   VALUE array = rb_ary_new_capa(length);
 
   for (long i = 0; i < length; i++) {
-    VALUE concrete_path = rb_ary_entry(resolved, i);
-    YerbaGetResult result = yerba_document_get(document, StringValueCStr(concrete_path));
+    VALUE concrete_selector = rb_ary_entry(resolved, i);
+    YerbaGetResult result = yerba_document_get(document, StringValueCStr(concrete_selector));
 
     if (result.error) {
       yerba_get_result_free(result);
@@ -479,10 +479,10 @@ static VALUE document_locations(VALUE self, VALUE path) {
   return array;
 }
 
-/* document.resolve_selectors(path) → ["[0].speakers[0]", "[0].speakers[1]", ...] */
-static VALUE document_resolve_selectors(VALUE self, VALUE path) {
+/* document.resolve_selectors(selector) → ["[0].speakers[0]", "[0].speakers[1]", ...] */
+static VALUE document_resolve_selectors(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
-  char *json = yerba_document_resolve_selectors(document, StringValueCStr(path));
+  char *json = yerba_document_resolve_selectors(document, StringValueCStr(selector));
 
   if (!json) return rb_ary_new();
 
@@ -517,10 +517,10 @@ static VALUE yerba_s_quote_scalar(int argc, VALUE *argv, VALUE self) {
   return result;
 }
 
-/* document.get_quote_style(path) → :plain, :single, :double, :literal, etc. or nil */
-static VALUE document_get_quote_style(VALUE self, VALUE path) {
+/* document.get_quote_style(selector) → :plain, :single, :double, :literal, etc. or nil */
+static VALUE document_get_quote_style(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
-  char *style = yerba_document_get_quote_style(document, StringValueCStr(path));
+  char *style = yerba_document_get_quote_style(document, StringValueCStr(selector));
 
   if (style == NULL) return Qnil;
 
@@ -531,8 +531,8 @@ static VALUE document_get_quote_style(VALUE self, VALUE path) {
   return symbol;
 }
 
-/* document.set_quote_style(path, style) */
-static VALUE document_set_quote_style(VALUE self, VALUE path, VALUE style) {
+/* document.set_quote_style(selector, style) */
+static VALUE document_set_quote_style(VALUE self, VALUE selector, VALUE style) {
   struct Document *document = get_document(self);
 
   const char *style_string;
@@ -545,17 +545,17 @@ static VALUE document_set_quote_style(VALUE self, VALUE path, VALUE style) {
     rb_raise(rb_eError, "Invalid quote style (expected Symbol or String)");
   }
 
-  YerbaResult result = yerba_document_set_quote_style(document, StringValueCStr(path), style_string);
+  YerbaResult result = yerba_document_set_quote_style(document, StringValueCStr(selector), style_string);
 
   check_result(result);
 
   return self;
 }
 
-/* document.get_collection_style(path) → :flow, :block, or nil */
-static VALUE document_get_collection_style(VALUE self, VALUE path) {
+/* document.get_collection_style(selector) → :flow, :block, or nil */
+static VALUE document_get_collection_style(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
-  char *style = yerba_document_get_collection_style(document, StringValueCStr(path));
+  char *style = yerba_document_get_collection_style(document, StringValueCStr(selector));
 
   if (style == NULL) return Qnil;
 
@@ -566,8 +566,8 @@ static VALUE document_get_collection_style(VALUE self, VALUE path) {
   return symbol;
 }
 
-/* document.set_collection_style(path, style) */
-static VALUE document_set_collection_style(VALUE self, VALUE path, VALUE style) {
+/* document.set_collection_style(selector, style) */
+static VALUE document_set_collection_style(VALUE self, VALUE selector, VALUE style) {
   struct Document *document = get_document(self);
 
   const char *style_string;
@@ -580,17 +580,17 @@ static VALUE document_set_collection_style(VALUE self, VALUE path, VALUE style) 
     rb_raise(rb_eError, "Invalid collection style (expected Symbol or String)");
   }
 
-  YerbaResult result = yerba_document_set_collection_style(document, StringValueCStr(path), style_string);
+  YerbaResult result = yerba_document_set_collection_style(document, StringValueCStr(selector), style_string);
 
   check_result(result);
 
   return self;
 }
 
-/* document.get_sequence_indent(path) → :compact, :indented, or nil */
-static VALUE document_get_sequence_indent(VALUE self, VALUE path) {
+/* document.get_sequence_indent(selector) → :compact, :indented, or nil */
+static VALUE document_get_sequence_indent(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
-  char *style = yerba_document_get_sequence_indent(document, StringValueCStr(path));
+  char *style = yerba_document_get_sequence_indent(document, StringValueCStr(selector));
 
   if (style == NULL) return Qnil;
 
@@ -601,8 +601,8 @@ static VALUE document_get_sequence_indent(VALUE self, VALUE path) {
   return symbol;
 }
 
-/* document.set_sequence_indent(path, style) */
-static VALUE document_set_sequence_indent(VALUE self, VALUE path, VALUE style) {
+/* document.set_sequence_indent(selector, style) */
+static VALUE document_set_sequence_indent(VALUE self, VALUE selector, VALUE style) {
   struct Document *document = get_document(self);
 
   const char *style_string;
@@ -615,38 +615,51 @@ static VALUE document_set_sequence_indent(VALUE self, VALUE path, VALUE style) {
     rb_raise(rb_eError, "Invalid sequence indent style (expected Symbol or String)");
   }
 
-  YerbaResult result = yerba_document_set_sequence_indent(document, StringValueCStr(path), style_string);
+  YerbaResult result = yerba_document_set_sequence_indent(document, StringValueCStr(selector), style_string);
 
   check_result(result);
 
   return self;
 }
 
-/* document.condition?(condition, path: "") */
+/* TODO(v1.0): stop reading the deprecated path: keyword. */
+static VALUE selector_option(VALUE opts) {
+  VALUE selector = rb_hash_aref(opts, ID2SYM(rb_intern("selector")));
+
+  if (!NIL_P(selector)) return selector;
+
+  VALUE path = rb_hash_aref(opts, ID2SYM(rb_intern("path")));
+
+  if (!NIL_P(path)) rb_warn("Yerba: the path: keyword is deprecated, use selector: instead");
+
+  return path;
+}
+
+/* document.condition?(condition, selector: "") */
 static VALUE document_condition_p(int argc, VALUE *argv, VALUE self) {
   VALUE condition, opts;
   rb_scan_args(argc, argv, "1:", &condition, &opts);
 
-  const char *parent_path = "";
+  const char *parent_selector = "";
   if (!NIL_P(opts)) {
-    VALUE v_path = rb_hash_aref(opts, ID2SYM(rb_intern("path")));
+    VALUE v_selector = selector_option(opts);
 
-    if (!NIL_P(v_path)) {
-      parent_path = StringValueCStr(v_path);
+    if (!NIL_P(v_selector)) {
+      parent_selector = StringValueCStr(v_selector);
     }
   }
 
   struct Document *document = get_document(self);
 
-  check_condition(StringValueCStr(condition), parent_path[0] != '\0');
+  check_condition(StringValueCStr(condition), parent_selector[0] != '\0');
 
-  return yerba_document_evaluate_condition(document, parent_path, StringValueCStr(condition)) ? Qtrue : Qfalse;
+  return yerba_document_evaluate_condition(document, parent_selector, StringValueCStr(condition)) ? Qtrue : Qfalse;
 }
 
-/* document.find(path, condition: nil, select: nil) */
+/* document.find(selector, condition: nil, select: nil) */
 static VALUE document_find(int argc, VALUE *argv, VALUE self) {
-  VALUE path, opts;
-  rb_scan_args(argc, argv, "1:", &path, &opts);
+  VALUE selector, opts;
+  rb_scan_args(argc, argv, "1:", &selector, &opts);
 
   const char *condition = NULL;
   const char *select = NULL;
@@ -663,7 +676,7 @@ static VALUE document_find(int argc, VALUE *argv, VALUE self) {
 
   check_condition(condition, true);
 
-  char *json = yerba_document_find(document, StringValueCStr(path), condition, select);
+  char *json = yerba_document_find(document, StringValueCStr(selector), condition, select);
 
   if (!json) return rb_ary_new();
 
@@ -716,10 +729,10 @@ static struct TypedValue ruby_to_typed_value(VALUE value, char *number_buffer) {
   return result;
 }
 
-/* document.set(path, value, condition: nil, if_exists: false, if_missing: false, plain: false, all: false) */
+/* document.set(selector, value, condition: nil, if_exists: false, if_missing: false, plain: false, all: false) */
 static VALUE document_set(int argc, VALUE *argv, VALUE self) {
-  VALUE path, value, opts;
-  rb_scan_args(argc, argv, "2:", &path, &value, &opts);
+  VALUE selector, value, opts;
+  rb_scan_args(argc, argv, "2:", &selector, &value, &opts);
 
   struct Document *document = get_document(self);
 
@@ -729,15 +742,15 @@ static VALUE document_set(int argc, VALUE *argv, VALUE self) {
     VALUE v_if_exists = rb_hash_aref(opts, ID2SYM(rb_intern("if_exists")));
     VALUE v_if_missing = rb_hash_aref(opts, ID2SYM(rb_intern("if_missing")));
 
-    if (RTEST(v_if_exists) && !yerba_document_exists(document, StringValueCStr(path))) return self;
+    if (RTEST(v_if_exists) && !yerba_document_exists(document, StringValueCStr(selector))) return self;
 
     if (RTEST(v_if_missing)) {
-      if (yerba_document_exists(document, StringValueCStr(path))) return self;
+      if (yerba_document_exists(document, StringValueCStr(selector))) return self;
 
       VALUE insert_opts = rb_hash_new();
       rb_hash_aset(insert_opts, ID2SYM(rb_intern("plain")), rb_hash_aref(opts, ID2SYM(rb_intern("plain"))));
 
-      VALUE insert_argv[3] = { path, value, insert_opts };
+      VALUE insert_argv[3] = { selector, value, insert_opts };
       rb_funcallv_kw(self, rb_intern("insert"), 3, insert_argv, RB_PASS_KEYWORDS);
 
       return self;
@@ -757,16 +770,16 @@ static VALUE document_set(int argc, VALUE *argv, VALUE self) {
     if (RTEST(v_plain)) plain = true;
   }
 
-  YerbaResult result = yerba_document_set(document, StringValueCStr(path), typed_value.text, typed_value.length, typed_value.type, plain, all);
+  YerbaResult result = yerba_document_set(document, StringValueCStr(selector), typed_value.text, typed_value.length, typed_value.type, plain, all);
   check_result(result);
 
   return self;
 }
 
-/* document.insert(path, value, before: nil, after: nil, at: nil, plain: false, style: nil) */
+/* document.insert(selector, value, before: nil, after: nil, at: nil, plain: false, style: nil) */
 static VALUE document_insert(int argc, VALUE *argv, VALUE self) {
-  VALUE path, value, opts;
-  rb_scan_args(argc, argv, "2:", &path, &value, &opts);
+  VALUE selector, value, opts;
+  rb_scan_args(argc, argv, "2:", &selector, &value, &opts);
 
   const char *before = NULL;
   const char *after = NULL;
@@ -797,17 +810,17 @@ static VALUE document_insert(int argc, VALUE *argv, VALUE self) {
 
   struct Document *document = get_document(self);
   YerbaResult result =
-      yerba_document_insert(document, StringValueCStr(path), typed_value.text, typed_value.length, typed_value.type, plain, style,
+      yerba_document_insert(document, StringValueCStr(selector), typed_value.text, typed_value.length, typed_value.type, plain, style,
                             before, after, at);
   check_result(result);
 
   return self;
 }
 
-/* document.insert_object(path, object, before: nil, after: nil, at: nil) */
+/* document.insert_object(selector, object, before: nil, after: nil, at: nil) */
 static VALUE document_insert_object(int argc, VALUE *argv, VALUE self) {
-  VALUE path, object, opts;
-  rb_scan_args(argc, argv, "2:", &path, &object, &opts);
+  VALUE selector, object, opts;
+  rb_scan_args(argc, argv, "2:", &selector, &object, &opts);
 
   const char *before = NULL;
   const char *after = NULL;
@@ -826,51 +839,51 @@ static VALUE document_insert_object(int argc, VALUE *argv, VALUE self) {
   struct Document *document = get_document(self);
   VALUE json_string = rb_funcall(rb_path2class("JSON"), rb_intern("generate"), 1, object);
 
-  YerbaResult result = yerba_document_insert_object(document, StringValueCStr(path), StringValueCStr(json_string), before, after, at);
+  YerbaResult result = yerba_document_insert_object(document, StringValueCStr(selector), StringValueCStr(json_string), before, after, at);
   check_result(result);
   return self;
 }
 
-/* document.insert_objects(path, array) */
-static VALUE document_insert_objects(VALUE self, VALUE path, VALUE array) {
+/* document.insert_objects(selector, array) */
+static VALUE document_insert_objects(VALUE self, VALUE selector, VALUE array) {
   struct Document *document = get_document(self);
   VALUE json_string = rb_funcall(rb_path2class("JSON"), rb_intern("generate"), 1, array);
 
-  YerbaResult result = yerba_document_insert_objects(document, StringValueCStr(path), StringValueCStr(json_string));
+  YerbaResult result = yerba_document_insert_objects(document, StringValueCStr(selector), StringValueCStr(json_string));
   check_result(result);
 
   return self;
 }
 
-/* document.delete(path, condition: nil) */
+/* document.delete(selector, condition: nil) */
 static VALUE document_delete(int argc, VALUE *argv, VALUE self) {
-  VALUE path, opts;
-  rb_scan_args(argc, argv, "1:", &path, &opts);
+  VALUE selector, opts;
+  rb_scan_args(argc, argv, "1:", &selector, &opts);
 
   struct Document *document = get_document(self);
   if (!should_proceed(document, opts)) return self;
 
-  YerbaResult result = yerba_document_delete(document, StringValueCStr(path));
+  YerbaResult result = yerba_document_delete(document, StringValueCStr(selector));
 
   check_result(result);
 
   return self;
 }
 
-/* document.remove(path, value) */
-static VALUE document_remove(VALUE self, VALUE path, VALUE value) {
+/* document.remove(selector, value) */
+static VALUE document_remove(VALUE self, VALUE selector, VALUE value) {
   struct Document *document = get_document(self);
-  YerbaResult result = yerba_document_remove(document, StringValueCStr(path), StringValueCStr(value));
+  YerbaResult result = yerba_document_remove(document, StringValueCStr(selector), StringValueCStr(value));
 
   check_result(result);
 
   return self;
 }
 
-/* document.remove_at(path, index) */
-static VALUE document_remove_at(VALUE self, VALUE path, VALUE index) {
+/* document.remove_at(selector, index) */
+static VALUE document_remove_at(VALUE self, VALUE selector, VALUE index) {
   struct Document *document = get_document(self);
-  YerbaResult result = yerba_document_remove_at(document, StringValueCStr(path), NUM2SIZET(index));
+  YerbaResult result = yerba_document_remove_at(document, StringValueCStr(selector), NUM2SIZET(index));
 
   check_result(result);
 
@@ -887,16 +900,16 @@ static VALUE document_rename(VALUE self, VALUE source, VALUE destination) {
   return self;
 }
 
-/* document.sort(path = "", by: nil, order: nil, case_sensitive: false)
+/* document.sort(selector = "", by: nil, order: nil, case_sensitive: false)
  *
  * by:    a field, several fields separated by commas or spaces, or an Array of fields
  * order: :asc, :desc, or an explicit order of values (Array or comma-separated String)
  */
 static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
-  VALUE path, opts;
-  rb_scan_args(argc, argv, "01:", &path, &opts);
+  VALUE selector, opts;
+  rb_scan_args(argc, argv, "01:", &selector, &opts);
 
-  if (NIL_P(path)) path = rb_str_new_cstr("");
+  if (NIL_P(selector)) selector = rb_str_new_cstr("");
 
   VALUE by_value = Qnil;
   VALUE order_csv = Qnil;
@@ -935,7 +948,7 @@ static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
   }
 
   struct Document *document = get_document(self);
-  const char *path_string = StringValueCStr(path);
+  const char *path_string = StringValueCStr(selector);
   const char *by = NIL_P(by_value) ? NULL : StringValueCStr(by_value);
 
   if (!NIL_P(order_csv)) {
@@ -964,8 +977,8 @@ static VALUE document_sort(int argc, VALUE *argv, VALUE self) {
   return self;
 }
 
-/* document.sort_keys(path, order) */
-static VALUE document_sort_keys(VALUE self, VALUE path, VALUE order) {
+/* document.sort_keys(selector, order) */
+static VALUE document_sort_keys(VALUE self, VALUE selector, VALUE order) {
   struct Document *document = get_document(self);
 
   VALUE order_string;
@@ -975,44 +988,44 @@ static VALUE document_sort_keys(VALUE self, VALUE path, VALUE order) {
     order_string = order;
   }
 
-  YerbaResult result = yerba_document_sort_keys(document, StringValueCStr(path), StringValueCStr(order_string));
+  YerbaResult result = yerba_document_sort_keys(document, StringValueCStr(selector), StringValueCStr(order_string));
 
   check_result(result);
 
   return self;
 }
 
-/* document.quote_style(path: nil, key_style: nil, value_style: nil) */
+/* document.quote_style(selector: nil, key_style: nil, value_style: nil) */
 static VALUE document_quote_style(int argc, VALUE *argv, VALUE self) {
   VALUE opts;
   rb_scan_args(argc, argv, ":", &opts);
 
-  const char *path = NULL;
+  const char *selector = NULL;
   const char *key_style = NULL;
   const char *value_style = NULL;
 
   if (!NIL_P(opts)) {
-    VALUE v_path = rb_hash_aref(opts, ID2SYM(rb_intern("path")));
+    VALUE v_selector = selector_option(opts);
     VALUE v_key_style = rb_hash_aref(opts, ID2SYM(rb_intern("key_style")));
     VALUE v_value_style = rb_hash_aref(opts, ID2SYM(rb_intern("value_style")));
 
-    if (!NIL_P(v_path)) path = StringValueCStr(v_path);
+    if (!NIL_P(v_selector)) selector = StringValueCStr(v_selector);
     if (!NIL_P(v_key_style)) key_style = StringValueCStr(v_key_style);
     if (!NIL_P(v_value_style)) value_style = StringValueCStr(v_value_style);
   }
 
   struct Document *document = get_document(self);
-  YerbaResult result = yerba_document_quote_style(document, path, key_style, value_style);
+  YerbaResult result = yerba_document_quote_style(document, selector, key_style, value_style);
 
   check_result(result);
 
   return self;
 }
 
-/* document.blank_lines(path, count) */
-static VALUE document_blank_lines(VALUE self, VALUE path, VALUE count) {
+/* document.blank_lines(selector, count) */
+static VALUE document_blank_lines(VALUE self, VALUE selector, VALUE count) {
   struct Document *document = get_document(self);
-  YerbaResult result = yerba_document_blank_lines(document, StringValueCStr(path), NUM2SIZET(count));
+  YerbaResult result = yerba_document_blank_lines(document, StringValueCStr(selector), NUM2SIZET(count));
 
   check_result(result);
 
@@ -1093,20 +1106,20 @@ static VALUE document_changed_p(VALUE self) {
 
 /* document.location(selector = nil) → Yerba::Location */
 static VALUE document_location(int argc, VALUE *argv, VALUE self) {
-  VALUE path;
-  rb_scan_args(argc, argv, "01", &path);
+  VALUE selector;
+  rb_scan_args(argc, argv, "01", &selector);
 
   struct Document *document = get_document(self);
-  const char *selector = NIL_P(path) ? "" : StringValueCStr(path);
+  const char *selector_string = NIL_P(selector) ? "" : StringValueCStr(selector);
 
-  YerbaGetResult result = yerba_document_get(document, selector);
+  YerbaGetResult result = yerba_document_get(document, selector_string);
 
   if (result.error) {
     yerba_get_result_free(result);
     return Qnil;
   }
 
-  if (result.location.start_line == 0 && result.location.end_line == 0 && strlen(selector) > 0) {
+  if (result.location.start_line == 0 && result.location.end_line == 0 && strlen(selector_string) > 0) {
     yerba_get_result_free(result);
     return Qnil;
   }
@@ -1191,24 +1204,24 @@ static VALUE located_list_to_ruby(YerbaTypedList result, VALUE document) {
 }
 
 /* Collection.get(glob, selector) → [Yerba::Scalar|Map|Sequence, ...] */
-static VALUE collection_s_get(VALUE self, VALUE pattern, VALUE path) {
+static VALUE collection_s_get(VALUE self, VALUE pattern, VALUE selector) {
   (void) self;
 
-  return located_list_to_ruby(yerba_glob_get(StringValueCStr(pattern), StringValueCStr(path)), Qnil);
+  return located_list_to_ruby(yerba_glob_get(StringValueCStr(pattern), StringValueCStr(selector)), Qnil);
 }
 
 /* document.get_all(selector) → [Yerba::Scalar|Map|Sequence, ...] */
-static VALUE document_get_all(VALUE self, VALUE path) {
+static VALUE document_get_all(VALUE self, VALUE selector) {
   struct Document *document = get_document(self);
 
-  return located_list_to_ruby(yerba_document_get_all(document, StringValueCStr(path)), self);
+  return located_list_to_ruby(yerba_document_get_all(document, StringValueCStr(selector)), self);
 }
 
-/* Collection.find(glob, path, condition: nil, select: nil) */
+/* Collection.find(glob, selector, condition: nil, select: nil) */
 static VALUE collection_s_find(int argc, VALUE *argv, VALUE self) {
   (void)self;
-  VALUE pattern, path, opts;
-  rb_scan_args(argc, argv, "2:", &pattern, &path, &opts);
+  VALUE pattern, selector, opts;
+  rb_scan_args(argc, argv, "2:", &pattern, &selector, &opts);
 
   const char *condition = NULL;
   const char *select = NULL;
@@ -1223,7 +1236,7 @@ static VALUE collection_s_find(int argc, VALUE *argv, VALUE self) {
 
   check_condition(condition, true);
 
-  YerbaTypedList result = yerba_glob_find(StringValueCStr(pattern), StringValueCStr(path), condition, select);
+  YerbaTypedList result = yerba_glob_find(StringValueCStr(pattern), StringValueCStr(selector), condition, select);
 
   if (!result.json) return rb_ary_new();
 

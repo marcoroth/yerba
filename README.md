@@ -93,7 +93,7 @@ Selectors let you address any node in a YAML document:
 | Pattern           | Meaning             | Example                    |
 |-------------------|---------------------|----------------------------|
 | `key`             | A single key        | `"database.host"`          |
-| `key.nested`      | Nested key path     | `"database.settings.pool"` |
+| `key.nested`      | Nested keys         | `"database.settings.pool"` |
 | `[]`              | All items in array  | `"[].title"`               |
 | `[N]`             | Item at index       | `"[0].title"`              |
 | `[-N]`            | Item from the end   | `"[-1].title"`             |
@@ -150,14 +150,14 @@ yerba get videos.yml "[]" --condition ".speakers contains Matz" --raw
 
 ### `set`
 
-Update an existing value at a path. The original quote style is preserved automatically, if a value was double-quoted before, it stays double-quoted after the edit.
+Update an existing value at a selector. The original quote style is preserved automatically, if a value was double-quoted before, it stays double-quoted after the edit.
 
 ```bash
 yerba set config.yml "database.host" "0.0.0.0"
 yerba set videos.yml "[0].title" "New Title"
 ```
 
-Use `--if-exists` to only set the value when the path already exists, or `--if-missing` to only set it when the path does not exist:
+Use `--if-exists` to only set the value when the selector already exists, or `--if-missing` to only set it when the selector does not exist:
 
 ```bash
 yerba set config.yml "database.host" "0.0.0.0" --if-exists
@@ -190,7 +190,7 @@ Use `--all` to update all nodes matching a wildcard selector:
 yerba set videos.yml "[].description" "" --all
 ```
 
-Values are written in the quote style already at the path, which keeps string edits tidy. A value is quoted anyway when writing it plain would not read back as the string you passed, so `yes` becomes `"yes"` and `12345` becomes `"12345"` — whatever the field held before. Use `--plain` to write a YAML literal instead:
+Values are written in the quote style already at the selector, which keeps string edits tidy. A value is quoted anyway when writing it plain would not read back as the string you passed, so `yes` becomes `"yes"` and `12345` becomes `"12345"` — whatever the field held before. Use `--plain` to write a YAML literal instead:
 
 ```bash
 yerba set config.yml "database.replica" null --plain
@@ -487,7 +487,7 @@ yerba schema data/speakers.yml --schema lib/schemas/speaker_schema.json
 yerba schema "data/**/videos.yml" --schema lib/schemas/video_schema.json
 ```
 
-Use `--path` to scope validation to a specific selector (e.g. validate each item in an array):
+Use `--selector` to scope validation to a specific selector (e.g. validate each item in an array):
 
 ```bash
 yerba schema data/speakers.yml --schema speaker_schema.json --selector "[]"
@@ -584,11 +584,11 @@ rules:
   - files: "data/**/videos.yml"
     pipeline:
       - quote_style:
-          path: "[].speakers"
+          selector: "[].speakers"
           value_style: plain
 
       - sort_keys:
-          path: "[]"
+          selector: "[]"
           order:
             - id
             - title
@@ -597,7 +597,7 @@ rules:
   - files: "data/speakers.yml"
     pipeline:
       - sort_keys:
-          path: "[]"
+          selector: "[]"
           order:
             - name
             - slug
@@ -607,9 +607,11 @@ rules:
           by: name
 ```
 
+Rules and steps take a `selector` to scope them. `path` is still accepted as the older name for it.
+
 Available pipeline steps:
 
-- `quote_style` Enforce quote style on keys and/or values, optionally scoped by path
+- `quote_style` Enforce quote style on keys and/or values, optionally scoped by selector
 - `collection_style` Enforce flow or block style on collections
 - `sequence_indent` Enforce compact or indented sequence style
 - `sort_keys` Reorder keys to match a predefined list
@@ -622,8 +624,8 @@ Available pipeline steps:
 - `remove` Remove an item from a sequence
 - `directives` Add or remove the document start marker (`---`), with optional `max` validation
 - `unique` Find or remove duplicate items in a sequence
-- `schema` Validate against a JSON schema (with optional `path` for scoping)
-- `escapes` Spell escaped characters literally where the quote style can carry them (with optional `path` for scoping)
+- `schema` Validate against a JSON schema (with optional `selector` for scoping)
+- `escapes` Spell escaped characters literally where the quote style can carry them (with optional `selector` for scoping)
 - `final_newline` Enforce exact number of trailing newlines (`count: 1` by default, strips extras)
 
 This makes it easy to enforce project-wide YAML conventions in CI:
@@ -752,7 +754,7 @@ document["database"]["host"].value  # => "localhost"
 document["database.host"].value     # => "localhost" (same thing)
 ```
 
-The returned object type depends on what's at the path:
+The returned object type depends on what's at the selector:
 
 ```ruby
 document["database"]          # => Yerba::Map

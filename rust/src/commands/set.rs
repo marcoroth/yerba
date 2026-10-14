@@ -22,7 +22,7 @@ static EXAMPLES: LazyLock<String> = LazyLock::new(|| {
 
 #[derive(clap::Args)]
 #[command(
-  about = "Update an existing value at a path (preserves quote style)",
+  about = "Update an existing value at a selector (preserves quote style)",
   arg_required_else_help = true,
   after_help = EXAMPLES.as_str()
 )]
@@ -47,7 +47,7 @@ pub struct Args {
 
 impl Args {
   pub fn run(self) {
-    let parent_path = self.selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
+    let parent_selector = self.selector.rsplit_once('.').map(|(parent, _)| parent).unwrap_or("");
 
     if let Some(condition) = &self.condition {
       if let Err(error) = yerba::validate_condition(condition) {
@@ -60,7 +60,7 @@ impl Args {
     }
 
     let leaf = self.selector.rsplit_once('.').map(|(_, leaf)| leaf).unwrap_or(&self.selector);
-    let per_item = yerba::Selector::parse(parent_path).has_brackets();
+    let per_item = yerba::Selector::parse(parent_selector).has_brackets();
 
     for resolved_file in resolve_files(&self.file) {
       let mut document = parse_file(&resolved_file);
@@ -70,7 +70,7 @@ impl Args {
       } else if self.if_missing {
         !document.exists(&self.selector)
       } else if let Some(condition) = &self.condition {
-        per_item || document.evaluate_condition(parent_path, condition).unwrap_or(false)
+        per_item || document.evaluate_condition(parent_selector, condition).unwrap_or(false)
       } else {
         true
       };
@@ -82,7 +82,9 @@ impl Args {
 
             document.insert_into(&self.selector, &value, default_insert_position(&self.file, &self.selector))
           }
-          Some(condition) if per_item => document.set_where(parent_path, leaf, &self.value, condition, self.all, self.plain).map(|_| ()),
+          Some(condition) if per_item => document
+            .set_where(parent_selector, leaf, &self.value, condition, self.all, self.plain)
+            .map(|_| ()),
           _ if self.all && self.plain => document.set_all_plain(&self.selector, &self.value),
           _ if self.all => document.set_all(&self.selector, &self.value),
           _ if self.plain => document.set_plain(&self.selector, &self.value),

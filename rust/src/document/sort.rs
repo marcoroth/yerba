@@ -1,38 +1,38 @@
 use super::*;
 
 impl Document {
-  pub fn move_item(&mut self, dot_path: &str, from: usize, to: usize) -> Result<(), YerbaError> {
+  pub fn move_item(&mut self, selector: &str, from: usize, to: usize) -> Result<(), YerbaError> {
     if from == to {
       return Ok(());
     }
 
-    let current_node = self.navigate(dot_path)?;
+    let current_node = self.navigate(selector)?;
 
-    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(selector.to_string()))?;
 
     let entries: Vec<_> = sequence.entries().collect();
 
     self.reorder_entries(sequence.syntax(), &entries, from, to)
   }
 
-  pub fn move_key(&mut self, dot_path: &str, from: usize, to: usize) -> Result<(), YerbaError> {
+  pub fn move_key(&mut self, selector: &str, from: usize, to: usize) -> Result<(), YerbaError> {
     if from == to {
       return Ok(());
     }
 
-    let current_node = self.navigate(dot_path)?;
+    let current_node = self.navigate(selector)?;
 
-    let map = find_block_map(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let map = find_block_map(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
     let entries: Vec<_> = map.entries().collect();
 
     self.reorder_entries(map.syntax(), &entries, from, to)
   }
 
-  pub fn resolve_key_index(&self, dot_path: &str, reference: &str) -> Result<usize, YerbaError> {
-    let current_node = self.navigate(dot_path)?;
+  pub fn resolve_key_index(&self, selector: &str, reference: &str) -> Result<usize, YerbaError> {
+    let current_node = self.navigate(selector)?;
 
-    let map = find_block_map(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(dot_path.to_string()))?;
+    let map = find_block_map(&current_node).ok_or_else(|| YerbaError::SelectorNotFound(selector.to_string()))?;
 
     if let Ok(index) = reference.parse::<usize>() {
       let length = map.entries().count();
@@ -55,13 +55,13 @@ impl Document {
           .unwrap_or(false)
       })
       .map(|(index, _entry)| index)
-      .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} key '{}'", dot_path, reference)))
+      .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} key '{}'", selector, reference)))
   }
 
-  pub fn resolve_sequence_index(&self, dot_path: &str, reference: &str) -> Result<usize, YerbaError> {
-    let current_node = self.navigate(dot_path)?;
+  pub fn resolve_sequence_index(&self, selector: &str, reference: &str) -> Result<usize, YerbaError> {
+    let current_node = self.navigate(selector)?;
 
-    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(dot_path.to_string()))?;
+    let sequence = find_block_sequence(&current_node).ok_or_else(|| YerbaError::NotASequence(selector.to_string()))?;
 
     if let Ok(index) = reference.parse::<usize>() {
       let length = sequence.entries().count();
@@ -79,7 +79,7 @@ impl Document {
         .enumerate()
         .find(|(_index, entry)| self.evaluate_condition_on_node(entry.syntax(), reference))
         .map(|(index, _entry)| index)
-        .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} condition '{}'", dot_path, reference)));
+        .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} condition '{}'", selector, reference)));
     }
 
     sequence
@@ -93,15 +93,15 @@ impl Document {
           .unwrap_or(false)
       })
       .map(|(index, _entry)| index)
-      .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", dot_path, reference)))
+      .ok_or_else(|| YerbaError::SelectorNotFound(format!("{} item '{}'", selector, reference)))
   }
 
-  pub fn validate_sort_keys(&self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
-    if let Some(sequence_path) = strip_bracket_suffix(dot_path) {
-      return self.validate_each_sort_keys(sequence_path, key_order);
+  pub fn validate_sort_keys(&self, selector: &str, key_order: &[&str]) -> Result<(), YerbaError> {
+    if let Some(sequence_selector) = strip_bracket_suffix(selector) {
+      return self.validate_each_sort_keys(sequence_selector, key_order);
     }
 
-    let current_node = match self.navigate(dot_path) {
+    let current_node = match self.navigate(selector) {
       Ok(node) => node,
       Err(_) => return Ok(()),
     };
@@ -124,12 +124,12 @@ impl Document {
     }
   }
 
-  pub fn sort_keys(&mut self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
-    if let Some(sequence_path) = strip_bracket_suffix(dot_path) {
-      return self.sort_each_keys(sequence_path, key_order);
+  pub fn sort_keys(&mut self, selector: &str, key_order: &[&str]) -> Result<(), YerbaError> {
+    if let Some(sequence_selector) = strip_bracket_suffix(selector) {
+      return self.sort_each_keys(sequence_selector, key_order);
     }
 
-    let current_node = match self.navigate(dot_path) {
+    let current_node = match self.navigate(selector) {
       Ok(node) => node,
       Err(_) => return Ok(()),
     };
@@ -145,14 +145,14 @@ impl Document {
     }
   }
 
-  pub fn sort_each_keys(&mut self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
-    let nodes = if dot_path.is_empty() {
-      match self.navigate(dot_path) {
+  pub fn sort_each_keys(&mut self, selector: &str, key_order: &[&str]) -> Result<(), YerbaError> {
+    let nodes = if selector.is_empty() {
+      match self.navigate(selector) {
         Ok(node) => vec![node],
         Err(_) => return Ok(()),
       }
     } else {
-      let found = self.navigate_all_compact(dot_path);
+      let found = self.navigate_all_compact(selector);
       if found.is_empty() {
         return Ok(());
       }
@@ -182,14 +182,14 @@ impl Document {
     self.apply_edits(edits)
   }
 
-  pub fn validate_each_sort_keys(&self, dot_path: &str, key_order: &[&str]) -> Result<(), YerbaError> {
-    let nodes = if dot_path.is_empty() {
-      match self.navigate(dot_path) {
+  pub fn validate_each_sort_keys(&self, selector: &str, key_order: &[&str]) -> Result<(), YerbaError> {
+    let nodes = if selector.is_empty() {
+      match self.navigate(selector) {
         Ok(node) => vec![node],
         Err(_) => return Ok(()),
       }
     } else {
-      let found = self.navigate_all_compact(dot_path);
+      let found = self.navigate_all_compact(selector);
       if found.is_empty() {
         return Ok(());
       }
@@ -224,12 +224,12 @@ impl Document {
     }
   }
 
-  pub fn sort_items(&mut self, dot_path: &str, sort_fields: &[SortField], case_sensitive: bool) -> Result<(), YerbaError> {
-    if dot_path.contains("[].") {
-      return self.sort_each_items(dot_path, sort_fields, case_sensitive);
+  pub fn sort_items(&mut self, selector: &str, sort_fields: &[SortField], case_sensitive: bool) -> Result<(), YerbaError> {
+    if selector.contains("[].") {
+      return self.sort_each_items(selector, sort_fields, case_sensitive);
     }
 
-    let current_node = self.navigate(dot_path)?;
+    let current_node = self.navigate(selector)?;
 
     let sequence = match find_block_sequence(&current_node) {
       Some(sequence) => sequence,
@@ -242,21 +242,21 @@ impl Document {
     }
   }
 
-  fn sort_each_items(&mut self, dot_path: &str, sort_fields: &[SortField], case_sensitive: bool) -> Result<(), YerbaError> {
-    let (parent_path, child_path) = if let Some(last_bracket) = dot_path.rfind("[].") {
-      (&dot_path[..last_bracket + 2], &dot_path[last_bracket + 3..])
+  fn sort_each_items(&mut self, selector: &str, sort_fields: &[SortField], case_sensitive: bool) -> Result<(), YerbaError> {
+    let (parent_selector, child_selector) = if let Some(last_bracket) = selector.rfind("[].") {
+      (&selector[..last_bracket + 2], &selector[last_bracket + 3..])
     } else {
-      (dot_path, "")
+      (selector, "")
     };
 
-    let parent_nodes = self.navigate_all_compact(parent_path);
+    let parent_nodes = self.navigate_all_compact(parent_selector);
     let mut edits: Vec<(TextRange, String)> = Vec::new();
 
     for parent_node in &parent_nodes {
-      let child_nodes = if child_path.is_empty() {
+      let child_nodes = if child_selector.is_empty() {
         vec![parent_node.clone()]
       } else {
-        navigate_from_node(parent_node, child_path)
+        navigate_from_node(parent_node, child_selector)
       };
 
       for child_node in &child_nodes {
@@ -274,20 +274,20 @@ impl Document {
     self.apply_edits(edits)
   }
 
-  pub fn reorder_items(&mut self, dot_path: &str, by: &str, desired_order: &[&str]) -> Result<(), YerbaError> {
+  pub fn reorder_items(&mut self, selector: &str, by: &str, desired_order: &[&str]) -> Result<(), YerbaError> {
     let field = by.strip_prefix('.').unwrap_or(by);
     let is_scalar = field.is_empty() || field == ".";
 
     let items_selector = if is_scalar {
-      if dot_path.is_empty() {
+      if selector.is_empty() {
         "[]".to_string()
       } else {
-        format!("{}[]", dot_path)
+        format!("{}[]", selector)
       }
-    } else if dot_path.is_empty() {
+    } else if selector.is_empty() {
       format!("[].{}", field)
     } else {
-      format!("{}[].{}", dot_path, field)
+      format!("{}[].{}", selector, field)
     };
 
     let labels: Vec<String> = match self.get_value(&items_selector) {
@@ -332,7 +332,7 @@ impl Document {
       let source = moves[target];
 
       if source != target {
-        self.move_item(dot_path, source, target)?;
+        self.move_item(selector, source, target)?;
 
         for item in moves.iter_mut().skip(target + 1) {
           if *item >= target && *item < source {
@@ -439,10 +439,10 @@ fn entry_sort_values(entry: &yaml_parser::ast::BlockSeqEntry, sort_fields: &[Sor
   sort_fields
     .iter()
     .map(|field| {
-      if field.path.is_empty() {
+      if field.selector.is_empty() {
         scalar_value()
       } else {
-        let nodes = navigate_from_node(entry.syntax(), &field.path);
+        let nodes = navigate_from_node(entry.syntax(), &field.selector);
         nodes.first().and_then(extract_scalar_text).unwrap_or_default()
       }
     })
@@ -474,12 +474,12 @@ fn compare_sort_values(values_a: &[String], values_b: &[String], sort_fields: &[
   std::cmp::Ordering::Equal
 }
 
-fn strip_bracket_suffix(path: &str) -> Option<&str> {
-  if path == "[]" {
+fn strip_bracket_suffix(selector: &str) -> Option<&str> {
+  if selector == "[]" {
     Some("")
-  } else if let Some(stripped) = path.strip_suffix(".[]") {
+  } else if let Some(stripped) = selector.strip_suffix(".[]") {
     Some(stripped)
   } else {
-    path.strip_suffix("[]")
+    selector.strip_suffix("[]")
   }
 }

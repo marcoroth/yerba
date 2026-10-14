@@ -2,10 +2,10 @@ use super::*;
 
 impl Document {
   pub fn validate_schema(&self, schema: &serde_json::Value, items: bool, selector: Option<&str>) -> Vec<crate::schema::ValidationError> {
-    let path = selector.unwrap_or("");
-    let has_wildcard = crate::selector::Selector::parse(path).has_wildcard();
+    let selector = selector.unwrap_or("");
+    let has_wildcard = crate::selector::Selector::parse(selector).has_wildcard();
 
-    let value = match self.get_value(path) {
+    let value = match self.get_value(selector) {
       Some(value) => crate::json::yaml_to_json(&value),
       None => return vec![],
     };
@@ -62,12 +62,12 @@ fn json_pointer_to_selector(pointer: &str) -> String {
         segment.to_string()
       }
     })
-    .fold(String::new(), |mut path, segment| {
-      if !path.is_empty() && !segment.starts_with('[') {
-        path.push('.');
+    .fold(String::new(), |mut selector, segment| {
+      if !selector.is_empty() && !segment.starts_with('[') {
+        selector.push('.');
       }
 
-      path.push_str(&segment);
-      path
+      selector.push_str(&segment);
+      selector
     })
 }

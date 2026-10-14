@@ -22,25 +22,25 @@ fn key_of(node: &SyntaxNode, index: &LineIndex) -> (Option<String>, Location) {
 }
 
 impl Document {
-  pub fn is_valid_selector(&self, dot_path: &str) -> bool {
-    if dot_path.is_empty() {
+  pub fn is_valid_selector(&self, selector: &str) -> bool {
+    if selector.is_empty() {
       return true;
     }
 
     let selectors = self.selectors();
 
-    if selectors.contains(&dot_path.to_string()) {
+    if selectors.contains(&selector.to_string()) {
       return true;
     }
 
-    if crate::selector::Selector::parse(dot_path).has_wildcard() && !self.navigate_all_compact(dot_path).is_empty() {
+    if crate::selector::Selector::parse(selector).has_wildcard() && !self.navigate_all_compact(selector).is_empty() {
       return true;
     }
 
-    let wildcard_version = dot_path.replace(|c: char| c.is_ascii_digit(), "").replace("[.", "[");
+    let wildcard_version = selector.replace(|c: char| c.is_ascii_digit(), "").replace("[.", "[");
 
     let mut normalized = String::new();
-    let mut chars = dot_path.chars().peekable();
+    let mut chars = selector.chars().peekable();
 
     while let Some(char) = chars.next() {
       if char == '[' {
@@ -66,26 +66,26 @@ impl Document {
     selectors.contains(&normalized) || selectors.contains(&wildcard_version)
   }
 
-  pub fn get(&self, dot_path: &str) -> Option<String> {
-    if dot_path.contains('[') {
-      return self.get_all(dot_path).into_iter().next();
+  pub fn get(&self, selector: &str) -> Option<String> {
+    if selector.contains('[') {
+      return self.get_all(selector).into_iter().next();
     }
 
-    let current_node = self.navigate(dot_path).ok()?;
+    let current_node = self.navigate(selector).ok()?;
 
     extract_scalar_text(&current_node)
   }
 
-  pub fn get_all(&self, dot_path: &str) -> Vec<String> {
-    self.navigate_all_compact(dot_path).iter().filter_map(extract_scalar_text).collect()
+  pub fn get_all(&self, selector: &str) -> Vec<String> {
+    self.navigate_all_compact(selector).iter().filter_map(extract_scalar_text).collect()
   }
 
-  pub fn get_typed(&self, dot_path: &str) -> Option<ScalarValue> {
-    if crate::selector::Selector::parse(dot_path).has_wildcard() {
-      return self.get_all_typed(dot_path).into_iter().next();
+  pub fn get_typed(&self, selector: &str) -> Option<ScalarValue> {
+    if crate::selector::Selector::parse(selector).has_wildcard() {
+      return self.get_all_typed(selector).into_iter().next();
     }
 
-    let current_node = self.navigate(dot_path).ok()?;
+    let current_node = self.navigate(selector).ok()?;
 
     if current_node.descendants().any(|child| {
       matches!(
@@ -99,9 +99,9 @@ impl Document {
     extract_scalar(&current_node)
   }
 
-  pub fn get_all_typed(&self, dot_path: &str) -> Vec<ScalarValue> {
+  pub fn get_all_typed(&self, selector: &str) -> Vec<ScalarValue> {
     self
-      .navigate_all_compact(dot_path)
+      .navigate_all_compact(selector)
       .iter()
       .filter(|node| {
         !node
@@ -112,15 +112,15 @@ impl Document {
       .collect()
   }
 
-  pub fn resolve_selectors(&self, dot_path: &str) -> Vec<String> {
-    self.navigate_all_compact(dot_path).iter().map(node_selector).collect()
+  pub fn resolve_selectors(&self, selector: &str) -> Vec<String> {
+    self.navigate_all_compact(selector).iter().map(node_selector).collect()
   }
 
-  pub fn keys_at(&self, dot_path: &str) -> Vec<String> {
-    let node = if dot_path.is_empty() {
+  pub fn keys_at(&self, selector: &str) -> Vec<String> {
+    let node = if selector.is_empty() {
       self.root.clone()
     } else {
-      match self.navigate_all_compact(dot_path).into_iter().next() {
+      match self.navigate_all_compact(selector).into_iter().next() {
         Some(node) => node,
         None => return Vec::new(),
       }
@@ -159,19 +159,19 @@ impl Document {
     Vec::new()
   }
 
-  pub fn get_all_located(&self, dot_path: &str) -> Vec<LocatedNode> {
+  pub fn get_all_located(&self, selector: &str) -> Vec<LocatedNode> {
     let index = self.line_index();
     let file_path = self.path.as_ref().map(|p| p.to_string_lossy().to_string());
 
     self
-      .navigate_all_compact(dot_path)
+      .navigate_all_compact(selector)
       .iter()
       .map(|node| {
         let range = node.text_range();
         let offset: usize = range.start().into();
         let line = index.line_at(offset);
         let location = compute_location(index, offset, range.end().into());
-        let selector = node_selector(node);
+        let item_selector = node_selector(node);
         let is_scalar = !node
           .descendants()
           .any(|child| child.kind() == SyntaxKind::BLOCK_MAP || child.kind() == SyntaxKind::BLOCK_SEQ);
@@ -200,7 +200,7 @@ impl Document {
           text,
           value_type,
           file_path: file_path.clone(),
-          selector,
+          selector: item_selector,
           line,
           location,
           key_name,
@@ -210,8 +210,8 @@ impl Document {
       .collect()
   }
 
-  pub fn node_type(&self, dot_path: &str) -> NodeType {
-    match self.get_value(dot_path) {
+  pub fn node_type(&self, selector: &str) -> NodeType {
+    match self.get_value(selector) {
       Some(yaml_serde::Value::Mapping(_)) => NodeType::Map,
       Some(yaml_serde::Value::Sequence(_)) => NodeType::Sequence,
       Some(_) => NodeType::Scalar,
@@ -219,14 +219,14 @@ impl Document {
     }
   }
 
-  pub fn get_node_info(&self, dot_path: &str) -> NodeInfo {
-    let selector = crate::selector::Selector::parse(dot_path);
+  pub fn get_node_info(&self, selector: &str) -> NodeInfo {
+    let parsed = crate::selector::Selector::parse(selector);
     let index = self.line_index();
 
-    let (location, key_name, key_location) = self.resolve_location(dot_path);
+    let (location, key_name, key_location) = self.resolve_location(selector);
 
-    if selector.has_wildcard() {
-      let values = self.get_all_typed(dot_path);
+    if parsed.has_wildcard() {
+      let values = self.get_all_typed(selector);
 
       return NodeInfo {
         node_type: NodeType::Sequence,
@@ -239,7 +239,7 @@ impl Document {
       };
     }
 
-    match self.get_typed(dot_path) {
+    match self.get_typed(selector) {
       Some(scalar) => NodeInfo {
         node_type: NodeType::Scalar,
         is_list: false,
@@ -250,8 +250,8 @@ impl Document {
         key_location,
       },
       None => {
-        let (node_type, entry_location, entry_key_name, entry_key_location) = if self.navigate(dot_path).is_err() {
-          if let Some(entry_node) = self.find_entry(dot_path) {
+        let (node_type, entry_location, entry_key_name, entry_key_location) = if self.navigate(selector).is_err() {
+          if let Some(entry_node) = self.find_entry(selector) {
             let range = entry_node.text_range();
             let entry_location = compute_location(index, range.start().into(), range.end().into());
 
@@ -270,10 +270,10 @@ impl Document {
 
             (NodeType::Scalar, entry_location, node, location)
           } else {
-            (self.node_type(dot_path), location, key_name, key_location)
+            (self.node_type(selector), location, key_name, key_location)
           }
         } else {
-          (self.node_type(dot_path), location, key_name, key_location)
+          (self.node_type(selector), location, key_name, key_location)
         };
 
         NodeInfo {
@@ -289,8 +289,8 @@ impl Document {
     }
   }
 
-  fn resolve_location(&self, dot_path: &str) -> (Location, Option<String>, Location) {
-    match self.navigate(dot_path) {
+  fn resolve_location(&self, selector: &str) -> (Location, Option<String>, Location) {
+    match self.navigate(selector) {
       Ok(node) => {
         let range = node.text_range();
         let location = compute_location(self.line_index(), range.start().into(), range.end().into());
@@ -303,10 +303,10 @@ impl Document {
     }
   }
 
-  pub fn find_items(&self, dot_path: &str, condition: Option<&str>, select: Option<&str>) -> Result<Vec<serde_json::Value>, YerbaError> {
+  pub fn find_items(&self, selector: &str, condition: Option<&str>, select: Option<&str>) -> Result<Vec<serde_json::Value>, YerbaError> {
     let values = match condition {
-      Some(cond) => self.filter(dot_path, cond)?,
-      None => self.get_values(dot_path),
+      Some(cond) => self.filter(selector, cond)?,
+      None => self.get_values(selector),
     };
 
     let select_fields: Option<Vec<&str>> = select.map(|s| s.split(',').collect());
@@ -332,15 +332,15 @@ impl Document {
     Ok(items)
   }
 
-  pub fn get_value(&self, dot_path: &str) -> Option<yaml_serde::Value> {
-    if dot_path.is_empty() {
+  pub fn get_value(&self, selector: &str) -> Option<yaml_serde::Value> {
+    if selector.is_empty() {
       return Some(node_to_yaml_value(&self.root));
     }
 
-    let parsed = crate::selector::Selector::parse(dot_path);
+    let parsed = crate::selector::Selector::parse(selector);
 
     if parsed.has_wildcard() {
-      let padded = self.navigate_all(dot_path);
+      let padded = self.navigate_all(selector);
 
       if padded.is_empty() {
         return None;
@@ -356,7 +356,7 @@ impl Document {
 
       Some(yaml_serde::Value::Sequence(values))
     } else {
-      let nodes = self.navigate_all_compact(dot_path);
+      let nodes = self.navigate_all_compact(selector);
 
       if nodes.is_empty() {
         return None;
@@ -372,12 +372,12 @@ impl Document {
     }
   }
 
-  pub fn get_values(&self, dot_path: &str) -> Vec<yaml_serde::Value> {
-    let parsed = crate::selector::Selector::parse(dot_path);
+  pub fn get_values(&self, selector: &str) -> Vec<yaml_serde::Value> {
+    let parsed = crate::selector::Selector::parse(selector);
 
     if parsed.has_wildcard() {
       self
-        .navigate_all(dot_path)
+        .navigate_all(selector)
         .iter()
         .map(|maybe_node| match maybe_node {
           Some(node) => node_to_yaml_value(node),
@@ -385,7 +385,7 @@ impl Document {
         })
         .collect()
     } else {
-      self.navigate_all_compact(dot_path).iter().map(node_to_yaml_value).collect()
+      self.navigate_all_compact(selector).iter().map(node_to_yaml_value).collect()
     }
   }
 
@@ -403,30 +403,30 @@ impl Document {
     selectors
   }
 
-  pub fn exists(&self, dot_path: &str) -> bool {
-    if crate::selector::Selector::parse(dot_path).has_wildcard() {
-      if !self.navigate_all_compact(dot_path).is_empty() {
+  pub fn exists(&self, selector: &str) -> bool {
+    if crate::selector::Selector::parse(selector).has_wildcard() {
+      if !self.navigate_all_compact(selector).is_empty() {
         return true;
       }
-    } else if self.navigate(dot_path).is_ok() {
+    } else if self.navigate(selector).is_ok() {
       return true;
     }
 
-    self.find_entry(dot_path).is_some()
+    self.find_entry(selector).is_some()
   }
 
-  pub(crate) fn find_entry(&self, dot_path: &str) -> Option<SyntaxNode> {
-    let (parent_path, last_key) = match dot_path.rsplit_once('.') {
+  pub(crate) fn find_entry(&self, selector: &str) -> Option<SyntaxNode> {
+    let (parent_selector, last_key) = match selector.rsplit_once('.') {
       Some((parent, key)) => (parent, key),
-      None => ("", dot_path),
+      None => ("", selector),
     };
 
-    let parent_node = if parent_path.is_empty() {
+    let parent_node = if parent_selector.is_empty() {
       let root = Root::cast(self.root.clone())?;
       let document = root.documents().next()?;
       document.syntax().clone()
     } else {
-      self.navigate(parent_path).ok()?
+      self.navigate(parent_selector).ok()?
     };
 
     let map = find_block_map(&parent_node)?;
@@ -434,8 +434,8 @@ impl Document {
     find_entry_by_key(&map, last_key).map(|entry| entry.syntax().clone())
   }
 
-  pub fn get_sequence_values(&self, dot_path: &str) -> Vec<String> {
-    let current_node = match self.navigate(dot_path) {
+  pub fn get_sequence_values(&self, selector: &str) -> Vec<String> {
+    let current_node = match self.navigate(selector) {
       Ok(node) => node,
       Err(_) => return Vec::new(),
     };
@@ -451,8 +451,8 @@ impl Document {
       .collect()
   }
 
-  pub fn get_collection_style(&self, dot_path: &str) -> Option<&'static str> {
-    let current_node = self.navigate(dot_path).ok()?;
+  pub fn get_collection_style(&self, selector: &str) -> Option<&'static str> {
+    let current_node = self.navigate(selector).ok()?;
 
     for descendant in current_node.descendants() {
       match descendant.kind() {
@@ -465,8 +465,8 @@ impl Document {
     None
   }
 
-  pub fn get_sequence_indent(&self, dot_path: &str) -> Option<&'static str> {
-    let current_node = self.navigate(dot_path).ok()?;
+  pub fn get_sequence_indent(&self, selector: &str) -> Option<&'static str> {
+    let current_node = self.navigate(selector).ok()?;
 
     let sequence = find_block_sequence(&current_node)?;
     let first_entry = sequence.entries().next()?;
@@ -486,8 +486,8 @@ impl Document {
     }
   }
 
-  pub fn get_quote_style(&self, dot_path: &str) -> Option<&'static str> {
-    let current_node = self.navigate(dot_path).ok()?;
+  pub fn get_quote_style(&self, selector: &str) -> Option<&'static str> {
+    let current_node = self.navigate(selector).ok()?;
 
     for element in current_node.descendants_with_tokens() {
       match element.kind() {

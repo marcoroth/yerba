@@ -209,11 +209,11 @@ impl Document {
     self.apply_edits(edits)
   }
 
-  pub fn enforce_collection_style(&mut self, style: &str, dot_path: Option<&str>) -> Result<(), YerbaError> {
-    let scope_path = dot_path.unwrap_or("");
+  pub fn enforce_collection_style(&mut self, style: &str, selector: Option<&str>) -> Result<(), YerbaError> {
+    let scope_selector = selector.unwrap_or("");
 
-    if scope_path.contains("[]") {
-      let concrete_selectors = self.resolve_selectors(scope_path);
+    if scope_selector.contains("[]") {
+      let concrete_selectors = self.resolve_selectors(scope_selector);
 
       for selector in concrete_selectors.iter().rev() {
         self.enforce_collection_style(style, Some(selector))?;
@@ -243,18 +243,18 @@ impl Document {
       }
     }
 
-    let value = match self.get_value(scope_path) {
+    let value = match self.get_value(scope_selector) {
       Some(value) => value,
       None => return Ok(()),
     };
 
     let mut selectors = Vec::new();
 
-    if !scope_path.is_empty() {
-      selectors.push(scope_path.to_string());
+    if !scope_selector.is_empty() {
+      selectors.push(scope_selector.to_string());
     }
 
-    collect_selectors(&value, scope_path, &mut selectors);
+    collect_selectors(&value, scope_selector, &mut selectors);
 
     let mut collection_selectors: Vec<String> = selectors
       .into_iter()
@@ -270,11 +270,11 @@ impl Document {
     Ok(())
   }
 
-  pub fn enforce_sequence_indent(&mut self, style: &str, dot_path: Option<&str>) -> Result<(), YerbaError> {
-    let scope_path = dot_path.unwrap_or("");
+  pub fn enforce_sequence_indent(&mut self, style: &str, selector: Option<&str>) -> Result<(), YerbaError> {
+    let scope_selector = selector.unwrap_or("");
 
-    if scope_path.contains("[]") {
-      let concrete_selectors = self.resolve_selectors(scope_path);
+    if scope_selector.contains("[]") {
+      let concrete_selectors = self.resolve_selectors(scope_selector);
 
       for selector in concrete_selectors.iter().rev() {
         self.enforce_sequence_indent(style, Some(selector))?;
@@ -283,10 +283,10 @@ impl Document {
       return Ok(());
     }
 
-    let scope_node = if scope_path.is_empty() {
+    let scope_node = if scope_selector.is_empty() {
       self.root.clone()
     } else {
-      match self.navigate(scope_path) {
+      match self.navigate(scope_selector) {
         Ok(node) => node,
         Err(_) => return Ok(()),
       }
@@ -330,10 +330,10 @@ impl Document {
     loop {
       let source = self.source_text();
 
-      let scope_node = if scope_path.is_empty() {
+      let scope_node = if scope_selector.is_empty() {
         self.root.clone()
       } else {
-        match self.navigate(scope_path) {
+        match self.navigate(scope_selector) {
           Ok(node) => node,
           Err(_) => return Ok(()),
         }
@@ -434,10 +434,10 @@ impl Document {
     }
   }
 
-  pub fn set_sequence_indent(&mut self, dot_path: &str, style: &str) -> Result<(), YerbaError> {
+  pub fn set_sequence_indent(&mut self, selector: &str, style: &str) -> Result<(), YerbaError> {
     let current_style = self
-      .get_sequence_indent(dot_path)
-      .ok_or_else(|| YerbaError::ParseError(format!("'{}' is not a block sequence", dot_path)))?;
+      .get_sequence_indent(selector)
+      .ok_or_else(|| YerbaError::ParseError(format!("'{}' is not a block sequence", selector)))?;
 
     if current_style == style {
       return Ok(());
@@ -450,7 +450,7 @@ impl Document {
       )));
     }
 
-    let current_node = self.navigate(dot_path)?;
+    let current_node = self.navigate(selector)?;
     let source = self.source_text();
 
     let entry_node = current_node
@@ -507,16 +507,16 @@ impl Document {
     self.apply_edit(replace_range, &reindented)
   }
 
-  pub fn set_collection_style(&mut self, dot_path: &str, style: &str) -> Result<(), YerbaError> {
+  pub fn set_collection_style(&mut self, selector: &str, style: &str) -> Result<(), YerbaError> {
     let current_style = self
-      .get_collection_style(dot_path)
-      .ok_or_else(|| YerbaError::ParseError(format!("'{}' is not a collection (sequence or map)", dot_path)))?;
+      .get_collection_style(selector)
+      .ok_or_else(|| YerbaError::ParseError(format!("'{}' is not a collection (sequence or map)", selector)))?;
 
     if current_style == style {
       return Ok(());
     }
 
-    let current_node = self.navigate(dot_path)?;
+    let current_node = self.navigate(selector)?;
     let value = node_to_yaml_value(&current_node);
 
     match &value {
@@ -588,15 +588,15 @@ impl Document {
     }
   }
 
-  pub fn enforce_blank_lines(&mut self, dot_path: &str, blank_lines: usize) -> Result<(), YerbaError> {
-    self.enforce_blank_lines_with(dot_path, blank_lines, &BlankLineOptions::default())
+  pub fn enforce_blank_lines(&mut self, selector: &str, blank_lines: usize) -> Result<(), YerbaError> {
+    self.enforce_blank_lines_with(selector, blank_lines, &BlankLineOptions::default())
   }
 
-  pub fn enforce_blank_lines_with(&mut self, dot_path: &str, blank_lines: usize, options: &BlankLineOptions) -> Result<(), YerbaError> {
-    let nodes = if dot_path.contains('[') {
-      self.navigate_all_compact(dot_path)
+  pub fn enforce_blank_lines_with(&mut self, selector: &str, blank_lines: usize, options: &BlankLineOptions) -> Result<(), YerbaError> {
+    let nodes = if selector.contains('[') {
+      self.navigate_all_compact(selector)
     } else {
-      vec![self.navigate(dot_path)?]
+      vec![self.navigate(selector)?]
     };
 
     let mut edits: Vec<(TextRange, String)> = Vec::new();
@@ -703,9 +703,9 @@ impl Document {
     }
   }
 
-  pub fn enforce_key_style(&mut self, style: &crate::KeyStyle, dot_path: Option<&str>) -> Result<(), YerbaError> {
-    let scope_ranges: Vec<TextRange> = match dot_path {
-      Some(path) if !path.is_empty() => self.navigate_all_compact(path).iter().map(|node| node.text_range()).collect(),
+  pub fn enforce_key_style(&mut self, style: &crate::KeyStyle, selector: Option<&str>) -> Result<(), YerbaError> {
+    let scope_ranges: Vec<TextRange> = match selector {
+      Some(scope) if !scope.is_empty() => self.navigate_all_compact(scope).iter().map(|node| node.text_range()).collect(),
       _ => vec![self.root.text_range()],
     };
 
@@ -773,9 +773,9 @@ impl Document {
     self.enforce_quotes_at(style, None)
   }
 
-  pub fn decode_escapes(&mut self, dot_path: Option<&str>) -> Result<usize, YerbaError> {
-    let scope_ranges: Vec<TextRange> = match dot_path {
-      Some(path) if !path.is_empty() => self.navigate_all_compact(path).iter().map(|node| node.text_range()).collect(),
+  pub fn decode_escapes(&mut self, selector: Option<&str>) -> Result<usize, YerbaError> {
+    let scope_ranges: Vec<TextRange> = match selector {
+      Some(scope) if !scope.is_empty() => self.navigate_all_compact(scope).iter().map(|node| node.text_range()).collect(),
       _ => vec![self.root.text_range()],
     };
 
@@ -808,11 +808,11 @@ impl Document {
     Ok(count)
   }
 
-  pub fn enforce_quotes_at(&mut self, style: &QuoteStyle, dot_path: Option<&str>) -> Result<Vec<String>, YerbaError> {
+  pub fn enforce_quotes_at(&mut self, style: &QuoteStyle, selector: Option<&str>) -> Result<Vec<String>, YerbaError> {
     let source = self.source_text();
 
-    let scope_ranges: Vec<TextRange> = match dot_path {
-      Some(path) if !path.is_empty() => self.navigate_all_compact(path).iter().map(|node| node.text_range()).collect(),
+    let scope_ranges: Vec<TextRange> = match selector {
+      Some(scope) if !scope.is_empty() => self.navigate_all_compact(scope).iter().map(|node| node.text_range()).collect(),
       _ => vec![self.root.text_range()],
     };
 
@@ -863,7 +863,7 @@ impl Document {
         }
 
         if is_block_scalar_text && !is_block_scalar_target {
-          if dot_path.is_none() || dot_path == Some("") {
+          if selector.is_none() || selector == Some("") {
             continue;
           }
 

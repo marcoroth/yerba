@@ -210,11 +210,11 @@ fn test_sort_single_item_noop() {
 #[test]
 fn test_sort_field_parse() {
   let field = SortField::parse("title");
-  assert_eq!(field.path, "title");
+  assert_eq!(field.selector, "title");
   assert!(field.ascending);
 
   let field = SortField::parse("date:desc");
-  assert_eq!(field.path, "date");
+  assert_eq!(field.selector, "date");
   assert!(!field.ascending);
 }
 
@@ -223,11 +223,11 @@ fn test_sort_field_parse_list() {
   let fields = SortField::parse_list("kind,date:desc,title");
 
   assert_eq!(fields.len(), 3);
-  assert_eq!(fields[0].path, "kind");
+  assert_eq!(fields[0].selector, "kind");
   assert!(fields[0].ascending);
-  assert_eq!(fields[1].path, "date");
+  assert_eq!(fields[1].selector, "date");
   assert!(!fields[1].ascending);
-  assert_eq!(fields[2].path, "title");
+  assert_eq!(fields[2].selector, "title");
   assert!(fields[2].ascending);
 }
 
@@ -236,10 +236,10 @@ fn test_sort_field_parse_list_with_spaces() {
   let fields = SortField::parse_list(".date .start_time:desc  .end_time");
 
   assert_eq!(fields.len(), 3);
-  assert_eq!(fields[0].path, ".date");
-  assert_eq!(fields[1].path, ".start_time");
+  assert_eq!(fields[0].selector, ".date");
+  assert_eq!(fields[1].selector, ".start_time");
   assert!(!fields[1].ascending);
-  assert_eq!(fields[2].path, ".end_time");
+  assert_eq!(fields[2].selector, ".end_time");
 }
 
 #[test]
@@ -247,8 +247,8 @@ fn test_sort_field_parse_list_with_commas_and_spaces() {
   let fields = SortField::parse_list(".date, .title");
 
   assert_eq!(fields.len(), 2);
-  assert_eq!(fields[0].path, ".date");
-  assert_eq!(fields[1].path, ".title");
+  assert_eq!(fields[0].selector, ".date");
+  assert_eq!(fields[1].selector, ".title");
 }
 
 #[test]
@@ -256,9 +256,9 @@ fn test_sort_field_parse_list_keeps_separators_inside_brackets_and_quotes() {
   let fields = SortField::parse_list(r#".["first name"] .['a,b'] .title"#);
 
   assert_eq!(fields.len(), 3);
-  assert_eq!(fields[0].path, r#".["first name"]"#);
-  assert_eq!(fields[1].path, ".['a,b']");
-  assert_eq!(fields[2].path, ".title");
+  assert_eq!(fields[0].selector, r#".["first name"]"#);
+  assert_eq!(fields[1].selector, ".['a,b']");
+  assert_eq!(fields[2].selector, ".title");
 }
 
 #[test]

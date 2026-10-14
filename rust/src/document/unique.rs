@@ -11,12 +11,12 @@ pub struct DuplicateInfo {
 }
 
 impl Document {
-  pub fn unique(&mut self, dot_path: &str, by: &str, remove: bool) -> Result<Vec<DuplicateInfo>, YerbaError> {
-    self.unique_with_options(dot_path, by, remove, false)
+  pub fn unique(&mut self, selector: &str, by: &str, remove: bool) -> Result<Vec<DuplicateInfo>, YerbaError> {
+    self.unique_with_options(selector, by, remove, false)
   }
 
-  pub fn unique_with_options(&mut self, dot_path: &str, by: &str, remove: bool, allow_blank_duplicates: bool) -> Result<Vec<DuplicateInfo>, YerbaError> {
-    let current_node = self.navigate(dot_path)?;
+  pub fn unique_with_options(&mut self, selector: &str, by: &str, remove: bool, allow_blank_duplicates: bool) -> Result<Vec<DuplicateInfo>, YerbaError> {
+    let current_node = self.navigate(selector)?;
     let source = self.source_text();
 
     let sequence = match find_block_sequence(&current_node) {
@@ -76,7 +76,7 @@ impl Document {
 
     if remove && !duplicate_indices.is_empty() {
       for &index in duplicate_indices.iter().rev() {
-        self.remove_at(dot_path, index)?;
+        self.remove_at(selector, index)?;
       }
     }
 

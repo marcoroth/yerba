@@ -123,7 +123,7 @@ module Yerba
     end
 
     def where(selector = nil, value = nil, **criteria)
-      QueryResult.new(self, indices_of(selector, value, **criteria))
+      QueryResult.new(self, indices_of(selector, value, **criteria)) { indices_of(selector, value, **criteria) }
     end
 
     def pluck(*fields)

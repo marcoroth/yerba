@@ -314,5 +314,67 @@ module Document
 
       assert_equal ["rust", "go", "ruby"], document.value_at("tags")
     end
+    test "document.sort with missing: :keep leaves items without a value in place" do
+      document = Yerba::Document.parse(<<~YAML)
+        - id: c
+          time: "11:00"
+        - id: film
+        - id: a
+          time: "09:00"
+      YAML
+
+      document.sort(by: "time", missing: :keep)
+
+      assert_equal ["a", "film", "c"], document.value_at("[].id")
+    end
+
+    test "document.sort with missing: :last puts items without a value at the end" do
+      document = Yerba::Document.parse(<<~YAML)
+        - id: c
+          time: "11:00"
+        - id: film
+        - id: a
+          time: "09:00"
+      YAML
+
+      document.sort(by: "time", missing: "last")
+
+      assert_equal ["a", "c", "film"], document.value_at("[].id")
+    end
+
+    test "sequence.sort passes missing through" do
+      document = Yerba::Document.parse(<<~YAML)
+        talks:
+          - id: c
+            time: "11:00"
+          - id: film
+          - id: a
+            time: "09:00"
+      YAML
+
+      document["talks"].sort(by: "time", missing: :first)
+
+      assert_equal ["film", "a", "c"], document.value_at("talks[].id")
+    end
+
+    test "document.sort with missing: :skip leaves a sequence with missing values unsorted" do
+      document = Yerba::Document.parse(<<~YAML)
+        - id: c
+          time: "11:00"
+        - id: film
+        - id: a
+          time: "09:00"
+      YAML
+
+      document.sort(by: "time", missing: :skip)
+
+      assert_equal ["c", "film", "a"], document.value_at("[].id")
+    end
+
+    test "document.sort raises for an unknown missing value" do
+      document = Yerba::Document.parse("- id: b\n- id: a\n")
+
+      assert_raises(Yerba::Error) { document.sort(by: "id", missing: :middle) }
+    end
   end
 end

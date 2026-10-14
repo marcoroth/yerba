@@ -268,8 +268,8 @@ module Yerba
       self
     end
 
-    def sort(by: nil, order: nil, case_sensitive: false)
-      document&.sort(@selector, by: by, order: order, case_sensitive: case_sensitive)
+    def sort(by: nil, order: nil, case_sensitive: false, missing: nil)
+      document&.sort(@selector, by: by, order: order, case_sensitive: case_sensitive, missing: missing)
 
       self
     end

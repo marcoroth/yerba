@@ -15,7 +15,8 @@ pub mod yerbafile;
 
 pub use document::style::{BlankLineOptions, StyleEnforcement};
 pub use document::{
-  collect_selectors, validate_condition, validate_item_condition, Document, DuplicateInfo, InsertPosition, LocatedNode, Location, NodeInfo, NodeType, SortField,
+  collect_selectors, validate_condition, validate_item_condition, Document, DuplicateInfo, InsertPosition, LocatedNode, Location, NodeInfo, NodeType,
+  SortField, SortMissing,
 };
 pub use error::YerbaError;
 pub use quote_style::{KeyStyle, QuoteStyle};

@@ -300,6 +300,17 @@ yerba sort videos.yml --by ".date" --order desc --by ".title"
 yerba sort videos.yml "[].speakers" --by ".name"
 ```
 
+Items without a value for a sort field sort as an empty value, so they come first. Use `--missing` to decide what happens to them instead:
+
+- `first` or `last` puts a missing value before or after the present ones, comparing one field at a time like SQL's `NULLS FIRST` and `NULLS LAST`. Sorted by `.date` and `.start_time`, a talk without a time goes first or last within its date.
+- `keep` leaves items with a missing value where they are and sorts the other items around them.
+- `skip` leaves the whole sequence unsorted if any item has a missing value.
+
+
+```bash
+yerba sort videos.yml --by ".date" --by ".start_time" --missing keep
+```
+
 Use `--order` with a comma-separated list to specify an explicit custom order. All items must be listed:
 
 ```bash
@@ -582,6 +593,8 @@ pipeline:
 
 rules:
   - files: "data/**/videos.yml"
+    exclude:
+      - "data/archive/**/videos.yml"
     pipeline:
       - quote_style:
           selector: "[].speakers"
@@ -607,7 +620,7 @@ rules:
           by: name
 ```
 
-Rules and steps take a `selector` to scope them. `path` is still accepted as the older name for it.
+Rules and steps take a `selector` to scope them. `path` is still accepted as the older name for it. A rule's `exclude` takes a glob or a list of globs for files the rule skips.
 
 Available pipeline steps:
 
@@ -615,7 +628,7 @@ Available pipeline steps:
 - `collection_style` Enforce flow or block style on collections
 - `sequence_indent` Enforce compact or indented sequence style
 - `sort_keys` Reorder keys to match a predefined list
-- `sort` Sort sequence items by field(s), `by: ".date,.start_time"` or `by: ".date .start_time"` for tie-breakers
+- `sort` Sort sequence items by field(s), `by: ".date,.start_time"` or `by: ".date .start_time"` for tie-breakers, and `missing: first`, `last`, `keep` or `skip` for items without a value
 - `blank_lines` Enforce blank lines between sequence entries, optionally limited to named map keys with `before` and to non-empty values with `skip_empty`
 - `set` Set a value (supports conditions, and `plain: true` for YAML literals)
 - `insert` Insert a new key or sequence item (`plain: true` for YAML literals and fragments)
@@ -915,6 +928,12 @@ document.sort(by: ".date .start_time")
 The `by:` option accepts symbols, strings, or dot-prefixed strings (`:name`, `"name"`, `".name"`). Several fields, separated by commas or spaces or given as an Array, sort by the first and break ties with the next.
 
 The `order:` option is `:asc`, `:desc`, or an explicit order of values as an Array or comma-separated String.
+
+The `missing:` option decides what happens to items without a value for a sort field: `:first` or `:last` put the missing value before or after the present ones for each field, `:keep` leaves those items in place and sorts the others into the remaining positions, and `:skip` leaves the sequence unsorted if any value is missing. Without it, a missing value sorts as an empty string.
+
+```ruby
+document.sort(by: [:date, :start_time], missing: :keep)
+```
 
 ### Querying
 

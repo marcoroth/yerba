@@ -2125,3 +2125,133 @@ fn test_selector_keys_are_not_reported_as_deprecated() {
 
   assert!(yerbafile.deprecated_path_keys.is_empty());
 }
+
+fn load_yerbafile(content: &str) -> (TempDir, yerba::Yerbafile) {
+  let dir = TempDir::new().unwrap();
+  fs::write(dir.path().join("Yerbafile"), content).unwrap();
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+
+  (dir, yerbafile)
+}
+
+const UNSORTED_TALKS: &str = indoc! {r#"
+  - id: c
+    time: "11:00"
+  - id: film
+  - id: a
+    time: "09:00"
+"#};
+
+#[test]
+fn test_sort_step_with_missing_keep_leaves_items_without_a_value_in_place() {
+  let (_dir, yerbafile) = load_yerbafile(indoc! {r#"
+    rules:
+      - files: "**/videos.yml"
+        pipeline:
+          - sort:
+              by: ".time"
+              missing: keep
+  "#});
+
+  let mut document = yerba::Document::parse(UNSORTED_TALKS).unwrap();
+
+  yerbafile.apply_to_document(&mut document, "data/videos.yml").unwrap();
+
+  assert_eq!(document.get_all("[].id"), vec!["a", "film", "c"]);
+}
+
+#[test]
+fn test_sort_step_rejects_an_unknown_missing_value() {
+  let dir = TempDir::new().unwrap();
+  fs::write(
+    dir.path().join("Yerbafile"),
+    indoc! {r#"
+    rules:
+      - files: "**/videos.yml"
+        pipeline:
+          - sort:
+              by: ".time"
+              missing: middle
+  "#},
+  )
+  .unwrap();
+
+  assert!(yerba::Yerbafile::load(dir.path().join("Yerbafile")).is_err());
+}
+
+#[test]
+fn test_rule_exclude_skips_matching_files() {
+  let (_dir, yerbafile) = load_yerbafile(indoc! {r#"
+    rules:
+      - files: "data/**/videos.yml"
+        exclude:
+          - "data/euruko/euruko-2012/videos.yml"
+          - "data/rubyenrails/**/videos.yml"
+        pipeline:
+          - sort:
+              by: ".time"
+  "#});
+
+  for excluded in ["data/euruko/euruko-2012/videos.yml", "data/rubyenrails/rubyandrails-2010/videos.yml"] {
+    let mut document = yerba::Document::parse(UNSORTED_TALKS).unwrap();
+
+    assert!(!yerbafile.apply_to_document(&mut document, excluded).unwrap(), "{}", excluded);
+    assert_eq!(document.get_all("[].id"), vec!["c", "film", "a"]);
+  }
+
+  let mut document = yerba::Document::parse(UNSORTED_TALKS).unwrap();
+
+  assert!(yerbafile.apply_to_document(&mut document, "data/euruko/euruko-2024/videos.yml").unwrap());
+  assert_eq!(document.get_all("[].id"), vec!["film", "a", "c"]);
+}
+
+#[test]
+fn test_rule_exclude_accepts_a_single_glob() {
+  let (_dir, yerbafile) = load_yerbafile(indoc! {r#"
+    rules:
+      - files: "data/**/videos.yml"
+        exclude: "data/euruko/**/videos.yml"
+        pipeline:
+          - sort:
+              by: ".time"
+  "#});
+
+  assert_eq!(yerbafile.rules[0].exclude, vec!["data/euruko/**/videos.yml"]);
+  assert!(yerbafile.rules[0].excludes("data/euruko/euruko-2012/videos.yml"));
+  assert!(!yerbafile.rules[0].matches("data/euruko/euruko-2012/videos.yml"));
+  assert!(yerbafile.rules[0].matches("data/rubykaigi/rubykaigi-2026/videos.yml"));
+}
+
+#[test]
+fn test_apply_skips_excluded_files() {
+  let dir = TempDir::new().unwrap();
+  let root = dir.path().to_string_lossy().to_string();
+
+  for event in ["kept", "excluded"] {
+    fs::create_dir_all(dir.path().join(event)).unwrap();
+    fs::write(dir.path().join(event).join("videos.yml"), UNSORTED_TALKS).unwrap();
+  }
+
+  fs::write(
+    dir.path().join("Yerbafile"),
+    format!(
+      indoc! {r#"
+      rules:
+        - files: "{root}/**/videos.yml"
+          exclude: "{root}/excluded/videos.yml"
+          pipeline:
+            - sort:
+                by: ".time"
+    "#},
+      root = root
+    ),
+  )
+  .unwrap();
+
+  let yerbafile = yerba::Yerbafile::load(dir.path().join("Yerbafile")).unwrap();
+  let results = yerbafile.apply(false);
+  let files: Vec<String> = results.iter().map(|result| result.file.clone()).collect();
+
+  assert_eq!(files, vec![format!("{}/kept/videos.yml", root)]);
+  assert!(results[0].changed);
+}

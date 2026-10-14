@@ -1,5 +1,63 @@
 use crate::selector::{Selector, SelectorSegment};
 
+/// Serializes `value` as JSON, writing non-finite floats as `NaN`, `Infinity` and `-Infinity`
+/// (which Ruby's `JSON.parse` reads with `allow_nan: true`) instead of dropping them to `null`.
+pub fn yaml_to_json_string_allowing_nan(value: &yaml_serde::Value) -> String {
+  let mut output = String::new();
+  write_json_allowing_nan(value, &mut output);
+  output
+}
+
+fn write_json_allowing_nan(value: &yaml_serde::Value, output: &mut String) {
+  match value {
+    yaml_serde::Value::Number(number) if number.is_nan() => output.push_str("NaN"),
+    yaml_serde::Value::Number(number) if number.is_infinite() => output.push_str(if number.as_f64().is_some_and(f64::is_sign_negative) {
+      "-Infinity"
+    } else {
+      "Infinity"
+    }),
+
+    yaml_serde::Value::Sequence(sequence) => {
+      output.push('[');
+
+      for (index, item) in sequence.iter().enumerate() {
+        if index > 0 {
+          output.push(',');
+        }
+
+        write_json_allowing_nan(item, output);
+      }
+
+      output.push(']');
+    }
+
+    yaml_serde::Value::Mapping(mapping) => {
+      output.push('{');
+
+      for (index, (key, item)) in mapping.iter().enumerate() {
+        if index > 0 {
+          output.push(',');
+        }
+
+        let key = match key {
+          yaml_serde::Value::String(string) => string.clone(),
+          _ => format!("{:?}", key),
+        };
+
+        output.push_str(&serde_json::Value::String(key).to_string());
+        output.push(':');
+        write_json_allowing_nan(item, output);
+      }
+
+      output.push('}');
+    }
+
+    yaml_serde::Value::Tagged(tagged) => write_json_allowing_nan(&tagged.value, output),
+
+    _ => output.push_str(&yaml_to_json(value).to_string()),
+  }
+}
+
 pub fn yaml_to_json(value: &yaml_serde::Value) -> serde_json::Value {
   match value {
     yaml_serde::Value::Null => serde_json::Value::Null,
@@ -7,6 +65,8 @@ pub fn yaml_to_json(value: &yaml_serde::Value) -> serde_json::Value {
 
     yaml_serde::Value::Number(number) => {
       if let Some(integer) = number.as_i64() {
+        serde_json::Value::Number(integer.into())
+      } else if let Some(integer) = number.as_u64() {
         serde_json::Value::Number(integer.into())
       } else if let Some(float) = number.as_f64() {
         serde_json::json!(float)

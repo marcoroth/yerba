@@ -47,8 +47,8 @@ use crate::QuoteStyle;
 use crate::syntax::{
   column_at, dedent_block_scalar, extract_scalar, extract_scalar_text, find_block_map, find_block_sequence, find_entry_by_key, find_flow_entry_by_key,
   find_flow_map, find_flow_sequence, find_scalar_token, first_collection, flow_map_entries, flow_sequence_entries, format_scalar_value, in_flow_collection,
-  is_map_key, is_yaml_non_string, line_at, line_start_at, preceding_whitespace_indent, preceding_whitespace_token, raw_scalar_value, removal_range,
-  FirstCollection, LineIndex, ScalarValue,
+  is_map_key, is_yaml_non_string, line_at, line_start_at, needs_quoting, needs_quoting_in_flow, preceding_whitespace_indent, preceding_whitespace_token,
+  raw_scalar_value, removal_range, FirstCollection, LineIndex, ScalarValue,
 };
 
 #[derive(Debug, Clone)]

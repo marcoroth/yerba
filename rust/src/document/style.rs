@@ -193,7 +193,7 @@ impl Document {
               continue;
             }
 
-            let new_text = match inline_quote_replacement(&raw_value, current_kind, value_style) {
+            let new_text = match inline_quote_replacement(&raw_value, current_kind, value_style, token_in_flow_collection(token)) {
               Some(new_text) => new_text,
               None => continue,
             };
@@ -910,10 +910,19 @@ impl Document {
                 }
 
                 QuoteStyle::Plain => {
-                  if is_multiline || trimmed.contains(':') || trimmed.contains('#') || trimmed.contains('"') || trimmed.contains('\'') {
+                  let has_special_characters = trimmed.contains(':') || trimmed.contains('#') || trimmed.contains('"') || trimmed.contains('\'');
+
+                  if is_multiline || has_special_characters || needs_quoting(trimmed) {
                     let offset: usize = token.text_range().start().into();
                     let line = line_at(&source, offset);
-                    let reason = if is_multiline { "multiline content" } else { "special characters" };
+
+                    let reason = if is_multiline {
+                      "multiline content"
+                    } else if has_special_characters {
+                      "special characters"
+                    } else {
+                      "a value that needs quotes"
+                    };
 
                     warnings.push(format!("line {}: skipped block scalar → plain ({} can't be plain)", line, reason));
 
@@ -981,7 +990,7 @@ impl Document {
           continue;
         }
 
-        let new_text = match inline_quote_replacement(&raw_value, current_kind, style) {
+        let new_text = match inline_quote_replacement(&raw_value, current_kind, style, token_in_flow_collection(&token)) {
           Some(new_text) => new_text,
           None => continue,
         };
@@ -1046,7 +1055,11 @@ fn block_scalar_indent(line_prefix: &str) -> usize {
   column + 2
 }
 
-fn inline_quote_replacement(raw_value: &str, current_kind: SyntaxKind, style: &QuoteStyle) -> Option<String> {
+fn token_in_flow_collection(token: &SyntaxToken) -> bool {
+  token.parent().is_some_and(|parent| in_flow_collection(&parent))
+}
+
+fn inline_quote_replacement(raw_value: &str, current_kind: SyntaxKind, style: &QuoteStyle, in_flow: bool) -> Option<String> {
   match style {
     QuoteStyle::Double => {
       if raw_value.contains('"') && current_kind == SyntaxKind::SINGLE_QUOTED_SCALAR {
@@ -1060,6 +1073,16 @@ fn inline_quote_replacement(raw_value: &str, current_kind: SyntaxKind, style: &Q
 
     QuoteStyle::Plain => {
       if raw_value.contains('"') || raw_value.contains('\'') || raw_value.contains(':') || raw_value.contains('#') {
+        return None;
+      }
+
+      let needs_quotes = if in_flow {
+        needs_quoting_in_flow(raw_value)
+      } else {
+        needs_quoting(raw_value)
+      };
+
+      if needs_quotes {
         return None;
       }
 

@@ -413,6 +413,76 @@ fn test_enforce_quotes_plain_strips_safe_values() {
 }
 
 #[test]
+fn test_enforce_quotes_plain_keeps_strings_that_would_change_type() {
+  let mut document = parse(indoc! {r#"
+    year: "2014"
+    price: '9.99'
+    enabled: "true"
+    nothing: "null"
+    date: "2026-01-01"
+    symbol: ":ruby"
+    name: "myapp"
+  "#});
+
+  document.enforce_quotes(&yerba::QuoteStyle::Plain).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      year: "2014"
+      price: '9.99'
+      enabled: "true"
+      nothing: "null"
+      date: "2026-01-01"
+      symbol: ":ruby"
+      name: myapp
+    "#}
+  );
+}
+
+#[test]
+fn test_enforce_quotes_plain_keeps_strings_with_flow_indicators_in_flow_collections() {
+  let mut document = parse(indoc! {r#"
+    tags: ["a, b", "c"]
+  "#});
+
+  document.enforce_quotes(&yerba::QuoteStyle::Plain).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      tags: ["a, b", c]
+    "#}
+  );
+}
+
+#[test]
+fn test_enforce_quotes_plain_at_sequence_keeps_nested_values_that_need_quotes() {
+  let mut document = parse(indoc! {r#"
+    - name: "Organizer"
+      users:
+        - "Jane Doe"
+        - name: "John Doe"
+          from: "2014"
+          to: "2022-06"
+  "#});
+
+  document.enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("[].users")).unwrap();
+
+  assert_eq!(
+    document.to_string(),
+    indoc! {r#"
+      - name: "Organizer"
+        users:
+          - Jane Doe
+          - name: John Doe
+            from: "2014"
+            to: 2022-06
+    "#}
+  );
+}
+
+#[test]
 fn test_enforce_quotes_double_with_plain_containing_quotes() {
   let mut document = parse("name: simple\n");
 
@@ -586,6 +656,22 @@ fn test_literal_multiline_to_plain_skipped() {
   document.enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("description")).unwrap();
 
   assert_eq!(document.to_string(), original);
+}
+
+#[test]
+fn test_literal_number_to_plain_skipped() {
+  let mut document = parse(indoc! {"
+    year: |-
+      2014
+  "});
+
+  let original = document.to_string();
+
+  let warnings = document.enforce_quotes_at(&yerba::QuoteStyle::Plain, Some("year")).unwrap();
+
+  assert_eq!(document.to_string(), original);
+  assert_eq!(warnings.len(), 1);
+  assert!(warnings[0].ends_with("skipped block scalar → plain (a value that needs quotes can't be plain)"));
 }
 
 #[test]
